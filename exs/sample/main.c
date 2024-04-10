@@ -9,11 +9,11 @@ void g() {
 void h() {
 }
 
-int Routine(int source, int data) {
-    if(source == 2) {
+int Routine(int srcRank, int data) { // changes its behavior based on the source and the data
+    if(srcRank == 2) {
         printf("option 1\n");
         f();
-    } else {
+    } else { // getting the data from rank 1
         if(data % 2 == 0) {
             printf("option 2\n");
             g();
@@ -25,19 +25,18 @@ int Routine(int source, int data) {
     return 0;
 }
 
-// this is the main process
+// this is the master process
 int rank0(int rank) {
     int data = 42;
 
     MPI_Status status;
 
-    MPI_Recv(&data, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,  &status);
-    printf("Process %d received data %d from Process %d\n", rank, data, status.MPI_SOURCE);
-    Routine(status.MPI_SOURCE, data);
-
-    MPI_Recv(&data, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,  &status);
-    printf("Process %d received data %d from Process %d\n", rank, data, status.MPI_SOURCE);
-    Routine(status.MPI_SOURCE, data);
+    for(unsigned i = 0; i < 2; i++) {
+        // we want to force the order of communication to find the points of divergence because of input changes 
+        MPI_Recv(&data, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,  &status);
+        printf("Process %d received data %d from Process %d\n", rank, data, status.MPI_SOURCE);
+        Routine(status.MPI_SOURCE, data);
+    }
 
     return 0;
 }
@@ -56,14 +55,14 @@ int rank1(char *filename, int rank) {
     buf[size - 1] = '\0';
     fclose(fp);
     data = data + atoi(buf);
-    MPI_Send(&data, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+    MPI_Send(&data, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); // sends the message to rank 0
     return 0;
 }
 
 // this process just receives the message from rank0 and waits a little and pass it back 
 int rank2(int rank) {
     int data = 42;
-    MPI_Send(&data, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+    MPI_Send(&data, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); // sends 42 to rank 0
     return 0;
 }
 
@@ -74,12 +73,12 @@ int main(int argc, char** argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   if (rank == 0) {
-      rank0(rank);
+      rank0(rank); // master
   } else if (rank == 1) {
       char *filename = argv[1];
-      rank1(filename, rank);
+      rank1(filename, rank); // worker1 
   } else {
-      rank2(rank);
+      rank2(rank); // worker2
   }
 
   MPI_Finalize();
