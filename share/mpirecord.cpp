@@ -6,24 +6,11 @@
 #include <dlfcn.h>
 #include <mpi.h>
 
+#include "tools.h"
 
 using namespace std;
-FILE *recordFile = nullptr;
-
-#ifdef DEBUG_MODE
-#define DEBUG(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
-#else 
-#define DEBUG(fmt, ...)
-#endif
-/* extern "C" { */
-/*     void preprocess(const char *dummy); */
-/*     void printBBname(const char *name); */
-/*     void printFuncCall(const char *name); */
-/*     void printReturn(const char *name); */
-/*     void endMain(const char *dummy); */
-/* } */
-
-/* extern vector<FILE *> recordFiles(16, nullptr); */
+static FILE *recordFile = nullptr;
+static map<MPI_Request *, string> __requests;
 
 static int (*original_MPI_Init)(
     int *argc, 
@@ -33,10 +20,6 @@ static int (*original_MPI_Init)(
 static int (*original_MPI_Finalize)(
     void
 ) = NULL;
-
-/* #ifdef __RECORD__MPIFUNCS__ */
-
-/* static map<MPI_Request *, mpirq> requests; */
 
 static int (*original_MPI_Recv)(
     void *buf, 
@@ -209,6 +192,7 @@ int MPI_Irecv(
     int ret = original_MPI_Irecv(buf, count, datatype, source, tag, comm, request);
     // I just need to keep track of the request
     fprintf(recordFile, "MPI_Irecv:%d:%d:%p\n", rank, source, request);
+    __requests[request] = "MPI_Irecv";
     return ret;
 }
 
@@ -230,6 +214,7 @@ int MPI_Isend(
     int ret = original_MPI_Isend(buf, count, datatype, dest, tag, comm, request);
     // I just need to keep track of the request
     fprintf(recordFile, "MPI_Isend:%d:%d:%p\n", rank, dest, request);
+    __requests[request] = "MPI_Isend";
     return ret;
 }
 
@@ -242,9 +227,11 @@ int MPI_Cancel(
     }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_ASSERT(__requests.find(request) != __requests.end());
     int ret = original_MPI_Cancel(request);
     // I just need to keep track that it is cancelled
     fprintf(recordFile, "MPI_Cancel:%d:%p\n", rank, request);
+    __requests.erase(request);
     return ret;
 }
 
@@ -259,6 +246,7 @@ int MPI_Test(
         original_MPI_Test = reinterpret_cast<int (*)(MPI_Request *, int *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Test"));
     }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_ASSERT(__requests.find(request) != __requests.end());
     MPI_Status stat;
     int ret = original_MPI_Test(request, flag, &stat);
     if(status != MPI_STATUS_IGNORE) {
@@ -268,6 +256,7 @@ int MPI_Test(
     // record if the request was completed or not 
     if(*flag) {
         fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS\n", rank, request);
+        __requests.erase(request);
     } else {
         fprintf(recordFile, "MPI_Test:%d:%p:FAIL\n", rank, request);
     }
@@ -368,7 +357,9 @@ int MPI_Testsome(
     if(*outcount > 0) {
         for(int i = 0; i < *outcount; i++) {
             int ind = array_of_indices[i];
+            MPI_ASSERT(__requests.find(&array_of_requests[ind]) != __requests.end());
             fprintf(recordFile, ":%p", &(array_of_requests[ind])); 
+            __requests.erase(&array_of_requests[ind]);
         }
     }
     fprintf(recordFile, "\n");
@@ -393,62 +384,56 @@ int MPI_Testsome(
 /*     return ret; */
 /* } */
 
-/* // haven't tested this yet */
-/* int MPI_Wait( */
-/*     MPI_Request *request, */ 
-/*     MPI_Status *status */
-/* ) { */
-/*     int rank; */
-/*     if(!original_MPI_Wait) { */
-/*         original_MPI_Wait = reinterpret_cast<int (*)(MPI_Request *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Wait")); */
-/*     } */
-/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-/*     MPI_Status stat; */
-/*     int ret = original_MPI_Wait(request, &stat); */
-/*     if(status != MPI_STATUS_IGNORE) { */
-/*         *status = stat; */
-/*     } */
-/*     string req = "void"; */
-/*     if(requests.find(request) == requests.end()) { */
-/*         fprintf(stderr, "request not found on MPI_Wait\n"); */
-/*     } else { */
-/*         req = requests[request].name; */
-/*         requests.erase(request); */
-/*     } */
-/*     fprintf(stderr, "MPI_Wait:%s:%d:%d:%p\n", req.c_str(), rank, stat.MPI_SOURCE, request); */
-/*     return ret; */
-/* } */
+int MPI_Wait(
+    MPI_Request *request, 
+    MPI_Status *status
+) {
+    int rank;
+    if(!original_MPI_Wait) {
+        original_MPI_Wait = reinterpret_cast<int (*)(MPI_Request *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Wait"));
+    }
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Status stat;
+    int ret = original_MPI_Wait(request, &stat);
+    if(status != MPI_STATUS_IGNORE) {
+        *status = stat;
+    }
+    MPI_ASSERT(__requests.find(request) != __requests.end());
+    string req = __requests[request];
+    __requests.erase(request);
 
-/* // haven't tested this yet */
-/* int MPI_Waitany( */
-/*     int count, */ 
-/*     MPI_Request array_of_requests[], */ 
-/*     int *index, */ 
-/*     MPI_Status *status */
-/* ) { */
-/*     int rank; */
-/*     if(!original_MPI_Waitany) { */
-/*         original_MPI_Waitany = reinterpret_cast<int (*)(int, MPI_Request *, int *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Waitany")); */
-/*     } */
-/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-/*     MPI_Status stat; */
-/*     int ret = original_MPI_Waitany(count, array_of_requests, index, &stat); */
-/*     if(status != MPI_STATUS_IGNORE) { */
-/*         *status = stat; */
-/*     } */
+    fprintf(recordFile, "MPI_Wait:%d:%p\n", rank, request);
+    MPI_ASSERT(ret == MPI_SUCCESS);
+    return ret;
+}
 
-/*     if(*index != MPI_UNDEFINED) { */
-/*         string req = "void"; */
-/*         if(requests.find(&array_of_requests[*index]) == requests.end()) { */
-/*             fprintf(stderr, "request not found on MPI_Waitany\n"); */
-/*         } else { */
-/*             req = requests[&array_of_requests[*index]].name; */
-/*             requests.erase(&array_of_requests[*index]); */
-/*         } */
-/*         fprintf(stderr, "MPI_Waitany:%s:%d:%d\n", req.c_str(), rank, stat.MPI_SOURCE); */
-/*     } */
-/*     return ret; */
-/* } */
+int MPI_Waitany(
+    int count, 
+    MPI_Request array_of_requests[], 
+    int *index, 
+    MPI_Status *status
+) {
+    int rank;
+    if(!original_MPI_Waitany) {
+        original_MPI_Waitany = reinterpret_cast<int (*)(int, MPI_Request *, int *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Waitany"));
+    }
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Status stat;
+    int ret = original_MPI_Waitany(count, array_of_requests, index, &stat);
+    if(status != MPI_STATUS_IGNORE) {
+        *status = stat;
+    }
+
+    if(*index == MPI_UNDEFINED) {
+        fprintf(recordFile, "MPI_Waitany:%d:FAIL\n", rank);
+    } else {
+        MPI_ASSERT(__requests.find(&array_of_requests[*index]) != __requests.end());
+        string req = __requests[&array_of_requests[*index]];
+        fprintf(recordFile, "MPI_Waitany:%d:SUCCESS:%p\n", rank, &array_of_requests[*index]);
+    }
+
+    return ret;
+}
 
 /* int MPI_Waitall( */
 /*     int count, */ 
@@ -532,65 +517,6 @@ int MPI_Testsome(
 /*     return ret; */
 /* } */
 
-/* #endif // __RECORD__MPIFUNCS__ */
-
-/* // open a record file */
-/* int MPI_Init( */
-/*     int *argc, */ 
-/*     char ***argv */
-/* ) { */
-/*     if(!original_MPI_Init) { */
-/*         original_MPI_Init = reinterpret_cast<int (*)(int *, char ***)>(dlsym(RTLD_NEXT, "MPI_Init")); */
-/*     } */
-/*     int ret = original_MPI_Init(argc, argv); */
-/*     /1* int rank; *1/ */
-/*     /1* MPI_Comm_rank(MPI_COMM_WORLD, &rank); *1/ */
-/*     /1* int size; *1/ */
-/*     /1* MPI_Comm_size(MPI_COMM_WORLD, &size); *1/ */
-/*     /1* if(size > 16) { *1/ */
-/*     /1*     fprintf(stderr, "MPI_Init: too many processes\n"); *1/ */
-/*     /1*     MPI_Abort(MPI_COMM_WORLD, 1); *1/ */
-/*     /1* } *1/ */
-/*     /1* string filename = ".record_" + to_string(rank) + ".tr"; *1/ */
-/*     /1* recordFiles[rank] = fopen(filename.c_str(), "w"); *1/ */
-/*     /1* if(recordFiles[rank] == NULL) { *1/ */
-/*     /1*     fprintf(stderr, "MPI_Init: failed to open record file\n"); *1/ */
-/*     /1*     MPI_Abort(MPI_COMM_WORLD, 1); *1/ */
-/*     /1* } *1/ */
-    
-/*     return ret; */
-/* } */
-
-/* int MPI_Finalize( */
-/*     void */
-/* ) { */
-/*     if(!original_MPI_Finalize) { */
-/*         original_MPI_Finalize = reinterpret_cast<int (*)(void)>(dlsym(RTLD_NEXT, "MPI_Finalize")); */
-/*     } */
-/*     /1* int rank; *1/ */
-/*     /1* MPI_Comm_rank(MPI_COMM_WORLD, &rank); *1/ */
-/*     int ret = original_MPI_Finalize(); */
-/*     /1* if(recordFiles[rank] != NULL) { *1/ */
-/*     /1*     fclose(recordFiles[rank]); *1/ */
-/*     /1* } *1/ */
-/*     return ret; */
-/* } */
-
-/* void __attribute__((constructor)) init(void) { */
-/*     fprintf(stderr, "MPI record library loaded\n"); */
-/*     recordFile = fopen("./record.txt", "w"); */
-/*     if(recordFile == nullptr) { */
-/*         fprintf(stderr, "failed to open record file\n"); */
-/*         MPI_Abort(MPI_COMM_WORLD, 1); */
-/*     } */
-/* } */
-
-/* void __attribute__((destructor)) fini(void) { */
-/*     if(recordFile != nullptr) { */
-/*         fprintf(recordFile, "end of record\n"); */
-/*         fclose(recordFile); */
-/*     } */
-/* } */
 
 // MPI_Gather does not really show the way to create non-determinism, so I would just let it be
 // same for MPI_Barrier

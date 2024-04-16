@@ -1,10 +1,10 @@
 
 .PHONY: clean all
 SHARED_LIB = libmpirecord.so libmpireplay.so
-LD_FLAGS = -ldl -lmpi
+LD_FLAGS = -ldl 
 CC = mpicc
 CXX = mpicxx
-SRCS = mpirecord.cpp mpireplay.cpp parse.cpp
+SRCS = mpirecord.cpp mpireplay.cpp tools.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 all: $(SHARED_LIB)
@@ -12,7 +12,7 @@ all: $(SHARED_LIB)
 libmpirecord.so: mpirecord.o
 	$(CXX) -shared -fPIC -o $@ $^ $(LD_FLAGS)
 
-libmpireplay.so: mpireplay.o parse.o
+libmpireplay.so: mpireplay.o tools.o
 	$(CXX) -shared -fPIC -o $@ $^ $(LD_FLAGS)
 
 %.o: %.cpp
