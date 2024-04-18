@@ -13,6 +13,8 @@
 #include <algorithm>
 
 #include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include "tools.h"
 
 
@@ -121,4 +123,7 @@ static int (*original_MPI_Cancel)(
     MPI_Request *request
 ) = nullptr;
 
+static int (*original_MPI_Barrier)(
+    MPI_Comm comm
+) = nullptr;
 #endif // MPIRECORDREPLAY_H

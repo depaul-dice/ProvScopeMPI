@@ -31,7 +31,7 @@
 #else
 #define DEBUG(...)
 #define DEBUG0(...)
-#endif
+#endif // DEBUG_MODE
 
 std::vector<std::string> parse(std::string& line, char delimit);
 // returns the rank where you got the message from

@@ -30,7 +30,7 @@ int MPI_Finalize(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(recordFile != nullptr) {
-        DEBUG(stderr, "end of record at %d\n", rank);
+        DEBUG0("end of record at %d\n", rank);
         fclose(recordFile);
     } 
     if(!original_MPI_Finalize) {
@@ -246,7 +246,7 @@ int MPI_Testsome(
         for(int i = 0; i < *outcount; i++) {
             int ind = array_of_indices[i];
             MPI_ASSERT(__requests.find(&array_of_requests[ind]) != __requests.end());
-            fprintf(recordFile, ":%p:%d", &(array_of_requests[ind]), stats[ind].MPI_SOURCE); 
+            fprintf(recordFile, ":%p:%d", &(array_of_requests[ind]), array_of_statuses[i].MPI_SOURCE); 
             __requests.erase(&array_of_requests[ind]);
         }
     }
@@ -287,7 +287,7 @@ int MPI_Wait(
         *status = stat;
     }
     MPI_ASSERT(__requests.find(request) != __requests.end());
-    string req = __requests[request];
+    /* string req = __requests[request]; */
     __requests.erase(request);
 
     if(ret == MPI_SUCCESS) {
@@ -319,7 +319,7 @@ int MPI_Waitany(
         fprintf(recordFile, "MPI_Waitany:%d:FAIL\n", rank);
     } else {
         MPI_ASSERT(__requests.find(&array_of_requests[*index]) != __requests.end());
-        string req = __requests[&array_of_requests[*index]];
+        /* string req = __requests[&array_of_requests[*index]]; */
         fprintf(recordFile, "MPI_Waitany:%d:SUCCESS:%p:%d\n", rank, &array_of_requests[*index], stat.MPI_SOURCE);
     }
 

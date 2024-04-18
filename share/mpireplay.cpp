@@ -9,7 +9,8 @@
 
 static vector<string> orders;
 static unsigned __order_index = 0;
-static map<string, MPI_Request *> __requests;
+static unordered_map<string, MPI_Request *> __requests;
+static unordered_set<MPI_Request *> __isends;
 
 int MPI_Init(
     int *argc, 
@@ -102,7 +103,7 @@ int MPI_Irecv(
     /* int ret = original_MPI_Irecv(buf, count, datatype, source, tag, comm, request); */
     // I just need to keep track of the request
     vector<string> msgs = parse(orders[__order_index++], ':');
-    DEBUG0("MPI_Irecv: %s -> %p\n", msgs[3].c_str(), request);
+    DEBUG0("MPI_Irecv: %s -> %p", msgs[3].c_str(), request);
     MPI_ASSERT(msgs[0] == "MPI_Irecv");
     MPI_ASSERT(stoi(msgs[1]) == rank);
     MPI_ASSERT(stoi(msgs[2]) == source);
@@ -110,7 +111,11 @@ int MPI_Irecv(
     __requests[msgs[3]] = request;
     if(source == MPI_ANY_SOURCE) {
         source = lookahead(orders, __order_index, msgs[3]);
+        DEBUG0(":ANY_SOURCE to %d\n", source);
+        // -1 means was not able to find the right source, -2 means it was cancelled
         MPI_ASSERT(source != -1);
+    } else {
+        DEBUG0(":%d\n", source);
     }
     return original_MPI_Irecv(buf, count, datatype, source, tag, comm, request);
 }
@@ -138,13 +143,14 @@ int MPI_Isend(
     MPI_ASSERT(stoi(msgs[2]) == dest);
     MPI_ASSERT(__requests.find(msgs[3]) == __requests.end());
     __requests[msgs[3]] = request;
+    __isends.insert(request);
     return ret;
 }
 
 int MPI_Cancel(
     MPI_Request *request
 ) {
-    DEBUG0("MPI_Cancel\n");
+    DEBUG0("MPI_Cancel:%p\n", request);
     if(!original_MPI_Cancel) {
         original_MPI_Cancel = reinterpret_cast<int (*)(MPI_Request *)>(dlsym(RTLD_NEXT, "MPI_Cancel"));
     }
@@ -159,6 +165,9 @@ int MPI_Cancel(
     MPI_ASSERT(__requests.find(msgs[2]) != __requests.end());
     MPI_ASSERT(__requests[msgs[2]] == request);
     __requests.erase(msgs[2]);
+    if(__isends.find(request) != __isends.end()) {
+        __isends.erase(request);
+    }
 
     return ret;
 }
@@ -185,8 +194,11 @@ int MPI_Test(
     if(msgs[3] == "SUCCESS") {
         // call wait and make sure it succeeds
         DEBUG0(":SUCCESS:%p\n", request);
-        MPI_ASSERT(status->MPI_SOURCE == src);
         ret = original_MPI_Wait(request, status);
+        if(__isends.find(request) != __isends.end()) {
+            __isends.erase(request);
+        }
+        MPI_ASSERT(status->MPI_SOURCE == src);
         __requests.erase(msgs[2]);
         *flag = 1;
     } else {
@@ -215,7 +227,7 @@ int MPI_Testsome(
     MPI_ASSERT(msgs[0] == "MPI_Testsome");
     MPI_ASSERT(stoi(msgs[1]) == myrank);
     int oc = stoi(msgs[2]);
-    MPI_ASSERT(msgs.size() == oc + 3);
+    MPI_ASSERT(msgs.size() == oc * 2 + 3);
     if(oc == 0) {
         // don't do anything
         DEBUG0(":0\n");
@@ -244,7 +256,15 @@ int MPI_Testsome(
             MPI_ASSERT(ret == MPI_SUCCESS);
             __requests.erase(msgs[3 + 2 * i]);
             array_of_indices[i] = ind;
-            MPI_ASSERT(src == stat.MPI_SOURCE);
+            if(__isends.find(req) != __isends.end()) {
+                __isends.erase(req);
+            } else {
+                if(src != stat.MPI_SOURCE) {
+                    DEBUG0("MPI_Testsome: for request[%p], src[%d] != stat.MPI_SOURCE[%d]\n", \
+                            req, src, stat.MPI_SOURCE);
+                }
+                MPI_ASSERT(src == stat.MPI_SOURCE);
+            }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(&array_of_statuses[i], &stat, sizeof(MPI_Status));
             }
@@ -288,7 +308,10 @@ int MPI_Waitany(
     int *index, 
     MPI_Status *status
 ) {
-    DEBUG0("MPI_Waitany\n");
+    DEBUG0("MPI_Waitany");
+    for(int i = 0; i < count; i++) {
+        DEBUG0(":%p", &array_of_requests[i]);
+    }
     if(!original_MPI_Wait) {
         original_MPI_Wait = reinterpret_cast<int (*)(MPI_Request *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Wait"));
     }
@@ -300,11 +323,18 @@ int MPI_Waitany(
     MPI_ASSERT(stoi(msgs[1]) == rank);
     if(msgs[2] == "SUCCESS") {
         MPI_ASSERT(__requests.find(msgs[3]) != __requests.end());
+        *index = __requests[msgs[3]] - array_of_requests;
+        /* if(__requests[msgs[3]] != &array_of_requests[*index]) { */
+            /* DEBUG0("MPI_Waitany: __requests[%s] = %p != &array_of_requests[%d] = %p\n", msgs[3].c_str(), __requests[msgs[3]], *index, &array_of_requests[*index]); */
+        /* } */
+        DEBUG0(":SUCCESS:%d\n", *index);
+        MPI_ASSERT(0 <= *index && *index < count);
         MPI_ASSERT(__requests[msgs[3]] == &array_of_requests[*index]);
         __requests.erase(msgs[3]);
         ret = original_MPI_Wait(&array_of_requests[*index], status);
         MPI_ASSERT(ret == MPI_SUCCESS);
     } else {
+        DEBUG0(":FAIL\n");
         MPI_ASSERT(msgs[2] == "FAIL");
     }
 

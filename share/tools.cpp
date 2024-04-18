@@ -69,7 +69,15 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
         } else if (tokens[0] == "MPI_Waitsome") {
             // have not implemented this yet
             MPI_ASSERT(false);
+        } else if (tokens[0] == "MPI_Cancel") {
+            // MPI_Cancel:rank:request
+            if(tokens[2] == request) {
+                return -2;
+            }
+        } else {
+            // do nothing
         } 
+
         // if not, just continue
     }
     return -1;

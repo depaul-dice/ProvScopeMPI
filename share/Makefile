@@ -13,10 +13,10 @@ libmpirecord.so: mpirecord.o tools.o
 	$(CXX) -shared -fPIC -o $@ $^ $(LD_FLAGS)
 
 libmpireplay.so: mpireplay.o tools.o 
-	$(CXX) -shared -fPIC -o $@ $^ $(LD_FLAGS)
+	$(CXX) -shared -fPIC -DDEBUG_MODE -o $@ $^ $(LD_FLAGS)
 
 %.o: %.cpp
-	$(CXX) -c -fPIC -o $@ $<
+	$(CXX) -c -fPIC -DDEBUG_MODE -o $@ $<
 
 clean:
 	rm -f *.o $(SHARED_LIB)
