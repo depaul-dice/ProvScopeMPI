@@ -4,6 +4,8 @@
 
 #include <vector>
 #include <string>
+#include <set>
+#include <mpi.h>
 
 #define MPI_ASSERT(CONDITION) \
     do { \
@@ -32,5 +34,9 @@
 #endif
 
 std::vector<std::string> parse(std::string& line, char delimit);
+// returns the rank where you got the message from
+int lookahead(std::vector<std::string>& orders, unsigned start, std::string& request);
+
 
 #endif // PARSE_H
+       

@@ -1,119 +1,7 @@
-//#define _GNU_SOURCE
-#include <cstdio>
-#include <cstdarg>
-#include <string>
-#include <vector>
-#include <dlfcn.h>
-#include <mpi.h>
+#include "mpirecordreplay.h"
 
-#include "tools.h"
-
-using namespace std;
 static FILE *recordFile = nullptr;
 static map<MPI_Request *, string> __requests;
-
-static int (*original_MPI_Init)(
-    int *argc, 
-    char ***argv
-) = NULL;
-
-static int (*original_MPI_Finalize)(
-    void
-) = NULL;
-
-static int (*original_MPI_Recv)(
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
-    MPI_Status *status
-) = NULL;
-
-static int (*original_MPI_Irecv)(
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
-    MPI_Request *request
-) = NULL;
-
-static int (*original_MPI_Isend)(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
-    MPI_Request *request
-) = NULL;
-
-static int (*original_MPI_Test)(
-    MPI_Request *request, 
-    int *flag, 
-    MPI_Status *status
-) = NULL;
-
-static int (*original_MPI_Testany)(
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *index, 
-    int *flag, 
-    MPI_Status *status
-) = NULL;
-
-static int (*original_MPI_Testall)(
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *flag, 
-    MPI_Status array_of_statuses[]
-) = NULL;
-
-static int (*original_MPI_Testsome)(
-    int incount, 
-    MPI_Request array_of_requests[], 
-    int *outcount, 
-    int array_of_indices[], 
-    MPI_Status array_of_statuses[]
-) = NULL;
-
-static int (*original_MPI_Test_cancelled)(
-    const MPI_Status *status, 
-    int *flag
-) = NULL;
-
-static int (*original_MPI_Wait)(
-    MPI_Request *request, 
-    MPI_Status *status
-) = NULL;
-
-static int (*original_MPI_Waitany)(
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *index, 
-    MPI_Status *status
-) = NULL;
-
-static int (*original_MPI_Waitall)(
-    int count, 
-    MPI_Request array_of_requests[], 
-    MPI_Status array_of_statuses[]
-) = NULL;
-
-static int (*original_MPI_Waitsome)(
-    int incount, 
-    MPI_Request array_of_requests[], 
-    int *outcount, 
-    int array_of_indices[], 
-    MPI_Status array_of_statuses[]
-) = NULL;
-
-static int (*original_MPI_Cancel)(
-    MPI_Request *request
-) = NULL;
 
 int MPI_Init(
     int *argc, 
@@ -255,7 +143,7 @@ int MPI_Test(
 
     // record if the request was completed or not 
     if(*flag) {
-        fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS\n", rank, request);
+        fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS:%d\n", rank, request, stat.MPI_SOURCE);
         __requests.erase(request);
     } else {
         fprintf(recordFile, "MPI_Test:%d:%p:FAIL\n", rank, request);
@@ -358,7 +246,7 @@ int MPI_Testsome(
         for(int i = 0; i < *outcount; i++) {
             int ind = array_of_indices[i];
             MPI_ASSERT(__requests.find(&array_of_requests[ind]) != __requests.end());
-            fprintf(recordFile, ":%p", &(array_of_requests[ind])); 
+            fprintf(recordFile, ":%p:%d", &(array_of_requests[ind]), stats[ind].MPI_SOURCE); 
             __requests.erase(&array_of_requests[ind]);
         }
     }
@@ -402,8 +290,11 @@ int MPI_Wait(
     string req = __requests[request];
     __requests.erase(request);
 
-    fprintf(recordFile, "MPI_Wait:%d:%p\n", rank, request);
-    MPI_ASSERT(ret == MPI_SUCCESS);
+    if(ret == MPI_SUCCESS) {
+        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d\n", rank, request, stat.MPI_SOURCE);
+    } else {
+        fprintf(recordFile, "MPI_Wait:%d:%p:FAIL\n", rank, request);
+    }
     return ret;
 }
 
@@ -429,7 +320,7 @@ int MPI_Waitany(
     } else {
         MPI_ASSERT(__requests.find(&array_of_requests[*index]) != __requests.end());
         string req = __requests[&array_of_requests[*index]];
-        fprintf(recordFile, "MPI_Waitany:%d:SUCCESS:%p\n", rank, &array_of_requests[*index]);
+        fprintf(recordFile, "MPI_Waitany:%d:SUCCESS:%p:%d\n", rank, &array_of_requests[*index], stat.MPI_SOURCE);
     }
 
     return ret;
