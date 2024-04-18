@@ -59,6 +59,16 @@ static int (*original_MPI_Isend)(
     MPI_Request *request
 ) = nullptr;
 
+static int (*original_MPI_Irsend)(
+    const void *buf, 
+    int count, 
+    MPI_Datatype datatype, 
+    int dest, 
+    int tag, 
+    MPI_Comm comm, 
+    MPI_Request *request
+) = nullptr;
+
 static int (*original_MPI_Test)(
     MPI_Request *request, 
     int *flag, 
@@ -117,6 +127,50 @@ static int (*original_MPI_Waitsome)(
     int *outcount, 
     int array_of_indices[], 
     MPI_Status array_of_statuses[]
+) = nullptr;
+
+static int (*original_MPI_Probe)(
+    int source, 
+    int tag, 
+    MPI_Comm comm, 
+    MPI_Status *status
+) = nullptr;
+
+static int (*original_MPI_Iprobe)(
+    int source, 
+    int tag, 
+    MPI_Comm comm, 
+    int *flag, 
+    MPI_Status *status
+) = nullptr;
+
+static int (*original_MPI_Send_init)(
+    const void *buf, 
+    int count, 
+    MPI_Datatype datatype, 
+    int dest, 
+    int tag, 
+    MPI_Comm comm, 
+    MPI_Request *request
+) = nullptr;
+
+static int (*original_MPI_Recv_init)(
+    void *buf, 
+    int count, 
+    MPI_Datatype datatype, 
+    int source, 
+    int tag, 
+    MPI_Comm comm, 
+    MPI_Request *request
+) = nullptr;
+
+static int (*original_MPI_Start)(
+    MPI_Request *request
+) = nullptr;
+
+static int (*original_MPI_Startall)(
+    int count, 
+    MPI_Request array_of_requests[]
 ) = nullptr;
 
 static int (*original_MPI_Cancel)(
