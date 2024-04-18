@@ -212,33 +212,51 @@ int MPI_Testall(
     int *flag, 
     MPI_Status array_of_statuses[]
 ) {
+    DEBUG0("MPI_Testall\n");
     int rank;
-    if(!original_MPI_Testsome) {
-        original_MPI_Testsome = reinterpret_cast<int (*)(int, MPI_Request *, int *, int *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Testsome"));
+    if(!original_MPI_Testall) {
+        original_MPI_Testall = reinterpret_cast<int (*)(int, MPI_Request *, int *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Testall"));
     }
+    /* if(!original_MPI_Testsome) { */
+    /*     original_MPI_Testsome = reinterpret_cast<int (*)(int, MPI_Request *, int *, int *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Testsome")); */
+    /* } */
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int outcount; 
     int indices [count];
     MPI_Status stats [count];
-    int ret = original_MPI_Testsome(count, array_of_requests, &outcount, indices, stats);
-    MPI_ASSERT(ret == MPI_SUCCESS);
-    /* int ret = original_MPI_Testall(count, array_of_requests, flag, stats); */
-    if(array_of_statuses != MPI_STATUSES_IGNORE) {
-        for(int i = 0; i < count; i++) {
-            /* array_of_statuses[i] = stats[i]; */
-            memcpy(&array_of_statuses[i], &stats[i], sizeof(MPI_Status));
-        }
-    }
 
-    fprintf(recordFile, "MPI_Testall:%d:%d", rank, outcount);
-    for(int i = 0; i < outcount; i++) {
-        MPI_ASSERT(__requests.find(&array_of_requests[indices[i]]) != __requests.end());
-        fprintf(recordFile, ":%p:%d", &array_of_requests[indices[i]], stats[indices[i]].MPI_SOURCE);
-        __requests.erase(&array_of_requests[indices[i]]);
+    int ret = original_MPI_Testall(count, array_of_requests, flag, stats);
+    MPI_ASSERT(ret == MPI_SUCCESS);
+
+    fprintf(recordFile, "MPI_Testall:%d:%d", rank, count);
+    if(*flag) {
+        for(int i = 0; i < count; i++) {
+            MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
+            fprintf(recordFile, ":%p:%d", &array_of_requests[i], stats[i].MPI_SOURCE);
+            if(array_of_statuses != MPI_STATUSES_IGNORE) 
+                memcpy(&array_of_statuses[i], &stats[i], sizeof(MPI_Status));
+            __requests.erase(&array_of_requests[i]);
+        }
+    } else {
     }
     fprintf(recordFile, "\n");
 
-    *flag = (outcount == count);
+    // so testsome only gives out how many it received from each call and not the tally
+    /* int ret = original_MPI_Testsome(count, array_of_requests, &outcount, indices, stats); */
+    /* MPI_ASSERT(ret == MPI_SUCCESS); */
+    /* DEBUG0("MPI_Testall:%d:%d:%d\n", rank, count, outcount); */
+    /* fprintf(recordFile, "MPI_Testall:%d:%d:%d", rank, count, outcount); */
+    /* for(int i = 0; i < outcount; i++) { */
+    /*     MPI_ASSERT(__requests.find(&array_of_requests[indices[i]]) != __requests.end()); */
+    /*     fprintf(recordFile, ":%p:%d", &array_of_requests[indices[i]], stats[indices[i]].MPI_SOURCE); */
+    /*     memcpy(&array_of_statuses[indices[i]], &stats[indices[i]], sizeof(MPI_Status)); */
+    /*     __requests.erase(&array_of_requests[indices[i]]); */
+    /* } */
+    /* fprintf(recordFile, "\n"); */
+    /* if(outcount == count) *flag = 1; */
+    /* else *flag = 0; */
+
     return ret;
 }
 
@@ -250,7 +268,7 @@ int MPI_Testsome(
     MPI_Status array_of_statuses[]
 ) {
     // record which of the requests were filled in this
-    DEBUG("MPI_Testsome\n");
+    DEBUG0("MPI_Testsome\n");
     int rank;
     if(!original_MPI_Testsome) {
         original_MPI_Testsome = reinterpret_cast<int (*)(int, MPI_Request *, int *, int *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Testsome"));
@@ -423,6 +441,7 @@ int MPI_Probe (
     MPI_Status *status
 ) {
     int rank;
+    DEBUG("MPI_Probe\n");
     if(!original_MPI_Probe) {
         original_MPI_Probe = reinterpret_cast<int (*)(int, int, MPI_Comm, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Probe"));
     }
@@ -444,6 +463,7 @@ int MPI_Iprobe (
     MPI_Status *status
 ) {
     int rank;
+    DEBUG0("MPI_Iprobe\n");
     if(!original_MPI_Iprobe) {
         original_MPI_Iprobe = reinterpret_cast<int (*)(int, int, MPI_Comm, int *, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Iprobe"));
     }
