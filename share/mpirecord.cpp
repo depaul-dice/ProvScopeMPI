@@ -231,6 +231,7 @@ int MPI_Testall(
 
     fprintf(recordFile, "MPI_Testall:%d:%d", rank, count);
     if(*flag) {
+        fprintf(recordFile, ":SUCCESS");
         for(int i = 0; i < count; i++) {
             MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
             fprintf(recordFile, ":%p:%d", &array_of_requests[i], stats[i].MPI_SOURCE);
@@ -239,6 +240,7 @@ int MPI_Testall(
             __requests.erase(&array_of_requests[i]);
         }
     } else {
+        fprintf(recordFile, ":FAIL");
     }
     fprintf(recordFile, "\n");
 
@@ -381,13 +383,11 @@ int MPI_Waitall(
     MPI_Status stats [count];
     int ret = original_MPI_Waitall(count, array_of_requests, stats);
     MPI_ASSERT(ret == MPI_SUCCESS);
-    if(array_of_statuses != MPI_STATUSES_IGNORE) {
-        for(int i = 0; i < count; i++) {
-            array_of_statuses[i] = stats[i];
-        }
-    }
     fprintf(recordFile, "MPI_Waitall:%d:%d", rank, count);
     for(int i = 0; i < count; i++) {
+        if(array_of_statuses != MPI_STATUSES_IGNORE) {
+            memcpy(&array_of_statuses[i], &stats[i], sizeof(MPI_Status));
+        }
         fprintf(recordFile, ":%p:%d", &array_of_requests[i], stats[i].MPI_SOURCE);
     }
     fprintf(recordFile, "\n");
@@ -434,6 +434,7 @@ int MPI_Waitall(
 /* } */
 
 // not sure if these are actually necessary
+// we can check for MPI_Comm too later
 int MPI_Probe (
     int source, 
     int tag, 
