@@ -28,6 +28,14 @@ namespace {
         static char ID;
         bbprinter() : FunctionPass(ID) {}
 
+        bool isEntryBlock(const BasicBlock &bb) {
+            return &bb == &bb.getParent()->getEntryBlock();
+        }
+
+        bool isExitBlock(const BasicBlock &bb) {
+            return succ_begin(&bb) == succ_end(&bb);
+        }
+
         bool runOnFunction(Function &F) override {
             auto tik = high_resolution_clock::now();            
             LLVMContext& context = F.getContext();
@@ -43,7 +51,15 @@ namespace {
             unsigned funcBBnum = 0, count = 0;
             for(Function::iterator bb = F.begin(), e = F.end(); bb != e; ++bb){
                 funcBBnum++;
-                bb->setName(F.getName() + "_" + to_string(count++));
+                if(isEntryBlock(*bb) && isExitBlock(*bb)) {
+                    bb->setName(F.getName() + ":both:" + to_string(count++));
+                } else if (isEntryBlock(*bb)) {
+                    bb->setName(F.getName() + ":entry:" + to_string(count++));
+                } else if (isExitBlock(*bb)) {
+                    bb->setName(F.getName() + ":exit:" + to_string(count++));
+                } else {
+                    bb->setName(F.getName() + ":neither:" + to_string(count++));
+                }
                 /* errs() << "Basic Block name: " << bb->getName() << ", size: " << bb->size() << "\n"; */
 
                 if(!bb->empty()) { // checking if bb has instructions
@@ -59,10 +75,10 @@ namespace {
             }
             auto tok = high_resolution_clock::now();
             __duration += duration_cast<microseconds>(tok - tik);
-            errs() << "time: " << __duration.count() << "microseconds\n";
+            errs() << F.getName() << ": " << __duration.count() << "microseconds\n";
             return true;
         }
-    }; // end of struct Hello
+    }; // end of struct bbprinter 
 } // end anonymous namespace
 char bbprinter::ID = 0;
 static RegisterPass<bbprinter> X("bbprinter", "Basic Block Printer Pass",
