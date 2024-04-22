@@ -14,7 +14,7 @@ static unsigned __order_index = 0;
 
 /* static vector<vector<string>> recordtraces; */
 /* static unsigned __recordtrace_index = 0; */
-vector<element> recordTraces;
+extern vector<shared_ptr<element>> recordTraces;
 extern vector<vector<string>> replayTracesRaw;
 /* extern vector<element> replaytraces; */
 /* static unsigned __replaytrace_index = 0; */
@@ -119,6 +119,7 @@ int MPI_Finalize(
         original_MPI_Finalize = (int (*)()) dlsym(RTLD_NEXT, "MPI_Finalize");
     }
     appendReplayTrace();
+    greedyalignmentWhole();
     int ret = original_MPI_Finalize();
 
     return ret;

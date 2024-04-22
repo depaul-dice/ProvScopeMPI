@@ -4,6 +4,8 @@
 
 #include <vector>
 #include <memory>
+#include <unordered_map>
+#include <string>
 
 #include "tools.h"
 
@@ -26,4 +28,6 @@ std::vector<std::shared_ptr<element>> makeHierarchyWhole(std::vector<std::vector
 
 void print(std::vector<std::shared_ptr<element>>& functionalTraces, unsigned int depth);
 void appendReplayTrace();
+bool greedyalignmentWhole(std::vector<std::shared_ptr<element>>& original, std::vector<std::shared_ptr<element>>& reproduced);
+bool greedyalignmentWhole();
 #endif // ALIGNMENT_H

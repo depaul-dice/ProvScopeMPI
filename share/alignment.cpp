@@ -4,8 +4,12 @@
 using namespace std;
 
 /* static FILE* replayTraceFile = nullptr; */
-vector<vector<string>> replayTracesRaw;
+// recordTracesRaw is simply a local variable, so don't make it a global variable
+vector<shared_ptr<element>> recordTraces;
+
+vector<vector<string>> replayTracesRaw; // this is necessary for bbprinter
 vector<shared_ptr<element>> replayTraces;
+unordered_map<string, vector<unsigned>> bbMap;
 
 element::element(bool isEntry, bool isExit, string& bb) : isEntry(isEntry), isExit(isExit), bb(bb), funcs(vector<vector<shared_ptr<element>>>()) {
 }
@@ -26,7 +30,7 @@ vector<shared_ptr<element>> makeHierarchyWhole(vector<vector<string>>& traces, u
         shared_ptr<element> eptr = make_shared<element>(isEntry, isExit, bbname);
         index++;
         while(!isExit && funcname != traces[index][0]) {
-            MPI_ASSERT(traces[index][1] == "entry");
+            MPI_ASSERT(traces[index][1] == "entry" || traces[index][1] == "both");
             eptr->funcs.push_back(makeHierarchyWhole(traces, index)); 
         }
         functionalTraces.push_back(eptr);
@@ -90,7 +94,74 @@ void appendReplayTrace() {
     return;
 }
 
-void alignment(vector<element>& original, vector<element>& reproduced) {
-    
-
+static inline void create_map(vector<shared_ptr<element>>& reproduced, unsigned& j) {
+    for(unsigned k = j; k < reproduced.size(); k++) {
+        if(bbMap.find(reproduced[k]->bb) == bbMap.end()) {
+            bbMap[reproduced[k]->bb] = vector<unsigned>();
+        }
+        bbMap[reproduced[k]->bb].push_back(k);
+    }
+    return;
 }
+
+static inline bool matchbbmap(vector<shared_ptr<element>>& original, unsigned& i, unsigned& j) {
+    for(unsigned k = i; k < original.size(); k++) {
+        if(bbMap.find(original[k]->bb) != bbMap.end()) {
+            for(auto l: bbMap[original[k]->bb]) {
+                if(j <= l) {
+                    i = k;
+                    j = l;
+                    return true;
+                }
+            }
+        } 
+    }
+    return false;
+}
+
+static bool __greedyalignment(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned) {
+    unsigned i = 0, j = 0;
+    while(i < original.size() && j < reproduced.size()) {
+        if(original[i]->bb == reproduced[j]->bb) {
+            aligned.push_back(make_pair(original[i], reproduced[j]));
+            i++; j++;
+        } else {
+            fprintf(stderr, "point of divergence: %s", original[i - 1]->bb.c_str());
+            if(bbMap.size() == 0) create_map(reproduced, j);
+
+            // matchbbmap will update i and j
+            if(!matchbbmap(original, i, j)) return false;
+            else {
+                fprintf(stderr, "point of convergence: %s", original[i]->bb.c_str());
+                aligned.push_back(make_pair(original[i], reproduced[j]));
+                i++; j++;
+            }
+        }
+    }
+    return true;
+}
+
+bool greedyalignmentWhole(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced) { 
+    vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned;
+#ifdef DEBUG_MODE
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    fprintf(stderr, "greedy alignment on %s at %d\n", original[0]->bb.c_str(), rank);
+#endif
+    bool rv = __greedyalignment(original, reproduced, aligned); 
+    for(auto p : aligned) {
+        /* cout << p.first->bb << " " << p.second->bb << endl; */
+        MPI_ASSERT(p.first->bb == p.second->bb);
+        MPI_ASSERT(p.first->funcs.size() == p.second->funcs.size());
+        for(unsigned i = 0; i < p.first->funcs.size(); i++) {
+            // update rv at the end
+            rv = greedyalignmentWhole(p.first->funcs[i], p.second->funcs[i]);
+        }
+    }
+    return rv;
+}
+
+bool greedyalignmentWhole() {
+    return greedyalignmentWhole(recordTraces, replayTraces);
+}
+
