@@ -6,6 +6,44 @@ using namespace std;
 /* set<string> testfamily {"MPI_Test", "MPI_Testall", "MPI_Testany", "MPI_Testsome"}; */
 /* set<string> waitfamily {"MPI_Wait", "MPI_Waitall", "MPI_Waitany", "MPI_Waitsome"}; */
 
+#ifdef DEBUG_MODE
+
+static FILE* debugfile = nullptr;
+
+void open_debugfile() {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    char filename[100];
+    sprintf(filename, "debugfile_%d.txt", rank);
+    debugfile = fopen(filename, "w");
+    if(debugfile == nullptr) {
+        fprintf(stderr, "failed to open debugfile\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    fprintf(stderr, "%s opened\n", filename);
+}
+
+void close_debugfile() {
+    if(debugfile != nullptr) {
+        fclose(debugfile);
+    }
+}
+
+/* void DEBUG(const char* format, ...) { */
+/*     vfprintf(stderr, format, args); */
+/*     va_end(args); */
+/*     va_list args; */
+/*     va_start(args, format); */
+/*     if(debugfile == nullptr) { */
+/*         MPI_ASSERT(false); */
+/*     } */
+/*     vfprintf(debugfile, format, args); */
+/*     va_end(args); */
+/*     fflush(debugfile); */
+/* } */
+
+#endif // DEBUG_MODE
+
 vector<string> parse(string& line, char delimit) {
     vector<string> res;
     string tmp = "";

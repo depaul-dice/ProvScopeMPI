@@ -1,6 +1,6 @@
 
-#ifndef PARSE_H
-#define PARSE_H
+#ifndef TOOLS_H
+#define TOOLS_H
 
 #include <vector>
 #include <string>
@@ -19,6 +19,7 @@
     } while(0)
 
 #ifdef DEBUG_MODE
+
 #define DEBUG(...) fprintf(stderr, __VA_ARGS__)
 #define DEBUG0(...) \
     do { \
@@ -28,9 +29,15 @@
             fprintf(stderr, __VA_ARGS__); \
     } while(0)
 
+void open_debugfile();
+void close_debugfile();
+/* void DEBUG(const char* format, ...); */
+
 #else
 #define DEBUG(...)
 #define DEBUG0(...)
+#define open_debugfile()
+#define close_debugfile()
 #endif // DEBUG_MODE
 
 std::vector<std::string> parse(std::string& line, char delimit);
@@ -38,5 +45,5 @@ std::vector<std::string> parse(std::string& line, char delimit);
 int lookahead(std::vector<std::string>& orders, unsigned start, std::string& request);
 
 
-#endif // PARSE_H
+#endif // TOOLS_H
        

@@ -15,7 +15,9 @@
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
+
 #include "tools.h"
+#include "alignment.h"
 
 
 using namespace std;
@@ -177,7 +179,16 @@ static int (*original_MPI_Cancel)(
     MPI_Request *request
 ) = nullptr;
 
+static int (*original_MPI_Request_free)(
+    MPI_Request *request
+) = nullptr;
+
 static int (*original_MPI_Barrier)(
     MPI_Comm comm
 ) = nullptr;
+
+static void (*original_printBBname) (
+    const char *name
+) = nullptr;
+
 #endif // MPIRECORDREPLAY_H
