@@ -16,7 +16,7 @@ libmpireplay.so: mpireplay.o tools.o alignment.o
 	$(CXX) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS)
 
 %.o: %.cpp
-	$(CXX) -c -fPIC -DDEBUG_MODE -o $@ $<
+	$(CXX) -c -fPIC -g -DDEBUG_MODE -o $@ $<
 
 clean:
 	rm -f *.o $(SHARED_LIB)

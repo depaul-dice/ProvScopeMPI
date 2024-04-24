@@ -24,10 +24,12 @@ public:
     std::vector<std::vector<std::shared_ptr<element>>> funcs;
 };
 
-std::vector<std::shared_ptr<element>> makeHierarchyWhole(std::vector<std::vector<std::string>>& traces, unsigned long& index);
+std::vector<std::shared_ptr<element>> makeHierarchyMain(std::vector<std::vector<std::string>>& traces, unsigned long& index);
+std::vector<std::shared_ptr<element>> makeHierarchy(std::vector<std::vector<std::string>>& traces, unsigned long& index);
 
 void print(std::vector<std::shared_ptr<element>>& functionalTraces, unsigned int depth);
+
 void appendReplayTrace();
-bool greedyalignmentWhole(std::vector<std::shared_ptr<element>>& original, std::vector<std::shared_ptr<element>>& reproduced);
+bool greedyalignmentWhole(std::vector<std::shared_ptr<element>>& original, std::vector<std::shared_ptr<element>>& reproduced, const int& rank);
 bool greedyalignmentWhole();
 #endif // ALIGNMENT_H

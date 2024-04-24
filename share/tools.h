@@ -44,6 +44,7 @@ std::vector<std::string> parse(std::string& line, char delimit);
 // returns the rank where you got the message from
 int lookahead(std::vector<std::string>& orders, unsigned start, std::string& request);
 
+void printtails(std::vector<std::vector<std::string>>& traces, unsigned tail);
 
 #endif // TOOLS_H
        

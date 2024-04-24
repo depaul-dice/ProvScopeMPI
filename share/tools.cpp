@@ -120,3 +120,21 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
     }
     return -1;
 }
+
+void printtails(std::vector<std::vector<std::string>>& traces, unsigned tail) {
+    /* MPI_ASSERT(tail <= traces.size()); */
+    if(tail > traces.size()) {
+        fprintf(stderr, "tail is larger than traces.size()\n");
+        return;
+    }
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    for(unsigned i = traces.size() - tail; i < traces.size(); i++) {
+        /* MPI_ASSERT(traces[i].size() == 3); */
+        if(traces[i].size() != 3) {
+            fprintf(stderr, "%d:%s\n", rank, traces[i][0].c_str());
+            return;
+        }
+        fprintf(stderr, "%d:%s:%s:%s\n", rank, traces[i][0].c_str(), traces[i][1].c_str(), traces[i][2].c_str());
+    }
+}

@@ -14,14 +14,53 @@ unordered_map<string, vector<unsigned>> bbMap;
 element::element(bool isEntry, bool isExit, string& bb) : isEntry(isEntry), isExit(isExit), bb(bb), funcs(vector<vector<shared_ptr<element>>>()) {
 }
 
-vector<shared_ptr<element>> makeHierarchyWhole(vector<vector<string>>& traces, unsigned long& index) {
+vector<shared_ptr<element>> makeHierarchyMain(vector<vector<string>>& traces, unsigned long& index) {
+    vector<shared_ptr<element>> functionalTraces;
+    bool isEntry, isExit;
+    string funcname = "main";
+    string bbname;
+#ifdef DEBUG_MODE
+    /* int rank; */
+    /* MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+    /* fprintf(stderr, "rank: %d at makeHierarchyMain\n", rank); */
+#endif
+    while(index < traces.size() && funcname != traces[index][0]) {
+        index++;
+    }
+
+    do {
+        MPI_ASSERT(traces[index][0] == funcname);
+        MPI_ASSERT(traces[index].size() == 3);
+        bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
+        isEntry = (traces[index][1] == "entry" || traces[index][1] == "both");
+        isExit = (traces[index][1] == "exit" || traces[index][1] == "both");
+        shared_ptr<element> eptr = make_shared<element>(isEntry, isExit, bbname);
+        index++;
+        
+        while(!isExit && index < traces.size() && (traces[index][1] == "entry" || traces[index][1] == "both")) {
+            eptr->funcs.push_back(makeHierarchy(traces, index));
+        }
+        functionalTraces.push_back(eptr);
+    } while(!isExit && index < traces.size());
+
+    return functionalTraces;
+}
+
+/*  1. Every function starts from entry except for main */
+/*  2. Let's not take anything in unless the main function has started */
+/*  3. Let's not take anything in after the main function has ended */
+/*  4. Even if the function name is the same, if we reach the new entry node, we recursively call the function */
+vector<shared_ptr<element>> makeHierarchy(vector<vector<string>>& traces, unsigned long& index) {
     vector<shared_ptr<element>> functionalTraces;
     bool isEntry, isExit;
     string bbname, funcname;
     /* DEBUG0("index: %lu\n", index); */
     funcname = traces[index][0];
-    /* DEBUG0("funcname: %s\n", funcname.c_str()); */
+    /* DEBUG0("funcname: %s: %lu\n", funcname.c_str(), index); */
     do {
+        MPI_ASSERT(index < traces.size());
+        MPI_ASSERT(traces[index][0] == funcname);
+        MPI_ASSERT(traces[index].size() == 3);
         /* funcname = traces[index][0]; */
         bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         isEntry = (traces[index][1] == "entry" || traces[index][1] == "both");
@@ -29,12 +68,11 @@ vector<shared_ptr<element>> makeHierarchyWhole(vector<vector<string>>& traces, u
         /* element e(isEntry, isExit, bbname); */
         shared_ptr<element> eptr = make_shared<element>(isEntry, isExit, bbname);
         index++;
-        while(!isExit && funcname != traces[index][0]) {
-            MPI_ASSERT(traces[index][1] == "entry" || traces[index][1] == "both");
-            eptr->funcs.push_back(makeHierarchyWhole(traces, index)); 
+        while(!isExit && index < traces.size() && (traces[index][1] == "entry" || traces[index][1] == "both")) {
+            eptr->funcs.push_back(makeHierarchy(traces, index)); 
         }
         functionalTraces.push_back(eptr);
-    } while(!isExit);
+    } while(!isExit && index < traces.size());
 
     return functionalTraces; 
 }
@@ -62,35 +100,8 @@ static size_t findSize(FILE *fp) {
 void appendReplayTrace() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* if(replayTraceFile == nullptr) { */
-    /*     char filename[100]; */
-    /*     sprintf(filename, ".record%d.tr", rank); */
-    /*     replayTraceFile = fopen(filename, "r"); */
-    /*     size_t filesize = findSize(replayTraceFile); */
-    /*     MPI_ASSERT(replayTraceFile != nullptr); */
-    /*     DEBUG("opened file %s\n", filename); */
-    /*     MPI_ASSERT(filesize > 0); */
-    /* } */
-
-    /* char* line = nullptr; */ 
-    /* size_t len = 0; */
-    /* ssize_t read; */
-    /* while((read = getline(&line, &len, replayTraceFile)) != -1) { */
-    /*     if(read > 0 && line[read - 1] == '\n') { */
-    /*         line[read - 1] = '\0'; */
-    /*     } */
-    /*     string str(line); */
-    /*     replayTracesRaw.push_back(parse(str, ':')); */
-    /* } */
-    /* MPI_ASSERT(replayTracesRaw.size() > 0); */
     unsigned long index = 0;
-    // this is as of now 
-    /* for(unsigned i = 0; i < replayTracesRaw.size(); i++) { */
-    /*     fprintf(stderr, "%s:%s:%s\n", replayTracesRaw[i][0].c_str(), replayTracesRaw[i][1].c_str(), replayTracesRaw[i][2].c_str()); */
-    /* } */
-    replayTraces = makeHierarchyWhole(replayTracesRaw, index);
-    
-    /* print(replayTraces, 0); */
+    replayTraces = makeHierarchyMain(replayTracesRaw, index);
     return;
 }
 
@@ -119,49 +130,69 @@ static inline bool matchbbmap(vector<shared_ptr<element>>& original, unsigned& i
     return false;
 }
 
-static bool __greedyalignment(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned) {
+// it returns true iff the traces are aligned at the end
+static bool __greedyalignment(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, const int& rank) {
     unsigned i = 0, j = 0;
+    /* unsigned div = 0; */
     while(i < original.size() && j < reproduced.size()) {
         if(original[i]->bb == reproduced[j]->bb) {
+            /* fprintf(stderr, "aligned: %s\n", original[i]->bb.c_str()); */
             aligned.push_back(make_pair(original[i], reproduced[j]));
             i++; j++;
         } else {
-            fprintf(stderr, "point of divergence: %s", original[i - 1]->bb.c_str());
+            fprintf(stderr, "option 1, rank:%d, pod:%s\n", rank, original[i - 1]->bb.c_str());
+            /* div++; */
             if(bbMap.size() == 0) create_map(reproduced, j);
 
             // matchbbmap will update i and j
             if(!matchbbmap(original, i, j)) return false;
             else {
-                fprintf(stderr, "point of convergence: %s", original[i]->bb.c_str());
+                fprintf(stderr, "rank:%d, poc:%s", rank, original[i]->bb.c_str());
                 aligned.push_back(make_pair(original[i], reproduced[j]));
                 i++; j++;
             }
         }
     }
+
+    if(i < original.size()) {
+        fprintf(stderr, "option 2, rank:%d, pod:%s\n", rank, original[i - 1]->bb.c_str());
+        /* div++; */
+        return false;
+    } else if(j < reproduced.size()) {
+        fprintf(stderr, "option 3, rank:%d, pod:%s\n", rank, reproduced[j - 1]->bb.c_str());
+        /* div++; */
+        return false;
+    } 
+
+    /* DEBUG0("divergence: %u\n", div); */
+    /* fprintf(stderr, "divergence: %u\n", div); */
     return true;
 }
 
-bool greedyalignmentWhole(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced) { 
+bool greedyalignmentWhole(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, const int& rank) { 
     vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned;
-#ifdef DEBUG_MODE
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    fprintf(stderr, "greedy alignment on %s at %d\n", original[0]->bb.c_str(), rank);
-#endif
-    bool rv = __greedyalignment(original, reproduced, aligned); 
+    /* fprintf(stderr, "greedy alignment on %s at %d original.size: %lu, reproduced.size: %lu\n", \ */
+            /* original[0]->bb.c_str(), rank, original.size(), reproduced.size()); */
+    bool rv = __greedyalignment(original, reproduced, aligned, rank); 
     for(auto p : aligned) {
         /* cout << p.first->bb << " " << p.second->bb << endl; */
         MPI_ASSERT(p.first->bb == p.second->bb);
-        MPI_ASSERT(p.first->funcs.size() == p.second->funcs.size());
-        for(unsigned i = 0; i < p.first->funcs.size(); i++) {
+        /* MPI_ASSERT(p.first->funcs.size() == p.second->funcs.size()); */
+        unsigned long len = p.first->funcs.size() < p.second->funcs.size() ? p.first->funcs.size() : p.second->funcs.size();
+        for(unsigned i = 0; i < len; i++) {
             // update rv at the end
-            rv = greedyalignmentWhole(p.first->funcs[i], p.second->funcs[i]);
+            rv = greedyalignmentWhole(p.first->funcs[i], p.second->funcs[i], rank);
+        }
+        if(p.first->funcs.size() != p.second->funcs.size()) {
+            DEBUG("at %s, p.first->funcs.size(): %lu, p.second->funcs.size(): %lu\n", p.first->bb.c_str(), p.first->funcs.size(), p.second->funcs.size());
         }
     }
     return rv;
 }
 
 bool greedyalignmentWhole() {
-    return greedyalignmentWhole(recordTraces, replayTraces);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    return greedyalignmentWhole(recordTraces, replayTraces, rank);
 }
 
