@@ -1,5 +1,7 @@
 
+/* #include <cassert> */
 #include <string> 
+#include <chrono>
 
 #include "llvm/Pass.h"
 #include "llvm/IR/Function.h"
@@ -15,7 +17,6 @@
 // adding to include getFunction function
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Instruction.h"
-#include <chrono>
 
 using namespace llvm;
 using namespace std;
@@ -23,17 +24,39 @@ using namespace std::chrono;
 
 microseconds __duration(0);
 
+#define ASSERT(cond) if(!(cond)) {errs() << "assertion failed: " << #cond << '\n';}
+
 namespace {
     struct bbprinter : public FunctionPass {
         static char ID;
         bbprinter() : FunctionPass(ID) {}
 
         bool isEntryBlock(const BasicBlock &bb) {
-            return &bb == &bb.getParent()->getEntryBlock();
+            /* return &bb == &bb.getParent()->getEntryBlock(); */
+            return pred_begin(&bb) == pred_end(&bb);
         }
 
         bool isExitBlock(const BasicBlock &bb) {
             return succ_begin(&bb) == succ_end(&bb);
+        }
+         
+        void inline insertBeginning(string str, Function *printFunc, Function::iterator& bb, IRBuilder<>& Builder) {
+            /* Value *strPtr = Builder.CreateGlobalStringPtr(str, "blockString"); */
+            /* Builder.CreateCall(printFunc, strPtr); */
+            ASSERT(!bb->empty());
+            Builder.SetInsertPoint(&*bb, bb->getFirstInsertionPt());
+
+            Value *strPtr = Builder.CreateGlobalStringPtr(str, "blockString");
+            Builder.CreateCall(printFunc, strPtr);
+        }
+
+        void inline insertBeforeRet(string str, Function *printFunc, Function::iterator& bb, IRBuilder<>& Builder) {
+            ASSERT(!bb->empty());
+            Instruction *terminator = bb->getTerminator();
+            ASSERT(isa<ReturnInst>(terminator));
+            Builder.SetInsertPoint(terminator);
+            Value *strPtr = Builder.CreateGlobalStringPtr(str, "blockString");
+            Builder.CreateCall(printFunc, strPtr);
         }
 
         bool runOnFunction(Function &F) override {
@@ -49,33 +72,30 @@ namespace {
 
             IRBuilder<> Builder(context);
             unsigned funcBBnum = 0, count = 0;
+            bool isEntry = false, isExit = false;
             for(Function::iterator bb = F.begin(), e = F.end(); bb != e; ++bb){
                 funcBBnum++;
                 if(isEntryBlock(*bb) && isExitBlock(*bb)) {
-                    bb->setName(F.getName() + ":both:" + to_string(count++));
+                    bb->setName(F.getName() + ":entry:" + to_string(count++));
+                    insertBeginning(bb->getName().str(), printFunc, bb, Builder);
+                    string str = (F.getName() + ":exit:" + to_string(count++)).str();
+                    insertBeforeRet(str, printFunc, bb, Builder);
                 } else if (isEntryBlock(*bb)) {
                     bb->setName(F.getName() + ":entry:" + to_string(count++));
+                    insertBeginning(bb->getName().str(), printFunc, bb, Builder);
                 } else if (isExitBlock(*bb)) {
                     bb->setName(F.getName() + ":exit:" + to_string(count++));
+                    insertBeforeRet(bb->getName().str(), printFunc, bb, Builder);
                 } else {
                     bb->setName(F.getName() + ":neither:" + to_string(count++));
+                    insertBeginning(bb->getName().str(), printFunc, bb, Builder);
                 }
                 /* errs() << "Basic Block name: " << bb->getName() << ", size: " << bb->size() << "\n"; */
 
-                if(!bb->empty()) { // checking if bb has instructions
-                    Builder.SetInsertPoint(&*bb, bb->getFirstInsertionPt());
-                } else {
-                    errs() << "empty bb found: " << bb->getName() << '\n';
-                    continue;
-                }
-
-                string str = bb->getName().str();
-                Value *strPtr = Builder.CreateGlobalStringPtr(str, "blockString");
-                Builder.CreateCall(printFunc, strPtr);
             }
             auto tok = high_resolution_clock::now();
             __duration += duration_cast<microseconds>(tok - tik);
-            errs() << F.getName() << ": " << __duration.count() << "microseconds\n";
+            errs() << F.getName() << ": " << __duration.count() << " microseconds\n";
             return true;
         }
     }; // end of struct bbprinter 
