@@ -76,7 +76,7 @@ namespace {
             for(Function::iterator bb = F.begin(), e = F.end(); bb != e; ++bb){
                 funcBBnum++;
                 if(isEntryBlock(*bb) && isExitBlock(*bb)) {
-                    bb->setName(F.getName() + ":entry:" + to_string(count++));
+                    bb->setName(F.getName() + ":both:" + to_string(count++));
                     insertBeginning(bb->getName().str(), printFunc, bb, Builder);
                     string str = (F.getName() + ":exit:" + to_string(count++)).str();
                     insertBeforeRet(str, printFunc, bb, Builder);
