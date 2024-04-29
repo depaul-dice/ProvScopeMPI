@@ -101,94 +101,67 @@ vector<shared_ptr<element>> makeHierarchy(vector<vector<string>>& traces, unsign
 void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<string>>& traces, unsigned long& index) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    // get the last element of functionalTraces
     stack<shared_ptr<element>> __stack;
-    /* vector<shared_ptr<element>>& lastFuncs = functionalTraces; */
     MPI_ASSERT(!functionalTraces.empty());
-    /* MPI_ASSERT(functionalTraces.back()->isExit); */
-    /* if(functionalTraces[0]->funcname != "main" || functionalTraces.back()->funcname != "main") { */
-    /*     DEBUG0("functionalTraces[0]->funcname: %s\n", functionalTraces[0]->funcname.c_str()); */
-    /*     DEBUG0("functionalTraces.back()->funcname: %s\n", functionalTraces.back()->funcname.c_str()); */
-    /* } */
-
-    /* DEBUG0("printing to make sure\n"); */
-    /* if(rank == 0) { */
-    /*     printf("functionalTraces.size(): %lu\n", functionalTraces.size()); */
-    /*     print(functionalTraces, 0); */
-    /* } */
     MPI_ASSERT(functionalTraces[0]->funcname == "main");
     MPI_ASSERT(functionalTraces.back()->funcname == "main");
-    shared_ptr<element> lastElement = functionalTraces.back();
+    shared_ptr<element> curr = functionalTraces.back();
 
 
-    while(!(lastElement->isExit)) {
+    while(!(curr->isExit)) {
         /* DEBUG0("lastElement->bb(): %s\n", lastElement->bb().c_str()); */
-        __stack.push(lastElement);
-        if(lastElement->funcs.size() == 0) {
+        __stack.push(curr);
+        if(curr->funcs.size() == 0) {
             break;
         } else {
-            lastElement = lastElement->funcs.back().back();
+            curr = curr->funcs.back().back();
         }
     }
     /* DEBUG0("stack ready\n"); */
-    shared_ptr<element> curr, parent;
+    shared_ptr<element> parent, newchild;
     MPI_ASSERT(!__stack.empty());
-    lastElement = __stack.top();
+    curr = __stack.top();
     __stack.pop();
-    /* DEBUG0("lastElement->bb(): %s\n", lastElement->bb().c_str()); */
-
-    string funcname, bbname;
-    bool isEntry, isExit;
-    shared_ptr<element> eptr;
-    funcname = lastElement->funcname;
-    // does the last element have any functions within? 
-    while(traces[index][1] == "entry") {
-        MPI_ASSERT(traces[index].size() == 3);
-        lastElement->funcs.push_back(makeHierarchy(traces, index));
-    }
-
-    // if that is not the case then we should go back one more step
     if(__stack.empty()) {
-        lastElement = nullptr;
+        parent = nullptr;
     } else {
-        lastElement = __stack.top();
+        parent = __stack.top();
         __stack.pop();
     }
 
-    // if not then we should add some elements to the last element
     while(index < traces.size()) {
-        // if not we need to pop first and get the right vector<element>
-        MPI_ASSERT(traces[index][0] == funcname);
-        MPI_ASSERT(traces[index].size() == 3);
-        isEntry = (traces[index][1] == "entry");
-        isExit = (traces[index][1] == "exit");
-        eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0]);
-        index++;
-        while(!isExit && index < traces.size() && traces[index][1] == "entry") {
-            eptr->funcs.push_back(makeHierarchy(traces, index));
-        }
-        if(lastElement != nullptr) {
-            lastElement->funcs.back().push_back(eptr);
-        } else {
-            functionalTraces.push_back(eptr);
-        }
-
-        if(isExit && !__stack.empty()) {
-            funcname = lastElement->funcname;
-            lastElement = __stack.top();
-            __stack.pop();
+        while (index < traces.size() && traces[index][1] == "entry") {
+            curr->funcs.push_back(makeHierarchy(traces, index));
+        } 
+        if(index >= traces.size()) {
             break;
-        } else if(isExit) {
-            // make sure we are exitting from the main function    
-            /* MPI_ASSERT(funcname == "main"); */ 
-            lastElement = nullptr;
-            return;
+        } 
+        MPI_ASSERT(traces[index][1] != "entry");
+        /* DEBUG0("%s:%s:%s\n", traces[index][0].c_str(), traces[index][1].c_str(), traces[index][2].c_str()); */
+        newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0]);
+        MPI_ASSERT(traces[index][0] == curr->funcname);
+        index++;
+        if(parent != nullptr) {
+            parent->funcs.back().push_back(newchild);
         } else {
-            // if it's not a exit node, then we should keep going
+            functionalTraces.push_back(newchild);
         }
-    } 
-    
-    return;
+        if(traces[index - 1][1] == "exit") { // this index - 1 is the last index
+            if(parent == nullptr) {
+                break; // this should be at the end of main
+            } else {
+                curr = parent;
+                if(!__stack.empty()) {
+                    parent = __stack.top();
+                    __stack.pop();
+                } else {
+                    parent = nullptr;
+                }
+            }
+        } else {
+            curr = newchild;
+        }
+    }
 }
 
 void print(vector<shared_ptr<element>>& functionalTraces, unsigned depth) {
@@ -217,7 +190,7 @@ void appendReplayTrace() {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     static unsigned long index = 0;
     if(replayTraces.size() == 0) {
-        /* DEBUG0("makeHierarchyMain called at %lu\n", index); */
+        DEBUG0("makeHierarchyMain called at %lu\n", index);
         MPI_ASSERT(index == 0);
         replayTraces = makeHierarchyMain(replayTracesRaw, index);
         if(rank == 0) {
