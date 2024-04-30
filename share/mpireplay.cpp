@@ -36,7 +36,7 @@ static unordered_set<MPI_Request *> __isends;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
             DEBUG("line: %d, rank: %d, assertion failed: %s\n", __LINE__, rank, #CONDITION); \
             appendReplayTrace(); \
-            greedyalignmentWhole(); \
+            greedyalignmentWholeOffline(); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
@@ -120,7 +120,7 @@ int MPI_Finalize(
         original_MPI_Finalize = (int (*)()) dlsym(RTLD_NEXT, "MPI_Finalize");
     }
     appendReplayTrace();
-    greedyalignmentWhole();
+    greedyalignmentWholeOffline();
     int ret = original_MPI_Finalize();
 
     return ret;

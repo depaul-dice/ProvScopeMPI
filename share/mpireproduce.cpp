@@ -36,7 +36,7 @@ static unordered_set<MPI_Request *> __isends;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
             DEBUG("line: %d, rank: %d, assertion failed: %s\n", __LINE__, rank, #CONDITION); \
             appendReplayTrace(); \
-            greedyalignmentWhole(); \
+            greedyalignmentWholeOffline(); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
@@ -122,7 +122,7 @@ int MPI_Finalize(
     }
     DEBUG0("MPI_Finalize\n");
     appendReplayTrace();
-    /* greedyalignmentWhole(); */
+    /* greedyalignmentWholeOffline(); */
     int ret = original_MPI_Finalize();
 
     return ret;
@@ -153,7 +153,6 @@ int MPI_Recv(
     }
     MPI_ASSERTNALIGN(source == src);
     
-
     if (!original_MPI_Recv) {
         original_MPI_Recv = (int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Status *)) dlsym(RTLD_NEXT, "MPI_Recv");
     }
@@ -182,6 +181,7 @@ int MPI_Irecv(
     
     vector<string> msgs = parse(orders[__order_index++], ':');
     DEBUG0("MPI_Irecv: %s -> %p: %s\t", msgs[3].c_str(), request, orders[__order_index - 1].c_str());
+    appendReplayTrace();
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Irecv");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
     MPI_ASSERTNALIGN(stoi(msgs[2]) == source);
