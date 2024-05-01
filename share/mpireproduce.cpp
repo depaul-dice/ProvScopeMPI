@@ -25,6 +25,7 @@ extern vector<vector<string>> replayTracesRaw;
 static unordered_map<string, MPI_Request *> __requests;
 static unordered_set<MPI_Request *> __isends;
 
+deque<shared_ptr<lastaligned>> __q;
 
 /* #undef MPI_ASSERT */
 
@@ -110,7 +111,7 @@ int MPI_Init(
     /* if(rank == 0) { */
     /*     print(recordTraces, 0); */
     /* } */
-    DEBUG0("this was for recordTraces\n");
+    /* DEBUG0("this was for recordTraces\n"); */
     
     return ret;
 }
@@ -121,8 +122,12 @@ int MPI_Finalize(
         original_MPI_Finalize = (int (*)()) dlsym(RTLD_NEXT, "MPI_Finalize");
     }
     DEBUG0("MPI_Finalize\n");
-    appendReplayTrace();
+    /* appendReplayTrace(); */
     /* greedyalignmentWholeOffline(); */
+
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    /* DEBUG0("onine alignment done\n"); */
     int ret = original_MPI_Finalize();
 
     return ret;
@@ -141,7 +146,9 @@ int MPI_Recv(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG0("MPI_Recv:%s:%d\n", orders[__order_index].c_str(), __order_index);
-    appendReplayTrace();  
+    /* appendReplayTrace(); */  
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
     vector<string> msgs = parse(orders[__order_index++], ':');
     int src = stoi(msgs[2]);
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Recv");

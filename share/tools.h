@@ -6,6 +6,8 @@
 #include <string>
 #include <set>
 #include <mpi.h>
+#include <deque>
+#include <memory>
 
 #define MPI_ASSERT(CONDITION) \
     do { \
@@ -46,5 +48,26 @@ int lookahead(std::vector<std::string>& orders, unsigned start, std::string& req
 
 void printtails(std::vector<std::vector<std::string>>& traces, unsigned tail);
 
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::deque<T>& deq) {
+    os << "[";
+    if(!deq.empty()) {
+        for(unsigned i = 0; i < deq.size(); ++i)
+            os << deq[i] << std::endl;
+    }
+    os << "]";
+    return os;
+}
+
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::deque<std::shared_ptr<T>>& deq) {
+    os << "[";
+    if(!deq.empty()) {
+        for(unsigned i = 0; i < deq.size(); ++i)
+            os << *(deq[i]) << std::endl;
+    }
+    os << "]";
+    return os;
+}
 #endif // TOOLS_H
        
