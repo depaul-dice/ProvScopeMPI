@@ -24,6 +24,7 @@ extern vector<vector<string>> replayTracesRaw;
 
 static unordered_map<string, MPI_Request *> __requests;
 static unordered_set<MPI_Request *> __isends;
+static unordered_set<MPI_Request *> __unalignedRequests;
 
 deque<shared_ptr<lastaligned>> __q;
 
@@ -64,6 +65,7 @@ int MPI_Init(
         original_MPI_Init = (int (*)(int *, char ***)) dlsym(RTLD_NEXT, "MPI_Init");
     }
     int ret = original_MPI_Init(argc, argv);
+    INSTALL_HANDLER();
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -145,11 +147,19 @@ int MPI_Recv(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (!original_MPI_Recv) {
+        original_MPI_Recv = (int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Status *)) dlsym(RTLD_NEXT, "MPI_Recv");
+    }
     DEBUG0("MPI_Recv:%s:%d\n", orders[__order_index].c_str(), __order_index);
     /* appendReplayTrace(); */  
     bool isaligned = true;
     __q = onlineAlignment(__q, isaligned);
-    vector<string> msgs = parse(orders[__order_index++], ':');
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Recv\n", rank);
+        // don't control anything
+        return original_MPI_Recv(buf, count, datatype, source, tag, comm, status);
+    }
+    vector<string> msgs = parse(orders[__order_index++], ':'); // this is subject to change too
     int src = stoi(msgs[2]);
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Recv");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
@@ -160,12 +170,7 @@ int MPI_Recv(
     }
     MPI_ASSERTNALIGN(source == src);
     
-    if (!original_MPI_Recv) {
-        original_MPI_Recv = (int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Status *)) dlsym(RTLD_NEXT, "MPI_Recv");
-    }
-    int rv = original_MPI_Recv(buf, count, datatype, source, tag, comm, status);
-
-    return rv;
+    return original_MPI_Recv(buf, count, datatype, source, tag, comm, status);
 }
 
 int MPI_Irecv(
@@ -185,6 +190,14 @@ int MPI_Irecv(
     // I need to look into the source first
     /* int ret = original_MPI_Irecv(buf, count, datatype, source, tag, comm, request); */
     // I just need to keep track of the request
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank);
+        // don't control anything, but keep track of the request
+        __unalignedRequests.insert(request);
+        return original_MPI_Irecv(buf, count, datatype, source, tag, comm, request);        
+    }
     
     vector<string> msgs = parse(orders[__order_index++], ':');
     DEBUG0("MPI_Irecv: %s -> %p: %s\t", msgs[3].c_str(), request, orders[__order_index - 1].c_str());
@@ -221,6 +234,16 @@ int MPI_Isend(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret = original_MPI_Isend(buf, count, datatype, dest, tag, comm, request);
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank);
+        // don't control anything, but keep track of the request
+        __unalignedRequests.insert(request);
+        __isends.insert(request);
+        // Isend is already called above
+        return ret;
+    }
     // I just need to keep track of the request
     vector<string> msgs = parse(orders[__order_index++], ':');
     DEBUG0("MPI_Isend: %s -> %p: %s\n", msgs[3].c_str(), request, orders[__order_index - 1].c_str());
@@ -249,6 +272,17 @@ int MPI_Irsend(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret = original_MPI_Irsend(buf, count, datatype, dest, tag, comm, request);
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Irsend\n", rank);
+        // don't control anything, but keep track of the request
+        // I don't know what to do with general requests
+        __unalignedRequests.insert(request);
+        __isends.insert(request);
+        // Irsend is already called above
+        return ret;
+    }
     // I just need to keep track of the request
     vector<string> msgs = parse(orders[__order_index++], ':');
     DEBUG("MPI_Irsend: %s -> %p\n", msgs[3].c_str(), request);
@@ -271,6 +305,13 @@ int MPI_Cancel(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret = original_MPI_Cancel(request);
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Cancel\n", rank);
+        // don't control anything
+        return ret;
+    }
     // I just need to keep track that it is cancelled
     vector<string> msgs = parse(orders[__order_index++], ':');
     MPI_ASSERTNALIGN(ret == MPI_SUCCESS); // what I am just hoping for
@@ -298,6 +339,13 @@ int MPI_Test(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG0(":%d:%p", rank, request);
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Test\n", rank);
+        // don't control anything
+        return original_MPI_Test(request, flag, status);
+    }
     vector<string> msgs = parse(orders[__order_index++], ':');
     MPI_ASSERT(msgs[0] == "MPI_Test");
     MPI_ASSERT(stoi(msgs[1]) == rank);
@@ -333,6 +381,13 @@ int MPI_Testall (
     /* DEBUG0("MPI_Testall\n"); */
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Testall\n", rank);
+        // don't control anything
+        return original_MPI_Testall(count, array_of_requests, flag, array_of_statuses);
+    }
     vector<string> msgs = parse(orders[__order_index++], ':');
     if(msgs[0] != "MPI_Testall") {
         DEBUG0("msgs[0]: %s\n", msgs[0].c_str());
@@ -391,10 +446,17 @@ int MPI_Testsome(
     MPI_Status array_of_statuses[]
 ) {
     // record which of the requests were filled in this
-    DEBUG("MPI_Testsome");
     int myrank;
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-    DEBUG(":%d", myrank);
+    DEBUG0("MPI_Testsome:%d", rank);
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Testsome\n", myrank);
+        // don't control anything
+        return original_MPI_Testsome(incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
+    }
+
     vector<string> msgs = parse(orders[__order_index++], ':');
     /* fprintf(stderr, "msgs[0]: %s\n", msgs[0].c_str()); */
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Testsome");
@@ -454,6 +516,13 @@ int MPI_Wait(
     }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Wait\n", rank);
+        // don't control anything
+        return original_MPI_Wait(request, status);
+    }
     // I just need to keep track that it is cancelled
     vector<string> msgs = parse(orders[__order_index++], ':');
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Wait");
@@ -487,6 +556,13 @@ int MPI_Waitany(
     int rank;
     int ret = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Waitany\n", rank);
+        // don't control anything
+        return original_MPI_Waitany(count, array_of_requests, index, status);
+    }
     vector<string> msgs = parse(orders[__order_index++], ':');
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Waitany");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
@@ -518,6 +594,13 @@ int MPI_Waitall(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG0("MPI_Waitall:%s\n", orders[__order_index].c_str());
+    bool isaligned = true;
+    __q = onlineAlignment(__q, isaligned);
+    if(!isaligned) {
+        DEBUG("at rank %d, the alignment was not successful at MPI_Waitall\n", rank);
+        // don't control anything
+        return original_MPI_Waitall(count, array_of_requests, array_of_statuses);
+    }
     vector<string> msgs = parse(orders[__order_index++], ':');
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Waitall");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
@@ -737,7 +820,7 @@ int MPI_Barrier(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    DEBUG0("MPI_Barrier Called:%d\n", rank);
+    /* DEBUG0("MPI_Barrier Called:%d\n", rank); */
     if(!original_MPI_Barrier) {
         original_MPI_Barrier = reinterpret_cast<int (*)(MPI_Comm)>(dlsym(RTLD_NEXT, "MPI_Barrier"));
     }

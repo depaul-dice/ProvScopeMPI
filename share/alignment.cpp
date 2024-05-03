@@ -226,7 +226,7 @@ deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q
     deque<shared_ptr<lastaligned>> rq;
     rq = greedyalignmentOnline(recordTraces, replayTraces, q, i, j, funcId, rank, isaligned);
     /* if(rank == 0) { */
-    /*     cerr << "printing rq at the end\n" << rq << endl; */
+        /* cerr << "printing rq at the end\n" << rq << endl; */
     /* } */
     /* DEBUG0("online alignment done\n"); */
     return rq;
@@ -282,7 +282,7 @@ static inline bool matchbbmap(unordered_map<string, vector<size_t>>& bbMap, vect
 
 static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, size_t& initi, size_t& initj, const int& rank, bool&isaligned) {
     /* DEBUG0("__greedyalignmentOnline at %s, i: %lu, j: %lu, ", \ */
-            /* original[initi]->bb().c_str(), initi, initj); */
+    /*         original[initi]->bb().c_str(), initi, initj); */
     size_t i = initi, j = initj;
     unordered_map<string, vector<size_t>> bbMap;
     while(i < original.size() && j < reproduced.size()) {
@@ -290,12 +290,20 @@ static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>&
             aligned.push_back(make_pair(original[i], reproduced[j]));
             i++; j++;
         } else {
-            printf("pov: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank);
+            if(i != initi || j != initj) {
+                printf("pod: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank);
+            }
             size_t oldj = j, oldi = i;
             if(bbMap.size() == 0) create_map(bbMap, reproduced, j);
             if(!matchbbmap(bbMap, original, i, j)) {
                 // never aligned here
-                /* DEBUG0("never aligned at i: %lu, j: %lu\n", oldi, oldj); */
+                DEBUG0("never aligned at i: %lu, j: %lu, from %s\n", oldi, oldj, original[oldi]->bb().c_str());
+                /* if(rank == 0) { */
+                    /* DEBUG0("original\n"); */
+                    /* printsurface(original); */
+                    /* DEBUG0("reproduced\n"); */
+                    /* printsurface(reproduced); */
+                /* } */
                 isaligned = false;
                 return make_pair(oldi, oldj);
             } else {
@@ -329,7 +337,7 @@ static bool islastaligned(vector<shared_ptr<element>>& original, vector<shared_p
 deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, deque<shared_ptr<lastaligned>>& q, size_t &i, size_t &j, const size_t& funcId, const int &rank, bool& isaligned) {
     // if the queue is not empty, let's do the alignment level below first
     deque<shared_ptr<lastaligned>> rq;
-    /* DEBUG0("greedyalignmentOnline called at %s with i: %lu, j: %lu, funcId:%lu\n",\ */
+    /* DEBUG0("greedyalignmentOnline at %s with i: %lu, j: %lu, funcId:%lu\n",\ */
             /* original[i]->bb().c_str(), i, j, funcId); */
 
     // in case the q is not empty, we need to do the alignment level below first
@@ -345,6 +353,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
             if(tmpfuncId == numeric_limits<size_t>::max()) {
                 tmpfuncId = 0;
             }
+            /* if(rank == 0) { */
+                /* cerr << *la << endl; */
+            /* } */
             rq = greedyalignmentOnline(original[i]->funcs[funcId], reproduced[j]->funcs[funcId], q, la->origIndex, la->repIndex, tmpfuncId, rank, isaligned);
         }
     } else {
@@ -356,8 +367,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
                 /* funcId: %lu, i: %lu, j: %lu\n", \ */
                 /* original[i]->bb().c_str(), funcId, i, j); */
         MPI_ASSERT(islastaligned(original, reproduced, i, j));
-        shared_ptr<lastaligned> la = make_shared<lastaligned>(funcId, i, j);
-        rq.push_back(la);
+        rq.push_back(make_shared<lastaligned>(funcId, i, j));
         return rq;
     }
 
@@ -365,10 +375,15 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
     MPI_ASSERT(q.empty());
 
     // in case functions were at the same element, we do the alignment the level below too
+    
     size_t k = -1;
     for(k = funcId + 1; k < reproduced[j]->funcs.size(); k++) {
-        MPI_ASSERT(rq.empty()); // in this case rq has to be empty because all the other places were not the last elements
+        while(!rq.empty()) {
+            MPI_ASSERT(rq.back()->isSuccess());
+            rq.pop_back();
+        }
         size_t tmpi = 0, tmpj = 0;
+        /* DEBUG0("k: %lu, reproduced[j]->funcs.size(): %lu\n", k, reproduced[j]->funcs.size()); */
         rq = greedyalignmentOnline(original[i]->funcs[k], reproduced[j]->funcs[k], q, tmpi, tmpj, k, rank, isaligned);
         MPI_ASSERT(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \
                 (k == reproduced[j]->funcs.size() - 1));
@@ -376,10 +391,10 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
 
     if(!rq.empty() && !(rq.back()->isSuccess())) {
         /* DEBUG0("at %s, we did not proceed this time 2\n", \ */
-                /* original[i]->bb().c_str()); */
+        /*         original[i]->bb().c_str()); */
         MPI_ASSERT(islastaligned(original, reproduced, i, j));
-        shared_ptr<lastaligned> la = make_shared<lastaligned>(reproduced[j]->funcs.size(), i, j);
-        rq.push_back(la);
+        // this logic is not correct, like funcs.size() would overflow
+        rq.push_back(make_shared<lastaligned>(reproduced[j]->funcs.size() - 1, i, j));
         return rq;
     }
 
@@ -411,9 +426,19 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
             size_t tmpi = 0, tmpj = 0, tmpfuncId = 0;
             qs = greedyalignmentOnline(aligned[ind0].first->funcs[ind1], aligned[ind0].second->funcs[ind1], q, tmpi, tmpj, tmpfuncId, rank, tmpisaligned); 
             // we only expect the last of the last thing to be not successful
+            /* if((!qs.back()->isSuccess() || !tmpisaligned) && \ */
+            /*         (ind0 != aligned.size() - 1 || ind1 != aligned[ind0].second->funcs.size() - 1)) { */
+            /*     DEBUG0("rank: %d, qs not successful, let's look\n\ */
+            /*             ind0: %u, aligned.size(): %lu, ind1: %u, \ */
+            /*             aligned[%u].first->funcs.size(): %lu", \ */
+            /*             rank, ind0, aligned.size(), ind1, ind0, aligned[ind0].second->funcs.size()); */
+            /*     if(rank == 0) { */
+            /*         cerr << qs << endl; */
+            /*     } */
+            /* } */
             MPI_ASSERT((qs.back()->isSuccess() && tmpisaligned) || \
                     (ind0 == aligned.size() - 1 && \
-                    ind1 == aligned[ind0].first->funcs.size() - 1));
+                    ind1 == aligned[ind0].second->funcs.size() - 1));
             if(!tmpisaligned) isaligned = false;
         }
     }
@@ -422,6 +447,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
 
     rq = qs;
     // funcId is where you left off
+    /* DEBUG0("pushing newfuncId: %lu, p.first:%lu, p.second:%lu\n", newfuncId, p.first, p.second); */
     rq.push_back(make_shared<lastaligned>(newfuncId, p.first, p.second));
     return rq;
 }

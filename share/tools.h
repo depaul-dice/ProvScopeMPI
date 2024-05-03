@@ -8,6 +8,12 @@
 #include <mpi.h>
 #include <deque>
 #include <memory>
+#include <signal.h>
+#include <execinfo.h>
+#include <iostream>
+#include <cstdlib>
+#include <cstdio>
+#include <unistd.h>
 
 #define MPI_ASSERT(CONDITION) \
     do { \
@@ -34,12 +40,14 @@
 void open_debugfile();
 void close_debugfile();
 /* void DEBUG(const char* format, ...); */
+#define INSTALL_HANDLER() install_segfault_handler()
 
 #else
 #define DEBUG(...)
 #define DEBUG0(...)
 #define open_debugfile()
 #define close_debugfile()
+#define INSTALL_HANDLER() ((void)0)
 #endif // DEBUG_MODE
 
 std::vector<std::string> parse(std::string& line, char delimit);
@@ -69,5 +77,7 @@ std::ostream& operator<<(std::ostream& os, const std::deque<std::shared_ptr<T>>&
     os << "]";
     return os;
 }
+
+void install_segfault_handler();
 #endif // TOOLS_H
        
