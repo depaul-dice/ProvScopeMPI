@@ -40,14 +40,12 @@
 void open_debugfile();
 void close_debugfile();
 /* void DEBUG(const char* format, ...); */
-#define INSTALL_HANDLER() install_segfault_handler()
 
 #else
 #define DEBUG(...)
 #define DEBUG0(...)
 #define open_debugfile()
 #define close_debugfile()
-#define INSTALL_HANDLER() ((void)0)
 #endif // DEBUG_MODE
 
 std::vector<std::string> parse(std::string& line, char delimit);
@@ -78,6 +76,6 @@ std::ostream& operator<<(std::ostream& os, const std::deque<std::shared_ptr<T>>&
     return os;
 }
 
-void install_segfault_handler();
+/* void segfault_handler(int sig, siginfo_t *info, void *ucontext); */
 #endif // TOOLS_H
        

@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <stack>
 #include <limits>
@@ -22,12 +23,14 @@ public:
     /* element(bool isEntry, bool isExit, std::string& bb); */
     /* element(bool isEntry, bool isExit, int id, std::string& funcname); */
     element(bool isEntry, bool isExit, int id, std::string& funcname);
+    element(bool isEntry, bool isExit, int id, std::string& funcname, unsigned long index);
     bool operator ==(const element &e) const;
 
     std::string bb() const;
 
     std::vector<std::vector<std::shared_ptr<element>>> funcs;
     std::string funcname;
+    unsigned long index;
     int id;
     bool isEntry;
     bool isExit;
@@ -51,7 +54,7 @@ struct lastaligned {
 
 typedef struct lastaligned lastaligned;
 
-std::deque<std::shared_ptr<lastaligned>> onlineAlignment(std::deque<std::shared_ptr<lastaligned>>& q, bool& isaligned);
+std::deque<std::shared_ptr<lastaligned>> onlineAlignment(std::deque<std::shared_ptr<lastaligned>>& q, bool& isaligned, size_t& lastind);
 void appendReplayTrace();
 
 std::vector<std::shared_ptr<element>> makeHierarchyMain(std::vector<std::vector<std::string>>& traces, unsigned long& index);
@@ -64,5 +67,7 @@ void printsurface(std::vector<std::shared_ptr<element>>& functionalTraces);
 bool greedyalignmentWholeOffline(std::vector<std::shared_ptr<element>>& original, std::vector<std::shared_ptr<element>>& reproduced, const int& rank);
 bool greedyalignmentWholeOffline();
 
-std::deque<std::shared_ptr<lastaligned>> greedyalignmentOnline(std::vector<std::shared_ptr<element>>& original, std::vector<std::shared_ptr<element>>& reproduced, std::deque<std::shared_ptr<lastaligned>>& q, size_t &i, size_t &j, const size_t& funcId, const int &rank, bool& isaligned);
+std::deque<std::shared_ptr<lastaligned>> greedyalignmentOnline(std::vector<std::shared_ptr<element>>& original, std::vector<std::shared_ptr<element>>& reproduced, std::deque<std::shared_ptr<lastaligned>>& q, size_t &i, size_t &j, const size_t& funcId, const int &rank, bool& isaligned, size_t& lastind);
+
+std::vector<std::string> getmsgs(std::vector<std::string> &orders, const size_t lastind, unsigned& order_index);
 #endif // ALIGNMENT_H

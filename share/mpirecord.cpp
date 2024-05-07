@@ -464,7 +464,7 @@ int MPI_Waitall(
         DEBUG0(":%p:%d", &array_of_requests[i], stats[i].MPI_SOURCE);
     }
     DEBUG0("\n");
-    fprintf(recordFile, "%lu\n", nodecnt);
+    fprintf(recordFile, ":%lu\n", nodecnt);
     RECORDTRACE("\n");
     return ret;
 }

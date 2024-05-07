@@ -139,20 +139,4 @@ void printtails(std::vector<std::vector<std::string>>& traces, unsigned tail) {
     }
 }
 
-void segfault_handler(int sig) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    void *array[10];
-    size_t size;
 
-    if(rank == 0) {
-        size = backtrace(array, 10);
-        cerr << "Error: signal " << sig << endl;
-        backtrace_symbols_fd(array, size, STDERR_FILENO);
-    }
-    MPI_Abort(MPI_COMM_WORLD, 1);
-}
-
-void install_segfault_handler() {
-    signal(SIGSEGV, segfault_handler);
-}

@@ -9,11 +9,18 @@ vector<shared_ptr<element>> recordTraces;
 
 vector<vector<string>> replayTracesRaw; // this is necessary for bbprinter
 vector<shared_ptr<element>> replayTraces;
+static unordered_map<string, unordered_set<string>> divs;
 
 /* element::element(bool isEntry, bool isExit, string& bb) : isEntry(isEntry), isExit(isExit), bb(bb), funcs(vector<vector<shared_ptr<element>>>()) { */
 /* } */
 
-element::element(bool isEntry, bool isExit, int id, string& funcname) : funcs(vector<vector<shared_ptr<element>>>()), funcname(funcname), id(id), isEntry(isEntry), isExit(isExit) {
+element::element(bool isEntry, bool isExit, int id, string& funcname) : \
+        funcs(vector<vector<shared_ptr<element>>>()), funcname(funcname), index(numeric_limits<unsigned long>::max()), id(id), isEntry(isEntry), isExit(isExit) {
+}
+
+element::element(bool isEntry, bool isExit, int id, string& funcname, unsigned long index) : \
+        funcs(vector<vector<shared_ptr<element>>>()), funcname(funcname), index(index), id(id), isEntry(isEntry), isExit(isExit) {
+            /* DEBUG0("element created with index: %lu\n", index); */
 }
 
 string element::bb() const {
@@ -48,7 +55,6 @@ ostream& operator<<(ostream& os, const lastaligned& l) {
 }
 
 vector<shared_ptr<element>> makeHierarchyMain(vector<vector<string>>& traces, unsigned long& index) {
-    /* DEBUG0("makeHierarchyMain called at %lu\n", index); */
     vector<shared_ptr<element>> functionalTraces;
     bool isEntry, isExit;
     string funcname = "main";
@@ -64,12 +70,17 @@ vector<shared_ptr<element>> makeHierarchyMain(vector<vector<string>>& traces, un
 
     do {
         MPI_ASSERT(traces[index][0] == funcname);
-        MPI_ASSERT(traces[index].size() == 3);
+        MPI_ASSERT(traces[index].size() == 3 || traces[index].size() == 4);
         bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
         /* DEBUG0("bbname: %s\n", bbname.c_str()); */
-        shared_ptr<element> eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0]);
+        shared_ptr<element> eptr;
+        if(traces[index].size() == 4) {
+            eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0], stoul(traces[index][3]));
+        } else {
+            eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0]);
+        }
         index++;
         
         while(!isExit && index < traces.size() && traces[index][1] == "entry") {
@@ -90,25 +101,48 @@ vector<shared_ptr<element>> makeHierarchy(vector<vector<string>>& traces, unsign
     bool isEntry, isExit;
     string bbname, funcname;
     funcname = traces[index][0];
+    /* bool debug = false; */
+    /* if(funcname == "hypre_PCGSolve") { */
+        /* DEBUG0("came to hypre_PCGSolve\n"); */
+    /* } */
     /* DEBUG0("makeHierarchy for %s, at index: %lu\n", funcname.c_str(), index); */
     /* DEBUG0("funcname: %s: %lu\n", funcname.c_str(), index); */
     do {
         MPI_ASSERT(index < traces.size());
         bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
-        if(traces[index][0] != funcname) {
-            DEBUG0("bbname: %s\n", bbname.c_str());
-            DEBUG0("funcname: %s, traces[index][0]: %s\n", funcname.c_str(), traces[index][0].c_str());
-        }
+        /* if(bbname == "hypre_PCGSolve:neither:15") { */
+        /*     DEBUG0("came to hypre_PCGSolve:neither:15\n"); */
+        /*     DEBUG0("show me next %s:%s:%s\n", traces[index + 1][0].c_str(), traces[index + 1][1].c_str(), traces[index + 1][2].c_str()); */
+        /*     debug = true; */
+        /* } */
+        /* if(traces[index][0] != funcname) { */
+        /*     DEBUG0("bbname: %s\n", bbname.c_str()); */
+        /*     DEBUG0("funcname: %s, traces[index][0]: %s\n", funcname.c_str(), traces[index][0].c_str()); */
+        /* } */
         MPI_ASSERT(traces[index][0] == funcname);
-        MPI_ASSERT(traces[index].size() == 3);
+        MPI_ASSERT(traces[index].size() == 3 || traces[index].size() == 4);
         /* DEBUG0("bbname: %s\n", bbname.c_str()); */
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
         /* shared_ptr<element> eptr = make_shared<element>(isEntry, isExit, bbname); */
-        shared_ptr<element> eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0]);
+        shared_ptr<element> eptr;
+        if(traces[index].size() == 4) {
+            eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0], stoul(traces[index][3]));
+        } else {
+            eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0]);
+        }
         index++;
         while(!isExit && index < traces.size() && traces[index][1] == "entry") {
             eptr->funcs.push_back(makeHierarchy(traces, index)); 
+            /* if(debug) { */
+            /*     int rank; */
+            /*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+            /*     if(!rank) { */
+                /* print(eptr->funcs.back(), 0); */
+                /* DEBUG0("eptr->bb(): %s\n", eptr->bb().c_str()); */
+            /*     debug = false; */
+            /*     } */
+            /* } */
         }
         functionalTraces.push_back(eptr);
     } while(!isExit && index < traces.size());
@@ -124,7 +158,7 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
     MPI_ASSERT(functionalTraces[0]->funcname == "main");
     MPI_ASSERT(functionalTraces.back()->funcname == "main");
     shared_ptr<element> curr = functionalTraces.back();
-
+    /* bool debug = false; */
 
     while(!(curr->isExit)) {
         /* DEBUG0("lastElement->bb(): %s\n", lastElement->bb().c_str()); */
@@ -133,6 +167,9 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
             break;
         } else {
             curr = curr->funcs.back().back();
+            /* if(curr->bb() == "hypre_PCGSolve:neither:15") { */
+                /* DEBUG0("at addHierarchy, came to hypre_PCGSolve:neither:15\n"); */
+            /* } */
         }
     }
     /* DEBUG0("stack ready\n"); */
@@ -148,7 +185,17 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
     }
 
     while(index < traces.size()) {
+        /* if(curr->bb() == "hypre_PCGSolve:neither:15") { */
+            /* debug = true; */
+        /* } */
         while (index < traces.size() && traces[index][1] == "entry") {
+            /* if(debug && !rank) { */
+                /* DEBUG0("traces[%lu]: %s:%s:%s\n", index, traces[index][0].c_str(), traces[index][1].c_str(), traces[index][2].c_str()); */
+                /* for(unsigned k = 0; k < curr->funcs.size(); k++) { */
+                /*     DEBUG0("k = %u\n", k); */
+                /*     printsurface(curr->funcs[k]); */
+                /* } */
+            /* } */
             curr->funcs.push_back(makeHierarchy(traces, index));
         } 
         if(index >= traces.size()) {
@@ -156,7 +203,11 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
         } 
         MPI_ASSERT(traces[index][1] != "entry");
         /* DEBUG0("%s:%s:%s\n", traces[index][0].c_str(), traces[index][1].c_str(), traces[index][2].c_str()); */
-        newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0]);
+        if(traces[index].size() == 3) {
+            newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0]);
+        } else {
+            newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0], stoul(traces[index][3]));
+        }
         MPI_ASSERT(traces[index][0] == curr->funcname);
         index++;
         if(parent != nullptr) {
@@ -169,6 +220,7 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
                 break; // this should be at the end of main
             } else {
                 curr = parent;
+                /* debug = false; */
                 if(!__stack.empty()) {
                     parent = __stack.top();
                     __stack.pop();
@@ -178,6 +230,7 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
             }
         } else {
             curr = newchild;
+            /* debug = false; */
         }
     }
 }
@@ -187,7 +240,11 @@ void print(vector<shared_ptr<element>>& functionalTraces, unsigned depth) {
         for(unsigned i = 0; i < depth; i++) {
             fprintf(stderr, "\t"); 
         }
-        fprintf(stderr, "%s\n", eptr->bb().c_str());
+        if(eptr->index != numeric_limits<unsigned long>::max()) {
+            fprintf(stderr, "%s:%lu\n", eptr->bb().c_str(), eptr->index);
+        } else {
+            fprintf(stderr, "%s\n", eptr->bb().c_str());
+        }
 
         for(unsigned i = 0; i < eptr->funcs.size(); i++) {
             print(eptr->funcs[i], depth + 1);
@@ -209,10 +266,11 @@ static size_t findSize(FILE *fp) {
     return size;
 }
 
-deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q, bool& isaligned) {
+deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q, bool& isaligned, size_t &lastind) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* static deque<shared_ptr<lastaligned>> q; */
+    /* DEBUG("onlineAlignment called at rank: %d\n", rank); */
     appendReplayTrace();
     size_t i = 0, j = 0; // this part is not correct, you need to read it from q
     size_t funcId = 0;
@@ -224,11 +282,13 @@ deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q
     }
     /* DEBUG0("online alignment starting\n"); */
     deque<shared_ptr<lastaligned>> rq;
-    rq = greedyalignmentOnline(recordTraces, replayTraces, q, i, j, funcId, rank, isaligned);
+    rq = greedyalignmentOnline(recordTraces, replayTraces, q, i, j, funcId, rank, isaligned, lastind);
+    MPI_ASSERT(lastind != numeric_limits<size_t>::max());
+    /* DEBUG0("lastind: %lu at %d\n", lastind, __LINE__); */
     /* if(rank == 0) { */
         /* cerr << "printing rq at the end\n" << rq << endl; */
     /* } */
-    /* DEBUG0("online alignment done\n"); */
+    /* DEBUG("online alignment done at rank: %d\n", rank); */
     return rq;
 }
 
@@ -280,7 +340,7 @@ static inline bool matchbbmap(unordered_map<string, vector<size_t>>& bbMap, vect
 }
 
 
-static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, size_t& initi, size_t& initj, const int& rank, bool&isaligned) {
+static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, size_t& initi, size_t& initj, const int& rank, bool&isaligned, size_t& lastind) {
     /* DEBUG0("__greedyalignmentOnline at %s, i: %lu, j: %lu, ", \ */
     /*         original[initi]->bb().c_str(), initi, initj); */
     size_t i = initi, j = initj;
@@ -290,14 +350,24 @@ static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>&
             aligned.push_back(make_pair(original[i], reproduced[j]));
             i++; j++;
         } else {
-            if(i != initi || j != initj) {
-                printf("pod: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank);
+            /* if(i != initi || j != initj) { */
+            /* printf("pod: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank); */
+            if(original[i - 1]->bb() == reproduced[j - 1]->bb()) {
+                string bb = original[i - 1]->bb();
+                printf("pod: %s, rank: %d\n", bb.c_str(), rank);
             }
+            /* if(divs.find(bb) == divs.end()) { */
+                /* divs[original[i - 1]->bb()] = unordered_set<string>(); */
+            /* } */
+            /* } */
             size_t oldj = j, oldi = i;
             if(bbMap.size() == 0) create_map(bbMap, reproduced, j);
             if(!matchbbmap(bbMap, original, i, j)) {
                 // never aligned here
-                DEBUG0("never aligned at i: %lu, j: %lu, from %s\n", oldi, oldj, original[oldi]->bb().c_str());
+                lastind = original[oldi]->index;
+                /* DEBUG0("at __greedyalignment lastind updated: %lu\n", lastind); */
+                MPI_ASSERT(lastind != numeric_limits<size_t>::max());
+                /* DEBUG0("never aligned at i: %lu, j: %lu, from %s\n", oldi, oldj, original[oldi]->bb().c_str()); */
                 /* if(rank == 0) { */
                     /* DEBUG0("original\n"); */
                     /* printsurface(original); */
@@ -307,7 +377,12 @@ static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>&
                 isaligned = false;
                 return make_pair(oldi, oldj);
             } else {
+                /* printf("pod: %s, rank: %d\n", bb.c_str(), rank); */
                 printf("poc: %s, rank: %d\n", original[i]->bb().c_str(), rank);
+                /* if(divs[bb].find(original[i]->bb()) == divs[bb].end()) { */
+                    /* divs[bb] = unordered_set<string>(); */
+                /* } */
+                /* divs[bb].insert(original[i]->bb()); */
                 i++; j++;
             }
         }
@@ -315,10 +390,20 @@ static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>&
     isaligned = true;
     if(i < original.size()) {
         /* DEBUG0("did not finish at i: %lu\n", i - 1); */
+        lastind = original[i - 1]->index;
+        /* DEBUG0("at __greedyalignment %d lastind updated: %lu\n", rank, lastind); */
+        /* if(lastind == numeric_limits<size_t>::max()) { */
+            /* print(original, 0); */
+            /* print(reproduced, 0); */
+        /* } */
+        MPI_ASSERT(lastind != numeric_limits<size_t>::max());
         return make_pair(i - 1, j - 1);
     } else {
         MPI_ASSERT(j == reproduced.size());
         /* DEBUG0("aligned till the end\n"); */
+        lastind = original[i - 1]->index;
+        /* DEBUG0("at __greedyalignment %d lastind updated: %lu\n", rank, lastind); */
+        MPI_ASSERT(lastind != numeric_limits<size_t>::max());
         return make_pair(numeric_limits<size_t>::max(), numeric_limits<size_t>::max());
     }
 }
@@ -334,7 +419,8 @@ static bool islastaligned(vector<shared_ptr<element>>& original, vector<shared_p
     return matchbbmap(bbMap, original, i, j);
 }
 
-deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, deque<shared_ptr<lastaligned>>& q, size_t &i, size_t &j, const size_t& funcId, const int &rank, bool& isaligned) {
+deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, deque<shared_ptr<lastaligned>>& q, size_t &i, size_t &j, const size_t& funcId, const int &rank, bool& isaligned, size_t& lastind) {
+    MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
     // if the queue is not empty, let's do the alignment level below first
     deque<shared_ptr<lastaligned>> rq;
     /* DEBUG0("greedyalignmentOnline at %s with i: %lu, j: %lu, funcId:%lu\n",\ */
@@ -356,7 +442,13 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
             /* if(rank == 0) { */
                 /* cerr << *la << endl; */
             /* } */
-            rq = greedyalignmentOnline(original[i]->funcs[funcId], reproduced[j]->funcs[funcId], q, la->origIndex, la->repIndex, tmpfuncId, rank, isaligned);
+            /* size_t tmplastind = numeric_limits<size_t>::max(); */
+            size_t tmplastind = 0;
+            MPI_ASSERT(original[i]->funcs[funcId][0]->funcname == reproduced[j]->funcs[funcId][0]->funcname);
+            rq = greedyalignmentOnline(original[i]->funcs[funcId], reproduced[j]->funcs[funcId], q, la->origIndex, la->repIndex, tmpfuncId, rank, isaligned, tmplastind);
+            if(lastind < tmplastind) {
+                lastind = tmplastind;
+            }
         }
     } else {
         firsttime = true;
@@ -382,9 +474,35 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
             MPI_ASSERT(rq.back()->isSuccess());
             rq.pop_back();
         }
-        size_t tmpi = 0, tmpj = 0;
+        size_t tmpi = 0, tmpj = 0, tmplastind = 0;
         /* DEBUG0("k: %lu, reproduced[j]->funcs.size(): %lu\n", k, reproduced[j]->funcs.size()); */
-        rq = greedyalignmentOnline(original[i]->funcs[k], reproduced[j]->funcs[k], q, tmpi, tmpj, k, rank, isaligned);
+        /* if(original[i]->funcs[k][0]->funcname != reproduced[j]->funcs[k][0]->funcname && rank == 0) { */
+            /* printsurface(original[i]->funcs[k]); */
+            /* DEBUG("////////////////////////////////////////////////////////////\n"); */
+            /* printsurface(reproduced[j]->funcs[k]); */
+            /* DEBUG("k: %lu, original[%lu]: %s, reproduced[%lu]: %s\n", k, i, original[i]->bb().c_str(), j, reproduced[j]->bb().c_str()); */
+            /* DEBUG("original[%lu]->funcs[%lu][0]->funcname: %s, reproduced[%lu]->funcs[%lu][0]->funcname: %s\n", i, k, original[i]->funcs[k][0]->funcname.c_str(), j, k, reproduced[j]->funcs[k][0]->funcname.c_str()); */
+        
+        /* } */
+        /* MPI_ASSERT(original[i]->funcs[k][0]->funcname == reproduced[j]->funcs[k][0]->funcname); */
+        if(original[i]->funcs[k][0]->funcname != reproduced[j]->funcs[k][0]->funcname) {
+            printf("different function called from %s: %s vs. %s\n", original[i]->bb().c_str(), original[i]->funcs[k][0]->funcname.c_str(), reproduced[j]->funcs[k][0]->funcname.c_str());
+        } else {
+            rq = greedyalignmentOnline(original[i]->funcs[k], reproduced[j]->funcs[k], q, tmpi, tmpj, k, rank, isaligned, tmplastind);
+        }
+        if(lastind < tmplastind) {
+            /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
+            lastind = tmplastind;
+        }
+        if(!(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \
+                (k == reproduced[j]->funcs.size() - 1))) {
+            /* if(rank == 0) { */
+                /* printsurface(original[i]->funcs[k]); */
+                /* DEBUG("////////////////////////////////////////////////////////////\n"); */
+                /* printsurface(reproduced[j]->funcs[k]); */
+            /* } */
+        }
+
         MPI_ASSERT(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \
                 (k == reproduced[j]->funcs.size() - 1));
     }
@@ -405,11 +523,18 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
     // in case we are doing this for the first time, we should start at i and j 
     // however, if not, then you should start at the i + 1 and j + 1
     pair<size_t, size_t> p;
+    size_t tmplastind = 0;
     if(firsttime) {
-        p = __greedyalignmentOnline(original, reproduced, aligned, i, j, rank, isaligned);
+        MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
+        p = __greedyalignmentOnline(original, reproduced, aligned, i, j, rank, isaligned, tmplastind);
     } else {
         size_t tmpi = i + 1, tmpj = j + 1;
-        p = __greedyalignmentOnline(original, reproduced, aligned, tmpi, tmpj, rank, isaligned);
+        MPI_ASSERT(original[tmpi]->funcname == reproduced[tmpj]->funcname);
+        p = __greedyalignmentOnline(original, reproduced, aligned, tmpi, tmpj, rank, isaligned, tmplastind);
+    }
+    if(lastind < tmplastind) {
+        /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
+        lastind = tmplastind;
     }
 
     deque<shared_ptr<lastaligned>> qs;
@@ -422,24 +547,37 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
         MPI_ASSERT(aligned[ind0].first->funcs.size() == aligned[ind0].second->funcs.size() || ind0 == aligned.size() - 1);
         MPI_ASSERT(aligned[ind0].first->funcs.size() >= aligned[ind0].second->funcs.size());
         newfuncId = aligned[ind0].second->funcs.size() - 1;
+        tmplastind = 0;
         for(unsigned ind1 = 0; ind1 < aligned[ind0].second->funcs.size(); ind1++) {
             size_t tmpi = 0, tmpj = 0, tmpfuncId = 0;
-            qs = greedyalignmentOnline(aligned[ind0].first->funcs[ind1], aligned[ind0].second->funcs[ind1], q, tmpi, tmpj, tmpfuncId, rank, tmpisaligned); 
-            // we only expect the last of the last thing to be not successful
-            /* if((!qs.back()->isSuccess() || !tmpisaligned) && \ */
-            /*         (ind0 != aligned.size() - 1 || ind1 != aligned[ind0].second->funcs.size() - 1)) { */
-            /*     DEBUG0("rank: %d, qs not successful, let's look\n\ */
-            /*             ind0: %u, aligned.size(): %lu, ind1: %u, \ */
-            /*             aligned[%u].first->funcs.size(): %lu", \ */
-            /*             rank, ind0, aligned.size(), ind1, ind0, aligned[ind0].second->funcs.size()); */
-            /*     if(rank == 0) { */
-            /*         cerr << qs << endl; */
-            /*     } */
-            /* } */
-            MPI_ASSERT((qs.back()->isSuccess() && tmpisaligned) || \
-                    (ind0 == aligned.size() - 1 && \
-                    ind1 == aligned[ind0].second->funcs.size() - 1));
-            if(!tmpisaligned) isaligned = false;
+            if(aligned[ind0].first->funcs[ind1][0]->funcname != aligned[ind0].second->funcs[ind1][0]->funcname) {
+                printf("different function called from %s: %s vs. %s\n", \
+                        aligned[ind0].first->bb().c_str(), \
+                        aligned[ind0].first->funcs[ind1][0]->funcname.c_str(), \
+                        aligned[ind0].second->funcs[ind1][0]->funcname.c_str());
+            } else {
+                /* MPI_ASSERT(aligned[ind0].first->funcs[ind1][0]->funcname == aligned[ind0].second->funcs[ind1][0]->funcname); */
+                qs = greedyalignmentOnline(aligned[ind0].first->funcs[ind1], aligned[ind0].second->funcs[ind1], q, tmpi, tmpj, tmpfuncId, rank, tmpisaligned, tmplastind); 
+                // we only expect the last of the last thing to be not successful
+                /* if((!qs.back()->isSuccess() || !tmpisaligned) && \ */
+                /*         (ind0 != aligned.size() - 1 || ind1 != aligned[ind0].second->funcs.size() - 1)) { */
+                /*     DEBUG0("rank: %d, qs not successful, let's look\n\ */
+                /*             ind0: %u, aligned.size(): %lu, ind1: %u, \ */
+                /*             aligned[%u].first->funcs.size(): %lu", \ */
+                /*             rank, ind0, aligned.size(), ind1, ind0, aligned[ind0].second->funcs.size()); */
+                /*     if(rank == 0) { */
+                /*         cerr << qs << endl; */
+                /*     } */
+                /* } */
+                MPI_ASSERT((qs.back()->isSuccess() && tmpisaligned) || \
+                        (ind0 == aligned.size() - 1 && \
+                        ind1 == aligned[ind0].second->funcs.size() - 1));
+                if(!tmpisaligned) isaligned = false;
+                if(lastind < tmplastind) {
+                    /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
+                    lastind = tmplastind;
+                }
+            }
         }
     }
     // if tmp said the alignment was not done at last, then we should expect the alignment did not finish at p either
@@ -520,3 +658,19 @@ bool greedyalignmentWholeOffline() {
 }
 
 
+// returns an empty vector in case of error
+vector<string> getmsgs(vector<string> &orders, const size_t lastind, unsigned& order_index) {
+    size_t ind = 0;
+    vector<string> msgs;
+    do {
+        if(order_index >= orders.size()) {
+            int rank;
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+            DEBUG("order_index went beyong the size of orders, rank: %d\n", rank);
+            return vector<string>();
+        }
+        msgs = parse(orders[order_index++], ':'); 
+        ind = stoul(msgs.back());
+    } while(lastind > ind);
+    return msgs;
+}
