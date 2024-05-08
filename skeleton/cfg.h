@@ -23,11 +23,15 @@ public:
     std::set<node *> findMinimalNodes();
     void insertEdge(const std::string& from, const std::string& to);
     void insertNode(const std::string& name);
+    node *getNode(const std::string& name);
+    std::set<node *> getNodes();
+    node *getEntry();
     
     std::string funcname;
     std::map<std::string, node *> nodes;
     std::map<node *, std::set<node *>> outEdges;
     std::map<node *, std::set<node *>> inEdges;
+    node *entry;
 };
 
 class node {

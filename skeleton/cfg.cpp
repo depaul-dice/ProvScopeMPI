@@ -5,7 +5,7 @@ using namespace std;
 
 node::node(const string& name) : name(name) {}
 
-cfg::cfg(const string& funcname): funcname(funcname) {}
+cfg::cfg(const string& funcname): funcname(funcname), entry(nullptr) {}
 
 cfg::~cfg() {
     for (auto it = nodes.begin(); it != nodes.end(); it++) {
@@ -31,6 +31,35 @@ void cfg::insertEdge(const string &from, const string &to) {
     inEdges[dst].insert(src);
 }
 
+set<node *> cfg::getNodes() {
+    set<node *> ret{};
+    for (auto it = nodes.begin(); it != nodes.end(); it++) {
+        ret.insert(it->second);
+    }
+    return ret;
+}
+
+node *cfg::getEntry() {
+    if(entry) return entry;
+    else {
+        for(auto it = nodes.begin(); it != nodes.end(); it++) {
+            if(inEdges.find(it->second) == inEdges.end()) {
+                entry = it->second;
+                return entry;
+            }
+        }
+        return nullptr;
+    }
+}
+
+node *cfg::getNode(const string &name) {
+    auto it = nodes.find(name);
+    if(it != nodes.end()) {
+        return it->second;
+    } else {
+        return nullptr;
+    }
+}
 static void mergeEdges(map<node *, set<node *>> &tmpOutEdges, map<node *, set<node *>> &outEdges, map<node *, set<node *>> &inEdges) {
     for(auto it = tmpOutEdges.begin(); it != tmpOutEdges.end(); it++) {
         if(outEdges.find(it->first) == outEdges.end()) {

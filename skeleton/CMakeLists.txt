@@ -4,6 +4,8 @@ project(SkeletonPass)
 add_library(SkeletonPass MODULE
     skeleton.cpp
     cfg.cpp
+    loops.cpp
+    tools.cpp
     # Possibly other .cpp files if you have any
 )
 
