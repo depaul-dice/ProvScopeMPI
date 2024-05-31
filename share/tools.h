@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <string>
+#include <unordered_set>
 #include <set>
 #include <mpi.h>
 #include <deque>
@@ -76,6 +77,45 @@ std::ostream& operator<<(std::ostream& os, const std::deque<std::shared_ptr<T>>&
     return os;
 }
 
+template <typename T>
+std::unordered_set<T> operator+=(std::unordered_set<T>& lhs, const std::unordered_set<T>& rhs) {
+    lhs.insert(rhs.begin(), rhs.end());
+    return lhs;
+}
+
+class Logger {
+public:
+    Logger();
+    ~Logger();
+
+    template <typename T>
+    Logger& operator << (const T& message);
+    Logger& operator << (std::ostream& (*manip)(std::ostream&));
+private:
+    int rank;
+    int initialized;
+};
+
+template <typename T>
+Logger& Logger::operator << (const T& message) {
+    if(rank == -1 && !initialized) {
+        MPI_Initialized(&initialized);
+        if(initialized) {
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        } else {
+            std::cerr << "called logger too early" << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+    if(rank == 0) {
+        std::cerr << message;
+    }
+    return *this;
+}
 /* void segfault_handler(int sig, siginfo_t *info, void *ucontext); */
+
+std::string replaceall(std::string& str, const std::string& from, const std::string& to);
+
+void splitNinsert(const std::string& str, const std::string& delimit, std::unordered_set<std::string>& container);
 #endif // TOOLS_H
        

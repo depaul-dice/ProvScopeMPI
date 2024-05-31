@@ -26,7 +26,10 @@ static unordered_map<string, MPI_Request *> __requests;
 static unordered_set<MPI_Request *> __isends;
 static unordered_set<MPI_Request *> __unalignedRequests;
 
+static unordered_map<string, loopNode *> __looptrees;
+
 deque<shared_ptr<lastaligned>> __q;
+Logger logger;
 
 /* #undef MPI_ASSERT */
 
@@ -80,7 +83,6 @@ void setup_signal_hander() {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
-
 
 extern "C" void printBBname(const char *name) {
     int rank, flag1, flag2;
@@ -151,8 +153,24 @@ int MPI_Init(
     /* if(rank == 0) { */
     /*     print(recordTraces, 0); */
     /* } */
-    /* DEBUG0("this was for recordTraces\n"); */
-    setup_signal_hander();
+
+    string looptreefile = "loops.dot";
+    __looptrees = parseDotFile(looptreefile);
+    DEBUG0("done with parsing\n");
+    for(auto lt: __looptrees) {
+        lt.second->fixExclusives();
+    }
+
+    if(rank == 0) {
+        for(auto lt: __looptrees) {
+            DEBUG("loop: %s\n", lt.first.c_str());
+            lt.second->print(cerr, lt.first);
+        }
+    }
+
+    DEBUG("we have done what we need for now: %d\n", rank);
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_ASSERT(false);
     
     return ret;
 }
@@ -173,6 +191,10 @@ int MPI_Finalize(
     __q = onlineAlignment(__q, isaligned, lastind);
     // doesn't matter and just finalize it
     /* DEBUG0("onine alignment done\n"); */
+    for(auto it = __looptrees.begin(); it != __looptrees.end(); it++) {
+        delete it->second;
+    }
+
     return original_MPI_Finalize();
 }
 

@@ -121,7 +121,7 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
     return -1;
 }
 
-void printtails(std::vector<std::vector<std::string>>& traces, unsigned tail) {
+void printtails(vector<vector<string>>& traces, unsigned tail) {
     /* MPI_ASSERT(tail <= traces.size()); */
     if(tail > traces.size()) {
         fprintf(stderr, "tail is larger than traces.size()\n");
@@ -140,3 +140,57 @@ void printtails(std::vector<std::vector<std::string>>& traces, unsigned tail) {
 }
 
 
+Logger::Logger(): rank(-1), initialized(0) {
+    MPI_Initialized(&initialized);
+    if(initialized) {
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    }
+    /* MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+}
+
+Logger& Logger::operator<<(ostream& (*manip)(ostream&)) {
+    if(rank == -1 && !initialized) {
+        MPI_Initialized(&initialized);
+        if(initialized) {
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        } else {
+            cerr << "called logger too early" << endl;
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+    if(rank == 0) {
+        cerr << manip;
+    }
+    return *this;
+}
+
+Logger::~Logger() {
+}
+
+string replaceall(string& str, const string& from, const string& to) {
+    string ret = str;
+    size_t start_pos = 0;
+    while((start_pos = ret.find(from, start_pos)) != string::npos) {
+        ret.replace(start_pos, from.length(), to);
+        start_pos += to.length();
+    }
+    return ret;
+}
+
+void splitNinsert(const string& str, const string& delimit, unordered_set<string>& container) {
+    size_t start = 0;
+    size_t end = str.find(delimit);
+    string res;
+    while(end != string::npos) {
+        res = str.substr(start, end - start);
+        if(res.size() > 0) {
+            container.insert(res);
+        }
+        start = end + delimit.size();
+        end = str.find(delimit, start);
+    }
+    res = str.substr(start, end);
+    if(res.size() > 0) {
+        container.insert(res);
+    }
+}

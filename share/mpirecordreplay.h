@@ -19,6 +19,7 @@
 
 #include "tools.h"
 #include "alignment.h"
+#include "loops.h"
 
 
 using namespace std;
