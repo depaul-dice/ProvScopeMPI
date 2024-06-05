@@ -60,7 +60,9 @@ struct lastaligned {
 typedef struct lastaligned lastaligned;
 
 std::deque<std::shared_ptr<lastaligned>> onlineAlignment(std::deque<std::shared_ptr<lastaligned>>& q, bool& isaligned, size_t& lastind);
+std::deque<std::shared_ptr<lastaligned>> onlineAlignment(std::deque<std::shared_ptr<lastaligned>>& q, bool& isaligned, size_t& lastind, std::unordered_map<std::string, loopNode *>& loopNodes);
 void appendReplayTrace();
+void appendReplayTrace(std::unordered_map<std::string, loopNode *>& loopNodes);
 
 // these functions below DO NOT consider loops at all
 std::vector<std::shared_ptr<element>> makeHierarchyMain(std::vector<std::vector<std::string>>& traces, unsigned long& index);
