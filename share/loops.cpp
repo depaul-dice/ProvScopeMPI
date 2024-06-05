@@ -203,7 +203,11 @@ unordered_set<string> loopNode::fixExclusives(void) {
         }
     }
     for(auto &c: children) {
-        nodes += c->fixExclusives();
+        if(nodes.size() > 0) {
+            nodes += c->fixExclusives();
+        } else {
+            c->fixExclusives();
+        }
     }
     return nodes;
 }

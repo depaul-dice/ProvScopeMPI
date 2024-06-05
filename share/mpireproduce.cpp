@@ -147,12 +147,6 @@ int MPI_Init(
         /* DEBUG0("%s:%s:%s\n", rawTraces[i][0].c_str(), rawTraces[i][1].c_str(), rawTraces[i][2].c_str()); */
     /* } */
 
-    unsigned long index = 0;
-    /* DEBUG("%d:MPI_Init\n", rank); */
-    recordTraces = makeHierarchyMain(rawTraces, index); 
-    /* if(rank == 0) { */
-    /*     print(recordTraces, 0); */
-    /* } */
 
     string looptreefile = "loops.dot";
     __looptrees = parseDotFile(looptreefile);
@@ -166,6 +160,12 @@ int MPI_Init(
             DEBUG("loop: %s\n", lt.first.c_str());
             lt.second->print(cerr, lt.first);
         }
+    }
+
+    unsigned long index = 0;
+    recordTraces = makeHierarchyMain(rawTraces, index, __looptrees); 
+    if(rank == 0) {
+        print(recordTraces, 0);
     }
 
     DEBUG("we have done what we need for now: %d\n", rank);

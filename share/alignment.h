@@ -12,6 +12,7 @@
 #include <deque>
 
 #include "tools.h"
+#include "loops.h"
 
 class element {
 public:
@@ -22,8 +23,11 @@ public:
 
     /* element(bool isEntry, bool isExit, std::string& bb); */
     /* element(bool isEntry, bool isExit, int id, std::string& funcname); */
-    element(bool isEntry, bool isExit, int id, std::string& funcname);
-    element(bool isEntry, bool isExit, int id, std::string& funcname, unsigned long index);
+    element(bool isEntry, bool isExit, int id, std::string& funcname, bool isLoop = false);
+    element(bool isEntry, bool isExit, int id, std::string& funcname, unsigned long index, bool isLoop = false);
+    // this is for the loop node, index is the iteration cnt of the loop
+    element(int id, std::string& funcname, unsigned long index, bool isLoop = true);
+
     bool operator ==(const element &e) const;
 
     std::string bb() const;
@@ -34,6 +38,7 @@ public:
     int id;
     bool isEntry;
     bool isExit;
+    bool isLoop = false;
 };
 
 struct lastaligned {
@@ -57,9 +62,16 @@ typedef struct lastaligned lastaligned;
 std::deque<std::shared_ptr<lastaligned>> onlineAlignment(std::deque<std::shared_ptr<lastaligned>>& q, bool& isaligned, size_t& lastind);
 void appendReplayTrace();
 
+// these functions below DO NOT consider loops at all
 std::vector<std::shared_ptr<element>> makeHierarchyMain(std::vector<std::vector<std::string>>& traces, unsigned long& index);
 std::vector<std::shared_ptr<element>> makeHierarchy(std::vector<std::vector<std::string>>& traces, unsigned long& index);
 void addHierarchy(std::vector<std::shared_ptr<element>>& functionalTraces, std::vector<std::vector<std::string>>& traces, unsigned long& index);
+
+// these functions below consider loops
+std::vector<std::shared_ptr<element>> makeHierarchyMain(std::vector<std::vector<std::string>>& traces, unsigned long &index, std::unordered_map<std::string, loopNode *>& loopNodes);
+std::vector<std::shared_ptr<element>> makeHierarchy(std::vector<std::vector<std::string>>& traces, unsigned long &index, std::unordered_map<std::string, loopNode *>& loopNodes);
+void addHierarchy(std::vector<std::shared_ptr<element>>& functionalTraces, std::vector<std::vector<std::string>>& traces, unsigned long &index, std::unordered_map<std::string, loopNode *>& loopNodes);
+
 
 void print(std::vector<std::shared_ptr<element>>& functionalTraces, unsigned int depth);
 void printsurface(std::vector<std::shared_ptr<element>>& functionalTraces);
