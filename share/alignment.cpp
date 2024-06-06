@@ -29,15 +29,20 @@ element::element(int id, string& funcname, unsigned long index, bool isLoop) : \
 }
 
 string element::bb() const {
+    string str = funcname + ":";
     if(isEntry && isExit) {
-        return funcname + ":both:" + to_string(id);
+        str += "both:" + to_string(id);
     } else if(isEntry) {
-        return funcname + ":entry:" + to_string(id);
+        str += "entry:" + to_string(id);
     } else if(isExit) {
-        return funcname + ":exit:" + to_string(id);
+        str += "exit:" + to_string(id);
     } else {
-        return funcname + ":neither:" + to_string(id);
+        str += "neither:" + to_string(id);
     }
+    if(isLoop) {
+        str += ":loop:" + to_string(index);
+    }
+    return str;
 }
 
 bool element::operator ==(const element &e) const {
@@ -198,12 +203,16 @@ vector<shared_ptr<element>> __makeHierarchyLoop(vector<vector<string>>& traces, 
         } else {
             eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0]);
         }
+        curriter.push_back(eptr);
         index++;
+        if(index >= traces.size()) {
+            break;
+        }
+
         while(!isExit && index < traces.size() && traces[index][1] == "entry") {
 
             eptr->funcs.push_back(makeHierarchyLoop(traces, index, loopTrees)); 
         }
-        curriter.push_back(eptr);
     } 
     MPI_ASSERT(!isExit);
 
@@ -314,7 +323,7 @@ vector<shared_ptr<element>> makeHierarchy(vector<vector<string>>& traces, unsign
     return functionalTraces; 
 }
 
-void addHierarchywLoop(vector<shared_ptr<element>>& functionalTraces, vector<vector<string>>& traces, unsigned long& index, unordered_map<string, loopNode *>& loopTrees) {
+void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<string>>& traces, unsigned long& index, unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     stack<shared_ptr<element>> __stack;
@@ -324,14 +333,17 @@ void addHierarchywLoop(vector<shared_ptr<element>>& functionalTraces, vector<vec
     shared_ptr<element> curr = functionalTraces.back();
     loopNode *currloop = nullptr, *tmploop = nullptr;
 
+    DEBUG0("traces.size(): %lu\n", traces.size());
     while(!(curr->isExit)) {
         __stack.push(curr);
+        DEBUG0("curr->bb(): %s in the stack\n", curr->bb().c_str());
         if(curr->funcs.size() == 0) {
             break;
         } else {
             curr = curr->funcs.back().back();
         }
     }
+
     shared_ptr<element> parent, newchild;
     MPI_ASSERT(!__stack.empty());
     curr = __stack.top();
@@ -343,30 +355,39 @@ void addHierarchywLoop(vector<shared_ptr<element>>& functionalTraces, vector<vec
         __stack.pop();
     }
 
+    DEBUG0("option 1\n");
     // initialize the correct currloop
     currloop = loopTrees[curr->funcname];
     while((tmploop = isNewLoop(curr->bb(), currloop)) != nullptr) {
         currloop = tmploop;
     }
-    
+
+    DEBUG0("option 2\n");
     while(index < traces.size()) {
+        DEBUG0("option 3\n");
         while(index < traces.size() && traces[index][1] == "entry") {
             curr->funcs.push_back(makeHierarchyLoop(traces, index, loopTrees));
         }
         if(index >= traces.size()) break;
         // if we are in other loops, we have to go through the loop
         // implement it here
+        DEBUG0("option 4\n");
         string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
         while((tmploop = isNewLoop(bb, currloop)) != nullptr) {
             // you need to make an loop element here
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(traces, index, loopTrees, tmploop);
+            DEBUG0("option 4.1\n");
             if(parent != nullptr) {
                 parent->funcs.back().insert(parent->funcs.back().end(), loops.begin(), loops.end());
             } else {
                 functionalTraces.insert(functionalTraces.end(), loops.begin(), loops.end());
             }
+            DEBUG0("option 4.2\n");
+            if(index >= traces.size()) break;
+            bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         }
         if(index >= traces.size()) break;
+        DEBUG0("option 5\n");
         MPI_ASSERT(traces[index][1] != "entry");
         // assert that we are in this exact loop too
         if(traces[index].size() == 3) {
@@ -377,16 +398,28 @@ void addHierarchywLoop(vector<shared_ptr<element>>& functionalTraces, vector<vec
         }
         MPI_ASSERT(traces[index][0] == curr->funcname);
         index++;
+        DEBUG0("option 6\n");
         if(parent != nullptr) {
+            DEBUG0("option 6.1\n");
+            if(parent->funcs.size() == 0) {
+                parent->funcs.push_back(vector<shared_ptr<element>>());
+            }
             parent->funcs.back().push_back(newchild);
         } else {
+            DEBUG0("option 6.2\n");
             functionalTraces.push_back(newchild);
         }
         
+        DEBUG0("option 7\n");
         // if we are ending this batch, it should be either a loop iteration, or a function
         // just add a condition || and add the condition of the end of the loop
+        if(index >= traces.size()) {
+            break;
+        }
         bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        DEBUG0("option 8 bb: %s\n", bb.c_str());
         if(traces[index - 1][1] == "exit") {
+            DEBUG0("option 8.1\n");
             if(parent == nullptr) {
                 MPI_ASSERT(traces[index - 1][1] == "exit");
                 break;
@@ -403,109 +436,129 @@ void addHierarchywLoop(vector<shared_ptr<element>>& functionalTraces, vector<vec
                     parent = nullptr;
                 }
             }
+        // if we need to start another iteration of the same loop
         } else if(currloop->entry == bb) {
+            DEBUG0("option 8.2\n");
             MPI_ASSERT(parent != nullptr);
             MPI_ASSERT(parent->isLoop);
             // you need to create another loop node here
             parent = make_shared<element>(stoi(traces[index][2]), parent->funcname, parent->index + 1);
-            __stack.top()->funcs.back().push_back(parent);
-            parent->funcs.back().push_back(newchild);
-            curr = newchild;
-        } else {
-            curr = newchild;
-        }
-    }
-}
-
-void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<string>>& traces, unsigned long& index) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    stack<shared_ptr<element>> __stack;
-    MPI_ASSERT(!functionalTraces.empty());
-    MPI_ASSERT(functionalTraces[0]->funcname == "main");
-    MPI_ASSERT(functionalTraces.back()->funcname == "main");
-    shared_ptr<element> curr = functionalTraces.back();
-    /* bool debug = false; */
-
-    while(!(curr->isExit)) {
-        /* DEBUG0("lastElement->bb(): %s\n", lastElement->bb().c_str()); */
-        __stack.push(curr);
-        if(curr->funcs.size() == 0) {
-            break;
-        } else {
-            curr = curr->funcs.back().back();
-            /* if(curr->bb() == "hypre_PCGSolve:neither:15") { */
-                /* DEBUG0("at addHierarchy, came to hypre_PCGSolve:neither:15\n"); */
-            /* } */
-        }
-    }
-    /* DEBUG0("stack ready\n"); */
-    shared_ptr<element> parent, newchild;
-    MPI_ASSERT(!__stack.empty());
-    curr = __stack.top();
-    __stack.pop();
-    if(__stack.empty()) {
-        parent = nullptr;
-    } else {
-        parent = __stack.top();
-        __stack.pop();
-    }
-
-    while(index < traces.size()) {
-        /* if(curr->bb() == "hypre_PCGSolve:neither:15") { */
-            /* debug = true; */
-        /* } */
-        while (index < traces.size() && traces[index][1] == "entry") {
-            /* if(debug && !rank) { */
-                /* DEBUG0("traces[%lu]: %s:%s:%s\n", index, traces[index][0].c_str(), traces[index][1].c_str(), traces[index][2].c_str()); */
-                /* for(unsigned k = 0; k < curr->funcs.size(); k++) { */
-                /*     DEBUG0("k = %u\n", k); */
-                /*     printsurface(curr->funcs[k]); */
-                /* } */
-            /* } */
-            curr->funcs.push_back(makeHierarchy(traces, index));
-        } 
-        if(index >= traces.size()) {
-            break;
-        } 
-        MPI_ASSERT(traces[index][1] != "entry");
-        /* DEBUG0("%s:%s:%s\n", traces[index][0].c_str(), traces[index][1].c_str(), traces[index][2].c_str()); */
-        if(traces[index].size() == 3) {
-            newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0]);
-        } else {
-            newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0], stoul(traces[index][3]));
-        }
-        if(traces[index][0] != curr->funcname) {
-            DEBUG0("traces[%lu][0]: %s, curr->funcname: %s\n", index, traces[index][0].c_str(), curr->funcname.c_str());
-            string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
-            DEBUG0("bb: %s\n", bb.c_str());
-        }
-        MPI_ASSERT(traces[index][0] == curr->funcname);
-        index++;
-        if(parent != nullptr) {
-            parent->funcs.back().push_back(newchild);
-        } else {
-            functionalTraces.push_back(newchild);
-        }
-        if(traces[index - 1][1] == "exit") { // this index - 1 is the last index
-            if(parent == nullptr) {
-                break; // this should be at the end of main
+            DEBUG0("option 8.2.1\n");
+            if(__stack.empty()) {
+                functionalTraces.push_back(parent);
             } else {
+                __stack.top()->funcs.back().push_back(parent);
+            }
+            DEBUG0("option 8.2.2\n");
+        // if we need to get out of the loop
+        // nodes.size > 0 to exclude the root node case
+        } else if (traces[index][1] != "entry" && currloop->nodes.size() > 0 && currloop->nodes.find(bb) == currloop->nodes.end()){
+            MPI_ASSERT(parent != nullptr); 
+            MPI_ASSERT(parent->isLoop);
+            while(currloop->nodes.size() > 0 && currloop->nodes.find(bb) == currloop->nodes.end()) {
+                currloop = currloop->parent;
                 curr = parent;
-                /* debug = false; */
-                if(!__stack.empty()) {
-                    parent = __stack.top();
-                    __stack.pop();
-                } else {
-                    parent = nullptr;
-                }
+                MPI_ASSERT(!__stack.empty());
+                parent = __stack.top();
+                __stack.pop();
+                MPI_ASSERT(curr->isLoop);
             }
         } else {
+            DEBUG0("option 8.3\n");
             curr = newchild;
-            /* debug = false; */
         }
     }
 }
+
+/* void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<string>>& traces, unsigned long& index) { */
+/*     int rank; */
+/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+/*     stack<shared_ptr<element>> __stack; */
+/*     MPI_ASSERT(!functionalTraces.empty()); */
+/*     MPI_ASSERT(functionalTraces[0]->funcname == "main"); */
+/*     MPI_ASSERT(functionalTraces.back()->funcname == "main"); */
+/*     shared_ptr<element> curr = functionalTraces.back(); */
+/*     /1* bool debug = false; *1/ */
+
+/*     while(!(curr->isExit)) { */
+/*         /1* DEBUG0("lastElement->bb(): %s\n", lastElement->bb().c_str()); *1/ */
+/*         __stack.push(curr); */
+/*         if(curr->funcs.size() == 0) { */
+/*             break; */
+/*         } else { */
+/*             curr = curr->funcs.back().back(); */
+/*             /1* if(curr->bb() == "hypre_PCGSolve:neither:15") { *1/ */
+/*                 /1* DEBUG0("at addHierarchy, came to hypre_PCGSolve:neither:15\n"); *1/ */
+/*             /1* } *1/ */
+/*         } */
+/*     } */
+/*     /1* DEBUG0("stack ready\n"); *1/ */
+/*     shared_ptr<element> parent, newchild; */
+/*     MPI_ASSERT(!__stack.empty()); */
+/*     curr = __stack.top(); */
+/*     __stack.pop(); */
+/*     if(__stack.empty()) { */
+/*         parent = nullptr; */
+/*     } else { */
+/*         parent = __stack.top(); */
+/*         __stack.pop(); */
+/*     } */
+
+/*     while(index < traces.size()) { */
+/*         /1* if(curr->bb() == "hypre_PCGSolve:neither:15") { *1/ */
+/*             /1* debug = true; *1/ */
+/*         /1* } *1/ */
+/*         while (index < traces.size() && traces[index][1] == "entry") { */
+/*             /1* if(debug && !rank) { *1/ */
+/*                 /1* DEBUG0("traces[%lu]: %s:%s:%s\n", index, traces[index][0].c_str(), traces[index][1].c_str(), traces[index][2].c_str()); *1/ */
+/*                 /1* for(unsigned k = 0; k < curr->funcs.size(); k++) { *1/ */
+/*                 /1*     DEBUG0("k = %u\n", k); *1/ */
+/*                 /1*     printsurface(curr->funcs[k]); *1/ */
+/*                 /1* } *1/ */
+/*             /1* } *1/ */
+/*             curr->funcs.push_back(makeHierarchy(traces, index)); */
+/*         } */ 
+/*         if(index >= traces.size()) { */
+/*             break; */
+/*         } */ 
+/*         MPI_ASSERT(traces[index][1] != "entry"); */
+/*         /1* DEBUG0("%s:%s:%s\n", traces[index][0].c_str(), traces[index][1].c_str(), traces[index][2].c_str()); *1/ */
+/*         if(traces[index].size() == 3) { */
+/*             newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0]); */
+/*         } else { */
+/*             newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0], stoul(traces[index][3])); */
+/*         } */
+/*         if(traces[index][0] != curr->funcname) { */
+/*             DEBUG0("traces[%lu][0]: %s, curr->funcname: %s\n", index, traces[index][0].c_str(), curr->funcname.c_str()); */
+/*             string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; */
+/*             DEBUG0("bb: %s\n", bb.c_str()); */
+/*         } */
+/*         MPI_ASSERT(traces[index][0] == curr->funcname); */
+/*         index++; */
+/*         if(parent != nullptr) { */
+/*             parent->funcs.back().push_back(newchild); */
+/*         } else { */
+/*             functionalTraces.push_back(newchild); */
+/*         } */
+/*         if(traces[index - 1][1] == "exit") { // this index - 1 is the last index */
+/*             if(parent == nullptr) { */
+/*                 break; // this should be at the end of main */
+/*             } else { */
+/*                 curr = parent; */
+/*                 /1* debug = false; *1/ */
+/*                 if(!__stack.empty()) { */
+/*                     parent = __stack.top(); */
+/*                     __stack.pop(); */
+/*                 } else { */
+/*                     parent = nullptr; */
+/*                 } */
+/*             } */
+/*         } else { */
+/*             curr = newchild; */
+/*             /1* debug = false; *1/ */
+/*         } */
+/*     } */
+/* } */
 
 void print(vector<shared_ptr<element>>& functionalTraces, unsigned depth) {
     for(auto& eptr : functionalTraces) {
@@ -513,11 +566,11 @@ void print(vector<shared_ptr<element>>& functionalTraces, unsigned depth) {
             fprintf(stderr, "\t"); 
         }
         if(eptr->index != numeric_limits<unsigned long>::max()) {
-            if(eptr->isLoop) {
-                fprintf(stderr, "%s:loop:%lu\n", eptr->bb().c_str(), eptr->index);
-            } else {
+            if(eptr->isLoop) 
+                fprintf(stderr, "%s\n", eptr->bb().c_str());
+            else
                 fprintf(stderr, "%s:%lu\n", eptr->bb().c_str(), eptr->index);
-            }
+
         } else {
             fprintf(stderr, "%s\n", eptr->bb().c_str());
         }
@@ -542,31 +595,33 @@ static size_t findSize(FILE *fp) {
     return size;
 }
 
-deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q, bool& isaligned, size_t &lastind) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* static deque<shared_ptr<lastaligned>> q; */
-    /* DEBUG("onlineAlignment called at rank: %d\n", rank); */
-    appendReplayTrace();
-    size_t i = 0, j = 0; 
-    size_t funcId = 0;
-    if(!q.empty()) {
-        i = q.back()->origIndex;
-        j = q.back()->repIndex;
-        funcId = q.back()->funcId;
-        q.pop_back();
-    }
-    /* DEBUG0("online alignment starting\n"); */
-    deque<shared_ptr<lastaligned>> rq;
-    rq = greedyalignmentOnline(recordTraces, replayTraces, q, i, j, funcId, rank, isaligned, lastind);
-    MPI_ASSERT(lastind != numeric_limits<size_t>::max());
-    /* DEBUG0("lastind: %lu at %d\n", lastind, __LINE__); */
-    /* if(rank == 0) { */
-        /* cerr << "printing rq at the end\n" << rq << endl; */
-    /* } */
-    /* DEBUG("online alignment done at rank: %d\n", rank); */
-    return rq;
-}
+/* deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q, bool& isaligned, size_t &lastind) { */
+/*     cerr << "this function should not be called\n"; */
+/*     MPI_ASSERT(false); */
+/*     int rank; */
+/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+/*     /1* static deque<shared_ptr<lastaligned>> q; *1/ */
+/*     /1* DEBUG("onlineAlignment called at rank: %d\n", rank); *1/ */
+/*     appendReplayTrace(); */
+/*     size_t i = 0, j = 0; */ 
+/*     size_t funcId = 0; */
+/*     if(!q.empty()) { */
+/*         i = q.back()->origIndex; */
+/*         j = q.back()->repIndex; */
+/*         funcId = q.back()->funcId; */
+/*         q.pop_back(); */
+/*     } */
+/*     /1* DEBUG0("online alignment starting\n"); *1/ */
+/*     deque<shared_ptr<lastaligned>> rq; */
+/*     rq = greedyalignmentOnline(recordTraces, replayTraces, q, i, j, funcId, rank, isaligned, lastind); */
+/*     MPI_ASSERT(lastind != numeric_limits<size_t>::max()); */
+/*     /1* DEBUG0("lastind: %lu at %d\n", lastind, __LINE__); *1/ */
+/*     /1* if(rank == 0) { *1/ */
+/*         /1* cerr << "printing rq at the end\n" << rq << endl; *1/ */
+/*     /1* } *1/ */
+/*     /1* DEBUG("online alignment done at rank: %d\n", rank); *1/ */
+/*     return rq; */
+/* } */
 
 deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q, bool& isaligned, size_t &lastind, unordered_map<string, loopNode *>& loopTrees) {
     int rank;
@@ -596,32 +651,33 @@ deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q
     return rq;
 }
 
-void appendReplayTrace() {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    static unsigned long index = 0;
-    if(replayTraces.size() == 0) {
-        /* DEBUG0("makeHierarchyMain called at %lu\n", index); */
-        MPI_ASSERT(index == 0);
-        replayTraces = makeHierarchyMain(replayTracesRaw, index);
-        /* if(rank == 0) { */
-            /* print(replayTraces, 0); */
-        /* } */
-    } else {
-        /* DEBUG0("addHierarchy called at %lu\n", index); */
-        addHierarchy(replayTraces, replayTracesRaw, index);
-        /* if(rank == 0) { */
-        /*     print(replayTraces, 0); */
-        /* } */
-    }
+/* void appendReplayTrace() { */
+/*     int rank; */
+/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+/*     static unsigned long index = 0; */
+/*     if(replayTraces.size() == 0) { */
+/*         /1* DEBUG0("makeHierarchyMain called at %lu\n", index); *1/ */
+/*         MPI_ASSERT(index == 0); */
+/*         replayTraces = makeHierarchyMain(replayTracesRaw, index); */
+/*         /1* if(rank == 0) { *1/ */
+/*             /1* print(replayTraces, 0); *1/ */
+/*         /1* } *1/ */
+/*     } else { */
+/*         /1* DEBUG0("addHierarchy called at %lu\n", index); *1/ */
+/*         addHierarchy(replayTraces, replayTracesRaw, index); */
+/*         /1* if(rank == 0) { *1/ */
+/*         /1*     print(replayTraces, 0); *1/ */
+/*         /1* } *1/ */
+/*     } */
 
-    return;
-}
+/*     return; */
+/* } */
 
 void appendReplayTrace(unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     static unsigned long index = 0;
+    DEBUG0("index at %lu\n", index);
     if(replayTraces.size() == 0) {
         /* DEBUG0("makeHierarchyMain called at %lu\n", index); */
         MPI_ASSERT(index == 0);
@@ -630,8 +686,8 @@ void appendReplayTrace(unordered_map<string, loopNode *>& loopTrees) {
             print(replayTraces, 0);
         }
     } else {
-        /* DEBUG0("addHierarchy called at %lu\n", index); */
-        addHierarchywLoop(replayTraces, replayTracesRaw, index, loopTrees);
+        DEBUG0("addHierarchy called at %lu\n", index);
+        addHierarchy(replayTraces, replayTracesRaw, index, loopTrees);
         if(rank == 0) {
             print(replayTraces, 0);
         }

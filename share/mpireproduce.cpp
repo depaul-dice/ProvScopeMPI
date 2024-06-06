@@ -41,48 +41,48 @@ Logger logger;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
             DEBUG("line: %d, rank: %d, assertion failed: %s\n\
                     going to abort\n", __LINE__, rank, #CONDITION); \
-            appendReplayTrace(); \
-            greedyalignmentWholeOffline(); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
 
-/* void segfault_handler(int sig, siginfo_t *info, void *ucontext) { */
-/*     int rank; */
-/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-/*     void *array[10]; */
-/*     size_t size; */
-/*     char **strings; */
+void segfault_handler(int sig, siginfo_t *info, void *ucontext) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    void *array[10];
+    size_t size;
+    char **strings;
 
-/*     size = backtrace(array, 10); */
-/*     cerr << "Error " << rank << ": signal " << sig \ */
-/*     << "at line " << info->si_code << endl; */
-/*     size = backtrace(array, 10); */
-/*     strings = backtrace_symbols(array, size); */
-/*     /1* for (size_t i = 0; i < size; ++i) { *1/ */
-/*     /1*     char command[256]; *1/ */
-/*     /1*     snprintf(command, sizeof(command), "addr2line -f -e %s %p", __progname, array[i]); *1/ */
-/*     /1*     system(command); *1/ */
-/*     /1* } *1/ */
-/*     fprintf(stderr, "Obtained %zd stack frames in rank %d\n", size, rank); */
-/*     for (size_t i = 0; i < size; i++) { */
-/*         fprintf(stderr, "%s\n", strings[i]); */
-/*     } */
+    if(rank == 0) {
+        size = backtrace(array, 10);
+        cerr << "Error " << rank << ": signal " << sig \
+        << "at line " << info->si_code << endl;
+        size = backtrace(array, 10);
+        strings = backtrace_symbols(array, size);
+        /* for (size_t i = 0; i < size; ++i) { */
+        /*     char command[256]; */
+        /*     snprintf(command, sizeof(command), "addr2line -f -e %s %p", __progname, array[i]); */
+        /*     system(command); */
+        /* } */
+        fprintf(stderr, "Obtained %zd stack frames in rank %d\n", size, rank);
+        for (size_t i = 0; i < size; i++) {
+            fprintf(stderr, "%s\n", strings[i]);
+        }
+    }
 
-/*     MPI_Abort(MPI_COMM_WORLD, 1); */
-/* } */
+    MPI_Abort(MPI_COMM_WORLD, 1);
+}
 
-/* void setup_signal_hander() { */
-/*     struct sigaction sa; */
+void setup_signal_hander() {
+    struct sigaction sa;
 
-/*     sa.sa_flags = SA_SIGINFO; */
-/*     sa.sa_sigaction = segfault_handler; */
-/*     sigemptyset(&sa.sa_mask); */
-/*     if(sigaction(SIGSEGV, &sa, NULL) == -1) { */
-/*         fprintf(stderr, "Error: cannot set signal handler\n"); */
-/*         MPI_Abort(MPI_COMM_WORLD, 1); */
-/*     } */
-/* } */
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = segfault_handler;
+    sigemptyset(&sa.sa_mask);
+    if(sigaction(SIGSEGV, &sa, NULL) == -1) {
+        fprintf(stderr, "Error: cannot set signal handler\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+}
 
 extern "C" void printBBname(const char *name) {
     int rank, flag1, flag2;
@@ -168,10 +168,8 @@ int MPI_Init(
         /* print(recordTraces, 0); */
     /* } */
 
-    /* DEBUG("we have done what we need for now: %d\n", rank); */
-    /* MPI_Barrier(MPI_COMM_WORLD); */
-    /* MPI_ASSERT(false); */
-    
+    setup_signal_hander();
+
     return ret;
 }
 
@@ -247,6 +245,7 @@ int MPI_Irecv(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
+    DEBUG0("MPI_Irecv\n");
     if(!original_MPI_Recv) {
         original_MPI_Irecv = reinterpret_cast<int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Request *)>(dlsym(RTLD_NEXT, "MPI_Irecv"));
     }
@@ -266,8 +265,7 @@ int MPI_Irecv(
     }
     
     vector<string> msgs = getmsgs(orders, lastind, __order_index);
-    DEBUG0("MPI_Irecv: %s -> %p: %s\t", msgs[3].c_str(), request, orders[__order_index - 1].c_str());
-    appendReplayTrace();
+    /* DEBUG0("MPI_Irecv: %s -> %p: %s\t", msgs[3].c_str(), request, orders[__order_index - 1].c_str()); */
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Irecv");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
     /* MPI_ASSERTNALIGN(stoi(msgs[2]) == source); // commenting for the greedy alignment */
@@ -276,11 +274,11 @@ int MPI_Irecv(
     __requests[msgs[3]] = request;
     if(source == MPI_ANY_SOURCE) {
         source = lookahead(orders, __order_index, msgs[3]);
-        DEBUG0(":ANY_SOURCE to %d\n", source);
+        /* DEBUG0(":ANY_SOURCE to %d\n", source); */
         // -1 means was not able to find the right source, -2 means it was cancelled
         MPI_ASSERTNALIGN(source != -1);
     } else {
-        DEBUG0(":%d\n", source);
+        /* DEBUG0(":%d\n", source); */
     }
     return original_MPI_Irecv(buf, count, datatype, source, tag, comm, request);
 }
