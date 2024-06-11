@@ -168,7 +168,7 @@ int MPI_Init(
         /* print(recordTraces, 0); */
     /* } */
 
-    setup_signal_hander();
+    //setup_signal_hander();
 
     return ret;
 }

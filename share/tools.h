@@ -21,8 +21,7 @@
         if(!(CONDITION)) { \
             int rank; \
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
-            if(rank == 0) \
-                fprintf(stderr, "line: %d, rank: %d, assertion failed: %s\n", __LINE__, rank, #CONDITION); \
+            fprintf(stderr, "line: %d, rank: %d, assertion failed: %s\n", __LINE__, rank, #CONDITION); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
