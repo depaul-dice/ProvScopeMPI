@@ -31,6 +31,7 @@ public:
     bool operator ==(const element &e) const;
 
     std::string bb() const;
+    std::string content() const;
 
     std::vector<std::vector<std::shared_ptr<element>>> funcs;
     std::string funcname;

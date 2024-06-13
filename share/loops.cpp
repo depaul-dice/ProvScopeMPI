@@ -116,9 +116,13 @@ pair<string, loopNode *> parseCluster(Agraph_t* subgraph, const std::string& pre
     string subgraphName = agnameof(subgraph);
     /* logger << prefix << "Cluster: " << subgraphName << endl; */
     ret.first = subgraphName;
+    /* bool flag = false; */
+    /* if(subgraphName == "hypre_NewCommPkgCreate_core") { */
+    /*     flag = true; */
+    /* } */
 
     unordered_set<string> dummyset;
-    string rootname = "root";
+    string rootname = "root_" + subgraphName;;
     loopNode *root = new loopNode(rootname, dummyset);
     ret.second = root;
 
@@ -131,7 +135,7 @@ pair<string, loopNode *> parseCluster(Agraph_t* subgraph, const std::string& pre
     string headname;
     for (Agnode_t* node = agfstnode(subgraph); node; node = agnxtnode(subgraph, node)) {
         /* logger << prefix << "  "; */
-        /* printNodeInfo(node, subgraph); */
+        /* if(flag) printNodeInfo(node, subgraph); */
         label = agget(node, (char *)"label");
         MPI_ASSERT(label && *label);
         if(string(agnameof(node)).rfind("root_", 0) == 0) {
@@ -141,15 +145,20 @@ pair<string, loopNode *> parseCluster(Agraph_t* subgraph, const std::string& pre
             MPI_ASSERT(!strcmp(label, "root"));
         } else {
             headname = agnameof(node);
+            /* if(flag) logger << "\nheadname: " << headname << endl; */
             string labelstr = string(label);
             unordered_set<string> content;
             splitNinsert(labelstr, "\\l", content);
             nodes[headname] = new loopNode(headname, content); 
+            /* int rank; */
+            /* MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+            /* if(flag && rank == 0) cerr << "\nnew node!\n" << *(nodes[headname]) << endl; */
         }
 
         for(Agedge_t *edge = agfstout(subgraph, node); edge; edge = agnxtout(subgraph, edge)) {
             string child = agnameof(aghead(edge));
-            if(edges.find(agnameof(node)) == edges.end()) {
+            /* if(flag) logger << "child: " << child << endl << endl; */
+            if(edges.find(headname) == edges.end()) {
                 edges[headname] = unordered_set<string>();
             }
             edges[headname].insert(child);
@@ -210,4 +219,13 @@ unordered_set<string> loopNode::fixExclusives(void) {
         }
     }
     return nodes;
+}
+
+ostream& operator << (ostream& os, loopNode& ln) {
+    os << ln.entry << '{' << endl;
+    for(auto &n: ln.nodes) {
+        os << '\t' << n << endl;
+    }
+    os << '}' << endl;
+    return os;
 }

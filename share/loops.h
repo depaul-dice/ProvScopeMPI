@@ -36,6 +36,7 @@ public:
     /* void print(std::string& file); */
     void print(std::ofstream& file, const std::string& funcname);
     void print(std::ostream& os, const std::string& funcname = "main");
+    friend std::ostream& operator << (std::ostream& os, loopNode& ln);
 
     std::string entry; // entry node of the loop
     loopNode *parent;
