@@ -43,6 +43,15 @@ static int (*original_MPI_Recv)(
     MPI_Status *status
 ) = nullptr;
 
+static int (*original_MPI_Send)(
+    const void *buf, 
+    int count, 
+    MPI_Datatype datatype, 
+    int dest, 
+    int tag, 
+    MPI_Comm comm
+) = nullptr;
+
 static int (*original_MPI_Irecv)(
     void *buf, 
     int count, 

@@ -24,7 +24,8 @@ extern vector<vector<string>> replayTracesRaw;
 
 static unordered_map<string, MPI_Request *> __requests;
 static unordered_set<MPI_Request *> __isends;
-
+using LamportClock = unsigned long long;
+LamportClock lamportClock = 0;
 
 /* #undef MPI_ASSERT */
 
@@ -34,12 +35,12 @@ static unordered_set<MPI_Request *> __isends;
         if(!(CONDITION)) { \
             int rank; \
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
-            DEBUG("line: %d, rank: %d, assertion failed: %s\n", __LINE__, rank, #CONDITION); \
-            appendReplayTrace(); \
-            greedyalignmentWholeOffline(); \
+            DEBUG("line: %d, rank: %d, assertion failed: %s\n\
+                    going to abort\n", __LINE__, rank, #CONDITION); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
+
 
 
 extern "C" void printBBname(const char *name) {
@@ -110,6 +111,8 @@ int MPI_Init(
     /* if(rank == 0) { */
     /*     print(recordTraces, 0); */
     /* } */
+
+    lamportClock = 0; // setting the lamport clock to 0
     
     return ret;
 }
@@ -119,11 +122,27 @@ int MPI_Finalize(
     if (original_MPI_Finalize == NULL) {
         original_MPI_Finalize = (int (*)()) dlsym(RTLD_NEXT, "MPI_Finalize");
     }
-    appendReplayTrace();
-    greedyalignmentWholeOffline();
     int ret = original_MPI_Finalize();
 
     return ret;
+}
+
+int MPI_Send(
+    const void *buf,
+    int count, 
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(!original_MPI_Send) {
+        original_MPI_Send = (int (*)(const void *, int, MPI_Datatype, int, int, MPI_Comm)) dlsym(RTLD_NEXT, "MPI_Send");
+    }
+    DEBUG0("MPI_Send:%s:%d\n", orders[__order_index].c_str(), __order_index);
+    
+    int rv = original_MPI_Send(buf, count, datatype, dest, tag, comm);
+    return rv;
 }
 
 // in this we will just manipulate the message source when calling MPI_Recv
@@ -154,6 +173,8 @@ int MPI_Recv(
         original_MPI_Recv = (int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Status *)) dlsym(RTLD_NEXT, "MPI_Recv");
     }
     int rv = original_MPI_Recv(buf, count, datatype, source, tag, comm, status);
+    // invoke a function to extract the timestamp here
+    // invoke a function to check with the buffer here, which exchanges with the correct message when necessary
 
     return rv;
 }
