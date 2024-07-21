@@ -24,7 +24,7 @@ extern vector<vector<string>> replayTracesRaw;
 
 static unordered_map<string, MPI_Request *> __requests;
 static unordered_set<MPI_Request *> __isends;
-using LamportClock = unsigned long long;
+using LamportClock = int;
 LamportClock lamportClock = 0;
 
 /* #undef MPI_ASSERT */
@@ -127,6 +127,25 @@ int MPI_Finalize(
     return ret;
 }
 
+int lamportBlockSend(int dest, int tag, int count, MPI_Datatype datatype, const void *buf) {
+    lamportClock++;
+    void *bufWithClock;
+    int ret;
+    
+    if(datatype == MPI_INT) { 
+        bufWithClock = (int *)malloc(sizeof(int) * (count + 1));
+        memcpy(bufWithClock, buf, sizeof(int) * count);
+        ((int *)bufWithClock)[count] = lamportClock;
+        //DEBUG("lamportBlockSend: %d\n", lamportClock);
+        ret = original_MPI_Send(bufWithClock, count + 1, datatype, dest, tag, MPI_COMM_WORLD);
+    } else {
+        perror("unsupported datatype\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    free(bufWithClock);
+    return ret;
+}
+
 int MPI_Send(
     const void *buf,
     int count, 
@@ -141,10 +160,23 @@ int MPI_Send(
     }
     DEBUG0("MPI_Send:%s:%d\n", orders[__order_index].c_str(), __order_index);
     
-    int rv = original_MPI_Send(buf, count, datatype, dest, tag, comm);
-    return rv;
+    return lamportBlockSend(dest, tag, count, datatype, buf); 
 }
 
+int lamportBlockReceive(int source, int tag, int count, MPI_Datatype datatype, void *buf, MPI_Status *status) {
+    if(datatype == MPI_INT) {
+        int *bufWithClock = (int *)malloc(sizeof(int) * (count + 1));
+        int ret = original_MPI_Recv(bufWithClock, count + 1, datatype, source, tag, MPI_COMM_WORLD, status);
+        memcpy(buf, bufWithClock, sizeof(int) * count);
+        lamportClock = std::max(lamportClock, ((int *)bufWithClock)[count]);
+        //DEBUG0("lamportBlockReceive: %d\n", lamportClock);
+        return ret;
+    } else {
+        perror("unsupported datatype\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    return -1;
+}
 // in this we will just manipulate the message source when calling MPI_Recv
 int MPI_Recv(
     void *buf, 
@@ -172,11 +204,7 @@ int MPI_Recv(
     if (!original_MPI_Recv) {
         original_MPI_Recv = (int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Status *)) dlsym(RTLD_NEXT, "MPI_Recv");
     }
-    int rv = original_MPI_Recv(buf, count, datatype, source, tag, comm, status);
-    // invoke a function to extract the timestamp here
-    // invoke a function to check with the buffer here, which exchanges with the correct message when necessary
-
-    return rv;
+    return lamportBlockReceive(source, tag, count, datatype, buf, status);
 }
 
 int MPI_Irecv(
