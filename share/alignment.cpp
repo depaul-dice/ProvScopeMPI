@@ -915,7 +915,15 @@ static bool islastaligned(vector<shared_ptr<element>>& original, vector<shared_p
  * it returns the last aligned point of both original and reproduced by dequeue, so that one can exactly know where it is
  * this function is also recursive, in case it needs to delve into the functions inside or a loop inside
  * below is the high level steps, it take
- * 1. 
+ * 1. it first checks for the queues passed down as an argument, and see if there's any misalignment there 
+ * 2. CASE 1: if there is one, we return the queue partially as it was passed,
+ *      partially where it left off
+ * 3. CASE 2: if there is no misalignment, we check for the last misalignment that happened 
+ *      at the same basic block, but at a different function call
+ * 4. CASE 3: if there's no misalignment in CASE 2, we check for the last misalignment 
+ *      at this function.
+ * 5. after the last point of alignment is found, we return the dequeue as a stack of 
+ *      where we left off (for ALL cases)
  */
 deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, deque<shared_ptr<lastaligned>>& q, size_t &i, size_t &j, const size_t& funcId, const int &rank, bool& isaligned, size_t& lastind) {
     MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
@@ -926,7 +934,10 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
 
     // in case the q is not empty, we need to do the alignment level below first
     bool firsttime = false;
-    /* DEBUG0("option 12\n"); */
+    /*
+     * Here, we are checking if the queue is empty, if not, go into the queue and find the last
+     * aligned point, and then do the alignment levels below with recursion
+     */
     if(!q.empty()) {
         shared_ptr<lastaligned> la = q.back();
         if(la->origIndex == numeric_limits<size_t>::max() && la->repIndex == numeric_limits<size_t>::max()) {
@@ -944,6 +955,11 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
             /* size_t tmplastind = numeric_limits<size_t>::max(); */
             size_t tmplastind = 0;
             MPI_ASSERT(original[i]->funcs[funcId][0]->funcname == reproduced[j]->funcs[funcId][0]->funcname);
+            /*
+             * We are calling greedyalignment online here recursively
+             * where one level of stack is popped and used as arguments
+             * this is CASE 1
+             */
             rq = greedyalignmentOnline(original[i]->funcs[funcId], reproduced[j]->funcs[funcId], q, la->origIndex, la->repIndex, tmpfuncId, rank, isaligned, tmplastind);
             if(lastind < tmplastind) {
                 lastind = tmplastind;
@@ -952,8 +968,13 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
     } else {
         firsttime = true;
     }
-    /* DEBUG0("option 13\n"); */
 
+    /* 
+     * If the recursive call of greedyalignmentOnline returns with rq that is not empty
+     * that means there was an unresolved misalignment, since we only have one return call
+     * for every control flow graphs, these conditions suffice as not going further down 
+     * in this function
+     */
     if(!rq.empty() && !(rq.back()->isSuccess())) {
         /* DEBUG0("at %s, we did not proceed this time 1, \ */
                 /* funcId: %lu, i: %lu, j: %lu\n", \ */
@@ -968,9 +989,20 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
 
     // in case functions were at the same element, we do the alignment the level below too
     
-    /* DEBUG0("option 14\n"); */
     size_t k = -1;
+    /*
+     * this is CASE 2, where we need to look into the same basic blocks, but in the following
+     * function calls, we basically do the same as the code block above,
+     * except in this case, we no longer have to worry about the stack that's passed down from 
+     * parent functions.
+     */
     for(k = funcId + 1; k < reproduced[j]->funcs.size(); k++) {
+        /*
+         * popping unnecessary data from rq, as we have gotten through the last call on
+         * greedyalignmentOnline
+         * TODO: this can be written more clearly, 
+         * like why are you filling in the garbage in the first place?
+         */
         while(!rq.empty()) {
             MPI_ASSERT(rq.back()->isSuccess());
             rq.pop_back();
@@ -986,6 +1018,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
         
         /* } */
         /* MPI_ASSERT(original[i]->funcs[k][0]->funcname == reproduced[j]->funcs[k][0]->funcname); */
+        /*
+         * below incorporates the case different functions being called through function pointers
+         */
         if(original[i]->funcs[k][0]->funcname != reproduced[j]->funcs[k][0]->funcname) {
             printf("different function called from %s: %s vs. %s\n", original[i]->bb().c_str(), original[i]->funcs[k][0]->funcname.c_str(), reproduced[j]->funcs[k][0]->funcname.c_str());
         } else {
@@ -995,20 +1030,23 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
             /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
             lastind = tmplastind;
         }
-        if(!(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \
-                (k == reproduced[j]->funcs.size() - 1))) {
+        /* if(!(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \ */
+                /* (k == reproduced[j]->funcs.size() - 1))) { */
             /* if(rank == 0) { */
                 /* printsurface(original[i]->funcs[k]); */
                 /* DEBUG("////////////////////////////////////////////////////////////\n"); */
                 /* printsurface(reproduced[j]->funcs[k]); */
             /* } */
-        }
+        /* } */
 
         MPI_ASSERT(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \
                 (k == reproduced[j]->funcs.size() - 1));
     }
-    /* DEBUG0("option 15\n"); */
 
+    /*
+     * Here, it's the same logic as above: if there are some misalignment ended as misalignment,
+     * one has to return back because the last point of misalignment is already found
+     */
     if(!rq.empty() && !(rq.back()->isSuccess())) {
         /* DEBUG0("at %s, we did not proceed this time 2\n", \ */
         /*         original[i]->bb().c_str()); */
@@ -1017,10 +1055,8 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
         rq.push_back(make_shared<lastaligned>(reproduced[j]->funcs.size() - 1, i, j));
         return rq;
     }
-    /* DEBUG0("option 16\n"); */
 
-    /* DEBUG0("rq is empty\n"); */
-    // let's do the greedy alignment from where we left off
+    // let's do the greedy alignment from where we left off in this function, below is CASE 3.
     vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned = vector<pair<shared_ptr<element>, shared_ptr<element>>>();
 
     // in case we are doing this for the first time, we should start at i and j 
@@ -1028,11 +1064,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
     pair<size_t, size_t> p;
     size_t tmplastind = 0;
     if(firsttime) {
-        /* DEBUG0("option 16.1\n"); */
         MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
         p = __greedyalignmentOnline(original, reproduced, aligned, i, j, rank, isaligned, tmplastind);
     } else {
-        /* DEBUG0("option 16.2\n"); */
         size_t tmpi = i + 1, tmpj = j + 1;
         /* DEBUG0("tmpi: %lu, tmpj: %lu, original.size(): %lu, reproduced.size(): %lu\n", tmpi, tmpj, original.size(), reproduced.size()); */
         if(tmpj == reproduced.size()) {
@@ -1048,7 +1082,6 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
             p = __greedyalignmentOnline(original, reproduced, aligned, tmpi, tmpj, rank, isaligned, tmplastind);
         }
     }
-    /* DEBUG0("option 17\n"); */
     if(lastind < tmplastind) {
         /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
         lastind = tmplastind;

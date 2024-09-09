@@ -26,17 +26,23 @@ static unordered_map<string, MPI_Request *> __requests;
 static unordered_set<MPI_Request *> __isends;
 static unordered_set<MPI_Request *> __unalignedRequests;
 
+// key is the function name
 static unordered_map<string, loopNode *> __looptrees;
 
+// TODO: better name for this variable because it's not self descriptive
 deque<shared_ptr<lastaligned>> __q;
+// TODO: delete this logger as it's just not really necessary
 Logger logger;
 
+/*
+ * These represent the current positions of the node; for both original and reproduced traces.
+ */
 vector<string> recordPositions;
 vector<string> reproducePositions;
 
-/* #undef MPI_ASSERT */
-
 // let's do the alignment before here
+// this is currently faulty because it could lead to a loop of fault
+// when assertnalign is called, there could be another procedure that could call assertnalign
 #define MPI_ASSERTNALIGN(CONDITION) \
     do { \
         if(!(CONDITION)) { \
@@ -102,25 +108,24 @@ extern "C" void printBBname(const char *name) {
     if(flag1 && !flag2) {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         string str(name);
-        /* fprintf(stderr, "%d:%s\n", rank, str.c_str()); */
         tokens = parse(str, ':');
         replayTracesRaw.push_back(tokens);
         // if it is a replay trace the trace length will be 3, but for record 4
         /* MPI_ASSERT(replayTracesRaw.size() > 0); */
         
-        // we are updating the current position here
+        /* 
+         * FOR GLOBAL ALIGNMENT: we are updating the current position here
+         * This is for the reproduced traces
+         * We use this to compare the current position with the positions in the recorded traces
+         */
         if(reproducePositions.empty()) {
             reproducePositions.push_back(tokens[0] + ':' + tokens[1] + ':' + tokens[2]); 
         } else {
             auto lastFuncname = parse(reproducePositions.back(), ':')[0];
-            // if the function name is the same, update
             if(lastFuncname == tokens[0]) {
                 reproducePositions.pop_back();
                 reproducePositions.push_back(tokens[0] + ':' + tokens[1] + ':' + tokens[2]);
             } else {
-            // if they are not, look into the last element and see if it is the exit node.
-            // if it is, pop_back and update the last element
-            // if it is not, make sure they are entry and push it back
                 MPI_ASSERT(reproducePositions.size() > 0);
                 auto lastTokens = parse(reproducePositions.back(), ':');
                 if(lastTokens[1] == "exit") {
