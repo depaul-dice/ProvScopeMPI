@@ -828,7 +828,6 @@ static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>&
                 /* cerr << "record\n"; */ 
                 /* print(recordTraces, 0); */
             }
-            MPI_ASSERT(false);
             /* if(original[i - 1]->bb() == reproduced[j - 1]->bb()) { */
                 /* string bb = original[i - 1]->bb(); */
                 /* if(rank == 0) { */
@@ -910,6 +909,14 @@ static bool islastaligned(vector<shared_ptr<element>>& original, vector<shared_p
     return matchbbmap(bbMap, original, i, j);
 }
 
+/*
+ * this function is the outside of the greedy alignment, while considering the loop iterations
+ * it compares the two hierarchical traces: original and reproduced
+ * it returns the last aligned point of both original and reproduced by dequeue, so that one can exactly know where it is
+ * this function is also recursive, in case it needs to delve into the functions inside or a loop inside
+ * below is the high level steps, it take
+ * 1. 
+ */
 deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, deque<shared_ptr<lastaligned>>& q, size_t &i, size_t &j, const size_t& funcId, const int &rank, bool& isaligned, size_t& lastind) {
     MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
     // if the queue is not empty, let's do the alignment level below first
@@ -1031,6 +1038,10 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
         if(tmpj == reproduced.size()) {
             p = make_pair(i, j);
         } else {
+            if(tmpi >= original.size()) {
+                cerr << "tmpi: " << tmpi << ", original.size(): " << original.size() << endl;
+                cerr << "tmpj: " << tmpj << ", reproduced.size(): " << reproduced.size() << endl;
+            }
             MPI_ASSERT(tmpi < original.size());
             MPI_ASSERT(tmpj < reproduced.size());
             MPI_ASSERT(original[tmpi]->funcname == reproduced[tmpj]->funcname);

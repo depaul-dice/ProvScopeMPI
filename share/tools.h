@@ -26,6 +26,11 @@
         } \
     } while(0)
 
+#define MPI_EQUAL(A, B) \
+    do { \
+        mpi_equal(A, B); \
+    } while(0)
+
 #ifdef DEBUG_MODE
 
 #define DEBUG(...) fprintf(stderr, __VA_ARGS__)
@@ -87,6 +92,17 @@ std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
     return os;
 }
 
+template <typename T> 
+std::ostream& operator<<(std::ostream& os, const std::vector<std::shared_ptr<T>>& vec) {
+    os << "[";
+    if(!vec.empty()) {
+        for(unsigned i = 0; i < vec.size(); ++i)
+            os << *(vec[i]) << std::endl;
+    }
+    os << "]";
+    return os;
+}
+
 template <typename T>
 std::unordered_set<T> operator+=(std::unordered_set<T>& lhs, const std::unordered_set<T>& rhs) {
     lhs.insert(rhs.begin(), rhs.end());
@@ -129,7 +145,7 @@ std::string replaceall(std::string& str, const std::string& from, const std::str
 void splitNinsert(const std::string& str, const std::string& delimit, std::unordered_set<std::string>& container);
 
 template <typename T>
-void MPI_EQUAL(T a, T b) {
+void mpi_equal(T a, T b) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
