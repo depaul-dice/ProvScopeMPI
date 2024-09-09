@@ -31,6 +31,9 @@ static unordered_map<string, loopNode *> __looptrees;
 deque<shared_ptr<lastaligned>> __q;
 Logger logger;
 
+vector<string> recordPositions;
+vector<string> reproducePositions;
+
 /* #undef MPI_ASSERT */
 
 // let's do the alignment before here
@@ -84,17 +87,60 @@ void setup_signal_hander() {
     }
 }
 
+/* 
+ * The name passed down as an argument will be in the format 
+ * FunctionName:Type:Count:(node count)
+ * Type is a type of a node (e.g. entry node, exit node, neither)
+ * Count is a unique identifier
+ * node count is the counter for nodes to be passed
+ */
 extern "C" void printBBname(const char *name) {
     int rank, flag1, flag2;
     MPI_Initialized(&flag1);
     MPI_Finalized(&flag2);
+    vector<string> tokens;
     if(flag1 && !flag2) {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         string str(name);
         /* fprintf(stderr, "%d:%s\n", rank, str.c_str()); */
-        replayTracesRaw.push_back(parse(str, ':'));
+        tokens = parse(str, ':');
+        replayTracesRaw.push_back(tokens);
         // if it is a replay trace the trace length will be 3, but for record 4
         /* MPI_ASSERT(replayTracesRaw.size() > 0); */
+        
+        // we are updating the current position here
+        if(reproducePositions.empty()) {
+            reproducePositions.push_back(tokens[0] + ':' + tokens[1] + ':' + tokens[2]); 
+        } else {
+            auto lastFuncname = parse(reproducePositions.back(), ':')[0];
+            // if the function name is the same, update
+            if(lastFuncname == tokens[0]) {
+                reproducePositions.pop_back();
+                reproducePositions.push_back(tokens[0] + ':' + tokens[1] + ':' + tokens[2]);
+            } else {
+            // if they are not, look into the last element and see if it is the exit node.
+            // if it is, pop_back and update the last element
+            // if it is not, make sure they are entry and push it back
+                MPI_ASSERT(reproducePositions.size() > 0);
+                auto lastTokens = parse(reproducePositions.back(), ':');
+                if(lastTokens[1] == "exit") {
+                    reproducePositions.pop_back();
+                    // in case there are already multiple positions, just ignore and add the new positions
+                    if(reproducePositions.size() > 0) {
+                        auto bottomTokens = parse(reproducePositions.back(), ':');
+                        MPI_EQUAL(bottomTokens[0], tokens[0]);
+                    }
+                } else {
+                    MPI_ASSERT(tokens[1] == "entry");
+                }
+                // safeguard for when there are no more elements
+                if(reproducePositions.size() > 0) {
+                    reproducePositions.pop_back();
+                }
+                reproducePositions.push_back(tokens[0] + ':' + tokens[1] + ':' + tokens[2]);
+            }
+        }
+        //cerr << reproducePositions << endl;
     }
 }
 
