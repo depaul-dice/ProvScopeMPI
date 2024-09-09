@@ -24,6 +24,8 @@ extern vector<vector<string>> replayTracesRaw;
 
 static unordered_map<string, MPI_Request *> __requests;
 static unordered_set<MPI_Request *> __isends;
+
+// instead of lamport clock, we want to send where we are at in terms of the trace
 using LamportClock = int;
 LamportClock lamportClock = 0;
 
