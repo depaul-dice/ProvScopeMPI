@@ -228,14 +228,28 @@ int MPI_Recv(
     /* DEBUG0("MPI_Recv:%s:%d\n", orders[__order_index].c_str(), __order_index); */
     bool isaligned = true;
     size_t lastind = 0;
-    __q = onlineAlignment(__q, isaligned, lastind, __looptrees);
+    __q = onlineAlignment(
+            __q, 
+            isaligned, 
+            lastind, 
+            __looptrees);
     vector<string> msgs;
     if(!isaligned) {
         DEBUG("at rank %d, the alignment was not successful at MPI_Recv\n", rank);
         // don't control anything
-        return original_MPI_Recv(buf, count, datatype, source, tag, comm, status);
+        return original_MPI_Recv(
+                buf, 
+                count, 
+                datatype, 
+                source, 
+                tag, 
+                comm, 
+                status);
     } 
-    msgs = getmsgs(orders, lastind, __order_index);
+    msgs = getmsgs(
+            orders, 
+            lastind, 
+            __order_index);
     int src = stoi(msgs[2]);
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Recv");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
@@ -246,7 +260,14 @@ int MPI_Recv(
     }
     MPI_ASSERTNALIGN(source == src);
     
-    return original_MPI_Recv(buf, count, datatype, source, tag, comm, status);
+    return original_MPI_Recv(
+            buf, 
+            count, 
+            datatype, 
+            source, 
+            tag, 
+            comm, 
+            status);
 }
 
 int MPI_Irecv(
