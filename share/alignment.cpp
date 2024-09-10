@@ -690,7 +690,11 @@ static size_t findSize(FILE *fp) {
 /*     return rq; */
 /* } */
 
-deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q, bool& isaligned, size_t &lastind, unordered_map<string, loopNode *>& loopTrees) {
+deque<shared_ptr<lastaligned>> onlineAlignment(
+        deque<shared_ptr<lastaligned>>& q, 
+        bool& isaligned, 
+        size_t &lastind, 
+        unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("onlineAlignment called at rank: %d\n", rank); */
@@ -709,7 +713,6 @@ deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q
             //cerr << recelement->bb() << " " << repelement->bb() << " " << q[i]->funcId << endl; 
         /* } */
     /* } */
-    /* DEBUG0("option 10\n"); */
     if(!q.empty()) { 
          i = q.back()->origIndex; 
          j = q.back()->repIndex; 
@@ -719,8 +722,17 @@ deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q
     deque<shared_ptr<lastaligned>> rq;
     isaligned = true; 
     
-    rq = greedyalignmentOnline(recordTraces, replayTraces, q, i, j, funcId, rank, isaligned, lastind); 
-    /* DEBUG0("option 11\n"); */
+    // there's no parent for original nor the reproduced, so kept empty
+    rq = greedyalignmentOnline(
+            recordTraces, 
+            replayTraces, 
+            q, 
+            i, 
+            j, 
+            funcId, 
+            rank, 
+            isaligned, 
+            lastind); 
     MPI_ASSERT(lastind != numeric_limits<size_t>::max()); 
     /* DEBUG0("lastind: %lu at %d\n", lastind, __LINE__); */
     //if(rank == 0) { 
@@ -816,18 +828,6 @@ static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>&
         } else {
             /* if(i != initi || j != initj) { */
             printf("pod: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank);
-            if(rank == 0) {
-                cerr << "replay\n";
-                printsurface(reproduced);
-                cerr << "replay2\n";
-                printsurface(reproduced[1]->funcs[0]);
-                
-                cerr << "record\n"; 
-                printsurface(original);
-                /* print(replayTraces, 0); */
-                /* cerr << "record\n"; */ 
-                /* print(recordTraces, 0); */
-            }
             /* if(original[i - 1]->bb() == reproduced[j - 1]->bb()) { */
                 /* string bb = original[i - 1]->bb(); */
                 /* if(rank == 0) { */
@@ -925,7 +925,18 @@ static bool islastaligned(vector<shared_ptr<element>>& original, vector<shared_p
  * 5. after the last point of alignment is found, we return the dequeue as a stack of 
  *      where we left off (for ALL cases)
  */
-deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, deque<shared_ptr<lastaligned>>& q, size_t &i, size_t &j, const size_t& funcId, const int &rank, bool& isaligned, size_t& lastind) {
+deque<shared_ptr<lastaligned>> greedyalignmentOnline(
+        vector<shared_ptr<element>>& original, 
+        vector<shared_ptr<element>>& reproduced, 
+        deque<shared_ptr<lastaligned>>& q, 
+        size_t &i, 
+        size_t &j, 
+        const size_t& funcId, 
+        const int &rank, 
+        bool& isaligned, 
+        size_t& lastind,
+        shared_ptr<element> originalParent,
+        shared_ptr<element> reproducedParent) {
     MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
     // if the queue is not empty, let's do the alignment level below first
     deque<shared_ptr<lastaligned>> rq;
@@ -940,7 +951,8 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
      */
     if(!q.empty()) {
         shared_ptr<lastaligned> la = q.back();
-        if(la->origIndex == numeric_limits<size_t>::max() && la->repIndex == numeric_limits<size_t>::max()) {
+        if(la->origIndex == numeric_limits<size_t>::max() 
+                && la->repIndex == numeric_limits<size_t>::max()) {
             // so we check if the next one has been completed
             q.clear();
         } else {
@@ -960,7 +972,18 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
              * where one level of stack is popped and used as arguments
              * this is CASE 1
              */
-            rq = greedyalignmentOnline(original[i]->funcs[funcId], reproduced[j]->funcs[funcId], q, la->origIndex, la->repIndex, tmpfuncId, rank, isaligned, tmplastind);
+            rq = greedyalignmentOnline(
+                    original[i]->funcs[funcId], 
+                    reproduced[j]->funcs[funcId], 
+                    q, 
+                    la->origIndex, 
+                    la->repIndex, 
+                    tmpfuncId, 
+                    rank, 
+                    isaligned, 
+                    tmplastind,
+                    original[i],
+                    reproduced[j]);
             if(lastind < tmplastind) {
                 lastind = tmplastind;
             }
@@ -1022,9 +1045,23 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
          * below incorporates the case different functions being called through function pointers
          */
         if(original[i]->funcs[k][0]->funcname != reproduced[j]->funcs[k][0]->funcname) {
-            printf("different function called from %s: %s vs. %s\n", original[i]->bb().c_str(), original[i]->funcs[k][0]->funcname.c_str(), reproduced[j]->funcs[k][0]->funcname.c_str());
+            printf("different function called from %s: %s vs. %s\n", 
+                    original[i]->bb().c_str(), 
+                    original[i]->funcs[k][0]->funcname.c_str(), 
+                    reproduced[j]->funcs[k][0]->funcname.c_str());
         } else {
-            rq = greedyalignmentOnline(original[i]->funcs[k], reproduced[j]->funcs[k], q, tmpi, tmpj, k, rank, isaligned, tmplastind);
+            rq = greedyalignmentOnline(
+                    original[i]->funcs[k], 
+                    reproduced[j]->funcs[k], 
+                    q, 
+                    tmpi, 
+                    tmpj, 
+                    k, 
+                    rank, 
+                    isaligned, 
+                    tmplastind,
+                    original[i],
+                    reproduced[j]);
         }
         if(lastind < tmplastind) {
             /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
@@ -1057,7 +1094,8 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
     }
 
     // let's do the greedy alignment from where we left off in this function, below is CASE 3.
-    vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned = vector<pair<shared_ptr<element>, shared_ptr<element>>>();
+    vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned = 
+        vector<pair<shared_ptr<element>, shared_ptr<element>>>();
 
     // in case we are doing this for the first time, we should start at i and j 
     // however, if not, then you should start at the i + 1 and j + 1
@@ -1065,21 +1103,56 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
     size_t tmplastind = 0;
     if(firsttime) {
         MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
-        p = __greedyalignmentOnline(original, reproduced, aligned, i, j, rank, isaligned, tmplastind);
+        p = __greedyalignmentOnline(
+                original, 
+                reproduced, 
+                aligned, 
+                i, 
+                j, 
+                rank, 
+                isaligned, 
+                tmplastind);
     } else {
-        size_t tmpi = i + 1, tmpj = j + 1;
+        size_t tmpI = i + 1, tmpJ = j + 1;
         /* DEBUG0("tmpi: %lu, tmpj: %lu, original.size(): %lu, reproduced.size(): %lu\n", tmpi, tmpj, original.size(), reproduced.size()); */
-        if(tmpj == reproduced.size()) {
+        /*
+         * tmpi could be equal to original.size() if the parent is a loop node
+         * tmpj could be equal to reproduced.size() if the parent is a loop node or at the end 
+         * of the trace
+         */
+        if(tmpJ == reproduced.size()) {
             p = make_pair(i, j);
         } else {
-            if(tmpi >= original.size()) {
-                cerr << "tmpi: " << tmpi << ", original.size(): " << original.size() << endl;
-                cerr << "tmpj: " << tmpj << ", reproduced.size(): " << reproduced.size() << endl;
+            if(tmpI == original.size()) {
+                // this happens when the parents are loop node
+                MPI_ASSERT(originalParent != nullptr
+                        && reproducedParent != nullptr
+                        && originalParent->isLoop 
+                        && reproducedParent->isLoop);
+                // we keep the point of last alignment as is
+                p = make_pair(i, j);
+            } else if (tmpJ == reproduced.size()) {
+                // we should check if we have the same parent loop node
+                // below is a temporary solution, as we need to use the last node
+                MPI_ASSERT((originalParent != nullptr
+                        && reproducedParent != nullptr
+                        && originalParent->isLoop
+                        && reproducedParent->isLoop)
+                        || (true));
+                // we keep the point of last alignment as is
+                p = make_pair(i, j);
+            } else {
+                MPI_ASSERT(original[tmpI]->funcname == reproduced[tmpJ]->funcname);
+                p = __greedyalignmentOnline(
+                        original, 
+                        reproduced, 
+                        aligned, 
+                        tmpI, 
+                        tmpJ, 
+                        rank, 
+                        isaligned, 
+                        tmplastind);
             }
-            MPI_ASSERT(tmpi < original.size());
-            MPI_ASSERT(tmpj < reproduced.size());
-            MPI_ASSERT(original[tmpi]->funcname == reproduced[tmpj]->funcname);
-            p = __greedyalignmentOnline(original, reproduced, aligned, tmpi, tmpj, rank, isaligned, tmplastind);
         }
     }
     if(lastind < tmplastind) {
@@ -1094,7 +1167,8 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
     size_t newfuncId;
     for(unsigned ind0 = 0; ind0 < aligned.size(); ind0++) {
         MPI_ASSERT(aligned[ind0].first->bb() == aligned[ind0].second->bb());
-        MPI_ASSERT(aligned[ind0].first->funcs.size() == aligned[ind0].second->funcs.size() || ind0 == aligned.size() - 1);
+        MPI_ASSERT(aligned[ind0].first->funcs.size() == aligned[ind0].second->funcs.size() || 
+                ind0 == aligned.size() - 1);
         MPI_ASSERT(aligned[ind0].first->funcs.size() >= aligned[ind0].second->funcs.size());
         newfuncId = aligned[ind0].second->funcs.size() - 1;
         tmplastind = 0;
@@ -1107,11 +1181,24 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
                         aligned[ind0].second->funcs[ind1][0]->funcname.c_str());
             } else {
                 /* MPI_ASSERT(aligned[ind0].first->funcs[ind1][0]->funcname == aligned[ind0].second->funcs[ind1][0]->funcname); */
-                qs = greedyalignmentOnline(aligned[ind0].first->funcs[ind1], aligned[ind0].second->funcs[ind1], q, tmpi, tmpj, tmpfuncId, rank, tmpisaligned, tmplastind); 
+                qs = greedyalignmentOnline(
+                        aligned[ind0].first->funcs[ind1], 
+                        aligned[ind0].second->funcs[ind1], 
+                        q, 
+                        tmpi, 
+                        tmpj, 
+                        tmpfuncId, 
+                        rank, 
+                        tmpisaligned, 
+                        tmplastind,
+                        aligned[ind0].first,
+                        aligned[ind0].second);
                 // we only expect the last of the last thing to be not successful
                 // why are we looking at funcids for isSuccess method?
-                if((!qs.back()->isSuccess() || !tmpisaligned) && \
-                        (ind0 != aligned.size() - 1 || ind1 != aligned[ind0].second->funcs.size() - 1)) {
+                if((!qs.back()->isSuccess() 
+                            || !tmpisaligned) && 
+                        (ind0 != aligned.size() - 1 
+                         || ind1 != aligned[ind0].second->funcs.size() - 1)) {
                     DEBUG("qs.back()->isSuccess(): %d, tmpisaligned: %d\n", qs.back()->isSuccess(), tmpisaligned);
                     DEBUG("rank: %d, qs not successful, let's look\n\
                             happened at function %s\n \
@@ -1142,7 +1229,11 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(vector<shared_ptr<element>>
     rq = qs;
     // funcId is where you left off
     /* DEBUG0("pushing newfuncId: %lu, p.first:%lu, p.second:%lu\n", newfuncId, p.first, p.second); */
-    rq.push_back(make_shared<lastaligned>(newfuncId, p.first, p.second));
+    rq.push_back(
+            make_shared<lastaligned>(
+                newfuncId, 
+                p.first, 
+                p.second));
     return rq;
 }
 
