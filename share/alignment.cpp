@@ -21,7 +21,6 @@ element::element(bool isEntry, bool isExit, int id, string& funcname, bool isLoo
 
 element::element(bool isEntry, bool isExit, int id, string& funcname, unsigned long index, bool isLoop) : \
         funcs(vector<vector<shared_ptr<element>>>()), funcname(funcname), index(index), id(id), isEntry(isEntry), isExit(isExit), isLoop(isLoop){
-            /* DEBUG0("element created with index: %lu\n", index); */
 }
 
 element::element(int id, string& funcname, unsigned long index, bool isLoop) : \

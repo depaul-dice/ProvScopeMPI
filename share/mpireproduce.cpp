@@ -34,12 +34,6 @@ deque<shared_ptr<lastaligned>> __q;
 // TODO: delete this logger as it's just not really necessary
 Logger logger;
 
-/*
- * These represent the current positions of the node; for both original and reproduced traces.
- */
-vector<string> recordPositions;
-vector<string> reproducePositions;
-
 // let's do the alignment before here
 // this is currently faulty because it could lead to a loop of fault
 // when assertnalign is called, there could be another procedure that could call assertnalign
@@ -112,40 +106,6 @@ extern "C" void printBBname(const char *name) {
         replayTracesRaw.push_back(tokens);
         // if it is a replay trace the trace length will be 3, but for record 4
         /* MPI_ASSERT(replayTracesRaw.size() > 0); */
-        
-        /* 
-         * FOR GLOBAL ALIGNMENT: we are updating the current position here
-         * This is for the reproduced traces
-         * We use this to compare the current position with the positions in the recorded traces
-         */
-        if(reproducePositions.empty()) {
-            reproducePositions.push_back(tokens[0] + ':' + tokens[1] + ':' + tokens[2]); 
-        } else {
-            auto lastFuncname = parse(reproducePositions.back(), ':')[0];
-            if(lastFuncname == tokens[0]) {
-                reproducePositions.pop_back();
-                reproducePositions.push_back(tokens[0] + ':' + tokens[1] + ':' + tokens[2]);
-            } else {
-                MPI_ASSERT(reproducePositions.size() > 0);
-                auto lastTokens = parse(reproducePositions.back(), ':');
-                if(lastTokens[1] == "exit") {
-                    reproducePositions.pop_back();
-                    // in case there are already multiple positions, just ignore and add the new positions
-                    if(reproducePositions.size() > 0) {
-                        auto bottomTokens = parse(reproducePositions.back(), ':');
-                        MPI_EQUAL(bottomTokens[0], tokens[0]);
-                    }
-                } else {
-                    MPI_ASSERT(tokens[1] == "entry");
-                }
-                // safeguard for when there are no more elements
-                if(reproducePositions.size() > 0) {
-                    reproducePositions.pop_back();
-                }
-                reproducePositions.push_back(tokens[0] + ':' + tokens[1] + ':' + tokens[2]);
-            }
-        }
-        //cerr << reproducePositions << endl;
     }
 }
 
