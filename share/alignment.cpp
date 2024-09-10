@@ -361,22 +361,44 @@ vector<shared_ptr<element>> makeHierarchyMain(
         // this returns the ptr of a child that has bbname in it
         // if none, then it returns nullptr
         if((child = isNewLoop(bbname, loopTree)) != nullptr) {
-            vector<shared_ptr<element>> loops = __makeHierarchyLoop(traces, index, loopTrees, child);
-            functionalTraces.insert(functionalTraces.end(), loops.begin(), loops.end());
+            vector<shared_ptr<element>> loops = __makeHierarchyLoop(
+                    traces, 
+                    index, 
+                    loopTrees, 
+                    child);
+            functionalTraces.insert(
+                    functionalTraces.end(), 
+                    loops.begin(), 
+                    loops.end());
             continue;
         }
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
         shared_ptr<element> eptr;
         if(traces[index].size() == 4) {
-            eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0], stoul(traces[index][3]));
+            eptr = make_shared<element>(
+                    isEntry, 
+                    isExit, 
+                    stoi(traces[index][2]), 
+                    traces[index][0], 
+                    stoul(traces[index][3]));
         } else {
-            eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0]);
+            eptr = make_shared<element>(
+                    isEntry, 
+                    isExit, 
+                    stoi(traces[index][2]), 
+                    traces[index][0]);
         }
         index++;
 
-        while(!isExit && index < traces.size() && traces[index][1] == "entry") {
-            eptr->funcs.push_back(makeHierarchyLoop(traces, index, loopTrees));
+        while(!isExit 
+                && index < traces.size() 
+                && traces[index][1] == "entry") {
+            eptr->funcs.push_back(
+                    makeHierarchyLoop(
+                        traces, 
+                        index, 
+                        loopTrees));
         }
         functionalTraces.push_back(eptr);
     }
@@ -384,34 +406,23 @@ vector<shared_ptr<element>> makeHierarchyMain(
     
 }
 
-/*  1. Every function starts from entry except for main */
-/*  2. Let's not take anything in unless the main function has started */
-/*  3. Let's not take anything in after the main function has ended */
-/*  4. Even if the function name is the same, if we reach the new entry node, we recursively call the function */
-vector<shared_ptr<element>> makeHierarchy(vector<vector<string>>& traces, unsigned long& index) {
+/*  
+ *  1. Every function starts from entry except for main 
+ *  2. Let's not take anything in unless the main function has started
+ *  3. Let's not take anything in after the main function has ended
+ *  4. Even if the function name is the same, if we reach the new entry node, we recursively call the function
+ */
+vector<shared_ptr<element>> makeHierarchy(
+        vector<vector<string>>& traces, unsigned long& index) {
     vector<shared_ptr<element>> functionalTraces;
     bool isEntry, isExit;
     string bbname, funcname;
     funcname = traces[index][0];
-    /* bool debug = false; */
-    if(funcname == "hypre_PCGSolve") {
-        DEBUG0("came to hypre_PCGSolve at makeHierarchy\n");
-        MPI_ASSERT(false);
-    }
     /* DEBUG0("makeHierarchy for %s, at index: %lu\n", funcname.c_str(), index); */
     /* DEBUG0("funcname: %s: %lu\n", funcname.c_str(), index); */
     do {
         MPI_ASSERT(index < traces.size());
         bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
-        /* if(bbname == "hypre_PCGSolve:neither:15") { */
-        /*     DEBUG0("came to hypre_PCGSolve:neither:15\n"); */
-        /*     DEBUG0("show me next %s:%s:%s\n", traces[index + 1][0].c_str(), traces[index + 1][1].c_str(), traces[index + 1][2].c_str()); */
-        /*     debug = true; */
-        /* } */
-        /* if(traces[index][0] != funcname) { */
-        /*     DEBUG0("bbname: %s\n", bbname.c_str()); */
-        /*     DEBUG0("funcname: %s, traces[index][0]: %s\n", funcname.c_str(), traces[index][0].c_str()); */
-        /* } */
         MPI_ASSERT(traces[index][0] == funcname);
         MPI_ASSERT(traces[index].size() == 3 || traces[index].size() == 4);
         /* DEBUG0("bbname: %s\n", bbname.c_str()); */
@@ -420,30 +431,37 @@ vector<shared_ptr<element>> makeHierarchy(vector<vector<string>>& traces, unsign
         /* shared_ptr<element> eptr = make_shared<element>(isEntry, isExit, bbname); */
         shared_ptr<element> eptr;
         if(traces[index].size() == 4) {
-            eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0], stoul(traces[index][3]));
+            eptr = make_shared<element>(
+                    isEntry, 
+                    isExit, 
+                    stoi(traces[index][2]), 
+                    traces[index][0], 
+                    stoul(traces[index][3]));
         } else {
-            eptr = make_shared<element>(isEntry, isExit, stoi(traces[index][2]), traces[index][0]);
+            eptr = make_shared<element>(
+                    isEntry, 
+                    isExit, 
+                    stoi(traces[index][2]), 
+                    traces[index][0]);
         }
         index++;
-        while(!isExit && index < traces.size() && traces[index][1] == "entry") {
-            eptr->funcs.push_back(makeHierarchy(traces, index)); 
-            /* if(debug) { */
-            /*     int rank; */
-            /*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-            /*     if(!rank) { */
-                /* print(eptr->funcs.back(), 0); */
-                /* DEBUG0("eptr->bb(): %s\n", eptr->bb().c_str()); */
-            /*     debug = false; */
-            /*     } */
-            /* } */
+        while(!isExit 
+                && index < traces.size() 
+                && traces[index][1] == "entry") {
+            eptr->funcs.push_back(
+                    makeHierarchy(traces, index)); 
         }
         functionalTraces.push_back(eptr);
-    } while(!isExit && index < traces.size());
+    } while(!isExit 
+            && index < traces.size());
 
     return functionalTraces; 
 }
 
-static inline bool isLoopEntry(string bbname, shared_ptr<element> parent, loopNode *currloop) {
+static inline bool isLoopEntry(
+        string bbname, 
+        shared_ptr<element> parent, 
+        loopNode *currloop) {
     string parentbb;     
     if(!parent) return false;
     if(parent->isEntry) {
@@ -454,7 +472,10 @@ static inline bool isLoopEntry(string bbname, shared_ptr<element> parent, loopNo
     } else {
         parentbb = parent->funcname + ":neither:" + to_string(parent->id);
     }
-    return parent->isLoop & parentbb == bbname && currloop->nodes.size() > 0 && bbname == currloop->entry;
+    return parent->isLoop 
+        && parentbb == bbname 
+        && currloop->nodes.size() > 0 
+        && bbname == currloop->entry;
 }
 
 void addHierarchy(
@@ -472,7 +493,6 @@ void addHierarchy(
     shared_ptr<element> curr = functionalTraces.back();
     loopNode *currloop = nullptr, *tmploop = nullptr;
 
-    /* DEBUG0("traces.size(): %lu\n", traces.size()); */
     /* 
      * we are first setting the cursor to the end of the functionalTraces here
      * we are pushing to a stack of the elements in the back too
@@ -582,11 +602,6 @@ void addHierarchy(
         if(index >= traces.size()) break;
 
         bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
-        //if(bb == "hypre_StructGridAssembleWithAP:neither:69") {
-        //    DEBUG0("hypre_StructGridAssembleWithAP:neither:69\n");
-        //    DEBUG0("currloop->entry: %s\n", currloop->entry.c_str());
-        //}
-
         /*
          * we assert that current loop node has some nodes in it, or a dummy loop node
          */
@@ -651,6 +666,9 @@ void addHierarchy(
             MPI_ASSERT(curr->isLoop);
         }
 
+        /*
+         * we create a new element here
+         */
         if(traces[index].size() == 3) {
             newchild = make_shared<element>(
                     traces[index][1] == "entry", 
@@ -670,34 +688,49 @@ void addHierarchy(
         index++;
     
         if(parent != nullptr) {
+            /*
+             * we initialize the vector, in case we don't have any value in them
+             * then we push back the new child we just created
+             */
             if(parent->funcs.size() == 0) {
                 parent->funcs.push_back(
                         vector<shared_ptr<element>>());
             }
-            parent->funcs.back().push_back(newchild);
+            parent->funcs.back().push_back(
+                    newchild);
         } else {
+            /*
+             * in case there's no parents, you push back directly to functionalTraces
+             */
             functionalTraces.push_back(newchild);
         }
         
-        // if we are ending this batch, it should be either a loop iteration, or a function
-        // just add a condition || and add the condition of the end of the loop
+        /*
+         * if we are ending this batch, it should be either a loop iteration, or a function
+         * just add a condition || and add the condition of the end of the loop
+         */
         if(index >= traces.size()) {
             break;
         }
      
+        /*
+         * this is the next node to be taken care of
+         * we try to break with a code block before in case we don't have one anymore
+         */
         bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
-        //DEBUG0("option 8 bb: %s, currloop->entry: %s\n", bb.c_str(), currloop->entry.c_str());
 
+        /*
+         * if the last node was an exit node, then we need to update the curr, parent, and stack
+         */
         if(traces[index - 1][1] == "exit") {
-            //DEBUG0("option 8.1: finding an exit here\n"); 
             if(parent == nullptr) {
-                MPI_ASSERT(traces[index - 1][1] == "exit");
+                /* 
+                 * if we don't have a parent anymore, and the last node was an exit node
+                 * then this node should be the main and we should not have any more nodes to be recorded
+                 */
+                MPI_ASSERT(traces[index - 1][0] == "main");
                 break;
             } else {
-                // this is just trying to be careful, should omit in release
-                if(traces[index - 1][1] != "exit" && currloop->entry == bb) {
-                    MPI_ASSERT(curr->funcname == parent->funcname);
-                }
                 curr = parent;
                 if(!__stack.empty()) {
                     parent = __stack.top();
@@ -706,7 +739,9 @@ void addHierarchy(
                     parent = nullptr;
                 }
             }
-            // need to update the looptrees as well -> this needs to be rethought
+            /*
+             * need to update the looptrees as well 
+             */
             currloop = loopTrees[curr->funcname];
             while((tmploop = isNewLoop(curr->content(), currloop)) != nullptr) {
                 currloop = tmploop;
@@ -721,79 +756,13 @@ void addHierarchy(
                 MPI_ASSERT(false);
             }
         } else {
-            /* DEBUG0("option 8.4\n"); */
+            /*
+             * otherwise, simply update the curr to the new child
+             */
             curr = newchild;
         }
     }
-    /* DEBUG0("option 9\n"); */
 }
-
-/* void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<string>>& traces, unsigned long& index) { */
-/*     int rank; */
-/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-/*     stack<shared_ptr<element>> __stack; */
-/*     MPI_ASSERT(!functionalTraces.empty()); */
-/*     MPI_ASSERT(functionalTraces[0]->funcname == "main"); */
-/*     MPI_ASSERT(functionalTraces.back()->funcname == "main"); */
-/*     shared_ptr<element> curr = functionalTraces.back(); */
-
-/*     while(!(curr->isExit)) { */
-/*         __stack.push(curr); */
-/*         if(curr->funcs.size() == 0) { */
-/*             break; */
-/*         } else { */
-/*             curr = curr->funcs.back().back(); */
-/*         } */
-/*     } */
-/*     shared_ptr<element> parent, newchild; */
-/*     MPI_ASSERT(!__stack.empty()); */
-/*     curr = __stack.top(); */
-/*     __stack.pop(); */
-/*     if(__stack.empty()) { */
-/*         parent = nullptr; */
-/*     } else { */
-/*         parent = __stack.top(); */
-/*         __stack.pop(); */
-/*     } */
-
-/*     while(index < traces.size()) { */
-/*         while (index < traces.size() && traces[index][1] == "entry") { */
-/*             curr->funcs.push_back(makeHierarchy(traces, index)); */
-/*         } */ 
-/*         if(index >= traces.size()) { */
-/*             break; */
-/*         } */ 
-/*         MPI_ASSERT(traces[index][1] != "entry"); */
-/*         /1* DEBUG0("%s:%s:%s\n", traces[index][0].c_str(), traces[index][1].c_str(), traces[index][2].c_str()); *1/ */
-/*         if(traces[index].size() == 3) { */
-/*             newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0]); */
-/*         } else { */
-/*             newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0], stoul(traces[index][3])); */
-/*         } */
-/*         MPI_ASSERT(traces[index][0] == curr->funcname); */
-/*         index++; */
-/*         if(parent != nullptr) { */
-/*             parent->funcs.back().push_back(newchild); */
-/*         } else { */
-/*             functionalTraces.push_back(newchild); */
-/*         } */
-/*         if(traces[index - 1][1] == "exit") { // this index - 1 is the last index */
-/*             if(parent == nullptr) { */
-/*                 break; // this should be at the end of main */
-/*             } else { */
-/*                 curr = parent; */
-/*                 if(!__stack.empty()) { */
-/*                     parent = __stack.top(); */
-/*                     __stack.pop(); */
-/*                 } else { */
-/*                     parent = nullptr; */
-/*                 } */
-/*             } */
-/*         } else { */
-/*             curr = newchild; */
-/*         } */
-/*     } */
-/* } */
 
 void print(vector<shared_ptr<element>>& functionalTraces, unsigned depth) {
     for(auto& eptr : functionalTraces) {
