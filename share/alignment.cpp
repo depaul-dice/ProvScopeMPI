@@ -1413,11 +1413,18 @@ static bool __greedyalignmentOffline(vector<shared_ptr<element>>& original, vect
     return true;
 }
 
-bool greedyalignmentWholeOffline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, const int& rank) { 
+bool greedyalignmentWholeOffline(
+        vector<shared_ptr<element>>& original, 
+        vector<shared_ptr<element>>& reproduced, 
+        const int& rank) { 
     vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned;
     /* fprintf(stderr, "greedy alignment on %s at %d original.size: %lu, reproduced.size: %lu\n", \ */
             /* original[0]->bb.c_str(), rank, original.size(), reproduced.size()); */
-    bool rv = __greedyalignmentOffline(original, reproduced, aligned, rank); 
+    bool rv = __greedyalignmentOffline(
+            original, 
+            reproduced, 
+            aligned, 
+            rank); 
     for(auto p : aligned) {
         /* cout << p.first->bb << " " << p.second->bb << endl; */
         MPI_ASSERT(p.first->bb() == p.second->bb());
@@ -1425,10 +1432,16 @@ bool greedyalignmentWholeOffline(vector<shared_ptr<element>>& original, vector<s
         unsigned long len = p.first->funcs.size() < p.second->funcs.size() ? p.first->funcs.size() : p.second->funcs.size();
         for(unsigned i = 0; i < len; i++) {
             // update rv at the end
-            rv = greedyalignmentWholeOffline(p.first->funcs[i], p.second->funcs[i], rank);
+            rv = greedyalignmentWholeOffline(
+                    p.first->funcs[i], 
+                    p.second->funcs[i], 
+                    rank);
         }
         if(p.first->funcs.size() != p.second->funcs.size()) {
-            DEBUG("at %s, p.first->funcs.size(): %lu, p.second->funcs.size(): %lu\n", p.first->bb().c_str(), p.first->funcs.size(), p.second->funcs.size());
+            DEBUG("at %s, p.first->funcs.size(): %lu, p.second->funcs.size(): %lu\n", 
+                    p.first->bb().c_str(), 
+                    p.first->funcs.size(), 
+                    p.second->funcs.size());
         }
     }
     return rv;
@@ -1437,11 +1450,17 @@ bool greedyalignmentWholeOffline(vector<shared_ptr<element>>& original, vector<s
 bool greedyalignmentWholeOffline() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    return greedyalignmentWholeOffline(recordTraces, replayTraces, rank);
+    return greedyalignmentWholeOffline(
+            recordTraces, 
+            replayTraces, 
+            rank);
 }
 
 // returns an empty vector in case of error
-vector<string> getmsgs(vector<string> &orders, const size_t lastind, unsigned& order_index) {
+vector<string> getmsgs(
+        vector<string> &orders, 
+        const size_t lastind, 
+        unsigned& order_index) {
     size_t ind = 0;
     vector<string> msgs;
     do {

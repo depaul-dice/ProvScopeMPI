@@ -155,7 +155,10 @@ int MPI_Init(
 
     MPI_ASSERT(rawTraces.size() > 0);
     /* for(unsigned i = 0; i < rawTraces.size(); i++) { */
-        /* DEBUG0("%s:%s:%s\n", rawTraces[i][0].c_str(), rawTraces[i][1].c_str(), rawTraces[i][2].c_str()); */
+        /* DEBUG0("%s:%s:%s\n", 
+         * rawTraces[i][0].c_str(), 
+         * rawTraces[i][1].c_str(), 
+         * rawTraces[i][2].c_str()); */
     /* } */
 
 

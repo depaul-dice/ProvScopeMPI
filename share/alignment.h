@@ -23,10 +23,25 @@ public:
 
     /* element(bool isEntry, bool isExit, std::string& bb); */
     /* element(bool isEntry, bool isExit, int id, std::string& funcname); */
-    element(bool isEntry, bool isExit, int id, std::string& funcname, bool isLoop = false);
-    element(bool isEntry, bool isExit, int id, std::string& funcname, unsigned long index, bool isLoop = false);
+    element(
+            bool isEntry, 
+            bool isExit, 
+            int id, 
+            std::string& funcname, 
+            bool isLoop = false);
+    element(
+            bool isEntry, 
+            bool isExit, 
+            int id, 
+            std::string& funcname, 
+            unsigned long index, 
+            bool isLoop = false);
     // this is for the loop node, index is the iteration cnt of the loop
-    element(int id, std::string& funcname, unsigned long index, bool isLoop = true);
+    element(
+            int id, 
+            std::string& funcname, 
+            unsigned long index, 
+            bool isLoop = true);
 
     bool operator ==(const element &e) const;
 
@@ -44,12 +59,16 @@ public:
 
 struct lastaligned {
     lastaligned();
-    lastaligned(unsigned long funcId, unsigned long origIndex, unsigned long repIndex);
+    lastaligned(
+            unsigned long funcId, 
+            unsigned long origIndex, 
+            unsigned long repIndex);
     lastaligned(const lastaligned &l) = default;
     lastaligned& operator=(const lastaligned &l) = default;
     ~lastaligned() = default;
 
-    friend std::ostream& operator<<(std::ostream& os, const lastaligned& l);
+    friend std::ostream& operator<<(
+            std::ostream& os, const lastaligned& l);
 
     unsigned long funcId;
     unsigned long origIndex;
