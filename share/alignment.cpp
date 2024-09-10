@@ -356,9 +356,14 @@ static inline bool isLoopEntry(string bbname, shared_ptr<element> parent, loopNo
     return parent->isLoop & parentbb == bbname && currloop->nodes.size() > 0 && bbname == currloop->entry;
 }
 
-void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<string>>& traces, unsigned long& index, unordered_map<string, loopNode *>& loopTrees) {
+void addHierarchy(
+        vector<shared_ptr<element>>& functionalTraces, 
+        vector<vector<string>>& traces, 
+        unsigned long& index, 
+        unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     stack<shared_ptr<element>> __stack;
     MPI_ASSERT(!functionalTraces.empty());
     MPI_ASSERT(functionalTraces[0]->funcname == "main");
@@ -367,6 +372,10 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
     loopNode *currloop = nullptr, *tmploop = nullptr;
 
     /* DEBUG0("traces.size(): %lu\n", traces.size()); */
+    /* 
+     * we are first setting the cursor to the end of the functionalTraces here
+     * we are pushing to a stack of the elements in the back too
+     */
     while(!(curr->isExit)) {
         __stack.push(curr);
         //DEBUG0("curr->bb(): %s in the stack\n", curr->bb().c_str());
@@ -377,6 +386,10 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
         }
     }
 
+    /*
+     * we are setting the parent to the right value
+     * we take out the parent values from the stack too
+     */
     shared_ptr<element> parent, newchild;
     MPI_ASSERT(!__stack.empty());
     curr = __stack.top();
@@ -388,33 +401,36 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
         __stack.pop();
     }
 
-    /* DEBUG0("option 1\n"); */
-    // initialize the correct currloop
+    /* 
+     * initializing to the correct currloop
+     */
     currloop = loopTrees[curr->funcname];
     while((tmploop = isNewLoop(curr->bb(), currloop)) != nullptr) {
         currloop = tmploop;
     }
 
-    /* DEBUG0("option 2\n"); */
     while(index < traces.size()) {
-        // if we are at the entry, we would go through this
+        /* 
+         * if we are at the entry of a new function (we assume that there's no loop to the entry here),
+         * we need to make a hierarchy of the new function
+         */
         while(index < traces.size() && traces[index][1] == "entry") {
             curr->funcs.push_back(makeHierarchyLoop(traces, index, loopTrees));
         }
         if(index >= traces.size()) break;
-        MPI_ASSERT(index < traces.size());
         MPI_ASSERT(traces[index].size() > 0);
-        //bool flag = false;
         string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
-        //DEBUG0("option 3, curr->bb: %s, bb:%s, currloop->entry: %s\n", curr->bb().c_str(), bb.c_str(), currloop->entry.c_str());
         /* if(parent) { */
             /* DEBUG0("parent->bb(): %s, parent->bb == bb: %d \n", parent->bb().c_str(), parent->bb() == bb); */
         /* } */
         
         
-        // we need to think of two cases
-        // 1. we are already in the loop
-        // 2. we are newly in the loop
+        /* 
+         * we need to think of two cases in case we are in the entry node of a current loop 
+         * 1. we are already in the loop
+         * 2. we are newly in the loop
+         * in either case, it is taken care of by __makeHierarchyLoop
+         */
         if(isLoopEntry(bb, parent, currloop)) {
             // implement the case where we have to go through the current loop
             /* if(parent->funcname != curr->funcname) { */
@@ -423,14 +439,37 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
             /* } */
             MPI_ASSERT(parent->funcname == curr->funcname);
             MPI_ASSERT(parent->isLoop);
-            vector<shared_ptr<element>> iterations = __makeHierarchyLoop(traces, index, loopTrees, currloop);
+            /*
+             * CAUTION: this will return the iterations of the loop, and they are at
+             * the same level as the parent, not the children
+             */
+            vector<shared_ptr<element>> iterations = 
+                __makeHierarchyLoop(
+                        traces, 
+                        index, 
+                        loopTrees, 
+                        currloop);
             if(!__stack.empty()) {
-                __stack.top()->funcs.back().insert(__stack.top()->funcs.back().end(), iterations.begin(), iterations.end());
+                /*
+                 * inserting the loop iteration as a children of the top of the stack
+                 * notice, they are at the level of the children, and not the parents
+                 */
+                __stack.top()->funcs.back().insert(
+                        __stack.top()->funcs.back().end(), 
+                        iterations.begin(), 
+                        iterations.end());
                 curr = parent;
                 parent = __stack.top();
                 __stack.pop();
             } else {
-                functionalTraces.insert(functionalTraces.end(), iterations.begin(), iterations.end());
+                /*
+                 * if there are no parents anymore, since they are also at the same level
+                 * the parent, we need to directly insert to functionalTraces here
+                 */
+                functionalTraces.insert(
+                        functionalTraces.end(), 
+                        iterations.begin(), 
+                        iterations.end());
                 curr = parent;
                 parent = nullptr;
             }
@@ -447,70 +486,98 @@ void addHierarchy(vector<shared_ptr<element>>& functionalTraces, vector<vector<s
         //    DEBUG0("currloop->entry: %s\n", currloop->entry.c_str());
         //}
 
-        //DEBUG0("option 4\n"); 
-        if(rank == 0 && currloop->nodes.size() == 0 && loopTrees[curr->funcname] != currloop) {
-            cerr << curr->funcname << endl \
-                << currloop->entry << endl;
-        }
-        MPI_ASSERT(currloop->nodes.size() > 0 || loopTrees[curr->funcname] == currloop);
+        /*
+         * we assert that current loop node has some nodes in it, or a dummy loop node
+         */
+        MPI_ASSERT(currloop->nodes.size() > 0 
+                || loopTrees[curr->funcname] == currloop);
+        /*
+         * if we are going into a new loop here
+         */
         while((tmploop = isNewLoop(bb, currloop)) != nullptr) {
-            // you need to make an loop element here
-            //DEBUG0("option 4.1\n"); 
-            vector<shared_ptr<element>> loops = __makeHierarchyLoop(traces, index, loopTrees, tmploop);
+            /*
+             * here you will create a loop iterations through __makeHierarchyLoop
+             * but this iterations are at the same level as the children of the parent
+             */
+            vector<shared_ptr<element>> loops 
+                = __makeHierarchyLoop(
+                        traces, 
+                        index, 
+                        loopTrees, 
+                        tmploop);
+            /*
+             * since these iterations are the same level as children of the parent,
+             * we push it as the children of the same parent here
+             */
             if(parent != nullptr) {
                 parent->funcs.back().insert(parent->funcs.back().end(), loops.begin(), loops.end());
             } else {
+                /* 
+                 * if there are no parents, we directly insert to functionalTraces
+                 */
                 functionalTraces.insert(functionalTraces.end(), loops.begin(), loops.end());
             }
-            /* DEBUG0("option 4.2\n"); */
             if(index >= traces.size()) break;
             bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         }
 
         if(index >= traces.size()) break;
-        //DEBUG0("option 5\n");  
+        /*
+         * the node cannot be an entry, because if it is, we should be at the beginning of 
+         * this function
+         */
         MPI_ASSERT(traces[index][1] != "entry");
-        // check if we are getting out of this loop
-        if(currloop->nodes.size() > 0 && currloop->nodes.find(bb) == currloop->nodes.end()) {
-            MPI_ASSERT(parent != nullptr); 
+        /* 
+         * here we check if we are getting out of this loop
+         * while we are, we need to update the currloop as well as curr, parent, and stack
+         */
+        while(currloop->nodes.size() > 0 
+                && currloop->nodes.find(bb) == currloop->nodes.end()) {
+            /*
+             * because of the condition above, we made sure that we are in the loop in curr
+             * hence parent has to be a loop node
+             */
+            MPI_ASSERT(parent != nullptr);
             MPI_ASSERT(parent->isLoop);
-            while(currloop->nodes.size() > 0 && currloop->nodes.find(bb) == currloop->nodes.end()) {
-                MPI_ASSERT(parent != nullptr);
-                MPI_ASSERT(parent->isLoop);
-                currloop = currloop->parent;
-                curr = parent;
-                if(!__stack.empty()) {
-                    parent = __stack.top();
-                    __stack.pop();
-                } else {
-                    parent = nullptr;
-                }
-                MPI_ASSERT(curr->isLoop);
+            currloop = currloop->parent;
+            curr = parent;
+            if(!__stack.empty()) {
+                parent = __stack.top();
+                __stack.pop();
+            } else {
+                parent = nullptr;
             }
+            MPI_ASSERT(curr->isLoop);
         }
 
         if(traces[index].size() == 3) {
-            newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0]);
+            newchild = make_shared<element>(
+                    traces[index][1] == "entry", 
+                    traces[index][1] == "exit", 
+                    stoi(traces[index][2]), 
+                    traces[index][0]);
         } else {
             MPI_ASSERT(traces[index].size() == 4);
-            newchild = make_shared<element>(traces[index][1] == "entry", traces[index][1] == "exit", stoi(traces[index][2]), traces[index][0], stoul(traces[index][3]));
+            newchild = make_shared<element>(
+                    traces[index][1] == "entry", 
+                    traces[index][1] == "exit", 
+                    stoi(traces[index][2]), 
+                    traces[index][0], 
+                    stoul(traces[index][3]));
         }
         MPI_ASSERT(traces[index][0] == curr->funcname);
         index++;
     
-        /* DEBUG0("option 6\n"); */
         if(parent != nullptr) {
-            /* DEBUG0("option 6.1\n"); */
             if(parent->funcs.size() == 0) {
-                parent->funcs.push_back(vector<shared_ptr<element>>());
+                parent->funcs.push_back(
+                        vector<shared_ptr<element>>());
             }
             parent->funcs.back().push_back(newchild);
         } else {
-            /* DEBUG0("option 6.2\n"); */
             functionalTraces.push_back(newchild);
         }
         
-        /* DEBUG0("option 7\n"); */
         // if we are ending this batch, it should be either a loop iteration, or a function
         // just add a condition || and add the condition of the end of the loop
         if(index >= traces.size()) {
