@@ -3,28 +3,68 @@
 
 using namespace std;
 
-/* static FILE* replayTraceFile = nullptr; */
-// recordTracesRaw is simply a local variable, so don't make it a global variable
+// recordTracesRaw should not be seen by mpireproduce.cpp
+vector<vector<string>> recordTracesRaw;
 vector<shared_ptr<element>> recordTraces;
-
 vector<vector<string>> replayTracesRaw; // this is necessary for bbprinter
 vector<shared_ptr<element>> replayTraces;
+
 static unordered_map<string, unordered_set<string>> divs;
 
-vector<shared_ptr<element>> __makeHierarchyLoop(vector<vector<string>>& traces, unsigned long& index, unordered_map<string, loopNode *>& loopTrees, loopNode *currloop);
+/*
+ * this is simply the declaration of the function for a reference
+ */
+vector<shared_ptr<element>> __makeHierarchyLoop(
+        vector<vector<string>>& traces, 
+        unsigned long& index, 
+        unordered_map<string, loopNode *>& loopTrees, 
+        loopNode *currloop);
 /* element::element(bool isEntry, bool isExit, string& bb) : isEntry(isEntry), isExit(isExit), bb(bb), funcs(vector<vector<shared_ptr<element>>>()) { */
 /* } */
 
-element::element(bool isEntry, bool isExit, int id, string& funcname, bool isLoop) : \
-        funcs(vector<vector<shared_ptr<element>>>()), funcname(funcname), index(numeric_limits<unsigned long>::max()), id(id), isEntry(isEntry), isExit(isExit), isLoop(isLoop) {
+element::element(
+        bool isEntry, 
+        bool isExit, 
+        int id, 
+        string& funcname, 
+        bool isLoop) : 
+    funcs(vector<vector<shared_ptr<element>>>()), 
+    funcname(funcname), 
+    index(numeric_limits<unsigned long>::max()), 
+    id(id), 
+    isEntry(isEntry), 
+    isExit(isExit), 
+    isLoop(isLoop) {
 }
 
-element::element(bool isEntry, bool isExit, int id, string& funcname, unsigned long index, bool isLoop) : \
-        funcs(vector<vector<shared_ptr<element>>>()), funcname(funcname), index(index), id(id), isEntry(isEntry), isExit(isExit), isLoop(isLoop){
+element::element(
+        bool isEntry, 
+        bool isExit, 
+        int id, 
+        string& funcname, 
+        unsigned long index, 
+        bool isLoop) :
+    funcs(vector<vector<shared_ptr<element>>>()), 
+    funcname(funcname), 
+    index(index), 
+    id(id), 
+    isEntry(isEntry), 
+    isExit(isExit), 
+    isLoop(isLoop){
 }
 
-element::element(int id, string& funcname, unsigned long index, bool isLoop) : \
-        funcs(vector<vector<shared_ptr<element>>>()), funcname(funcname), index(index), id(id), isEntry(false), isExit(false), isLoop(isLoop) {
+element::element(
+        int id, 
+        string& funcname, 
+        unsigned long index, 
+        bool isLoop) :
+    funcs(vector<vector<shared_ptr<element>>>()), 
+    funcname(funcname), 
+    index(index), 
+    id(id), 
+    isEntry(false), 
+    isExit(false), 
+    isLoop(isLoop) {
 }
 
 string element::bb() const {
@@ -798,34 +838,6 @@ static size_t findSize(FILE *fp) {
     return size;
 }
 
-/* deque<shared_ptr<lastaligned>> onlineAlignment(deque<shared_ptr<lastaligned>>& q, bool& isaligned, size_t &lastind) { */
-/*     cerr << "this function should not be called\n"; */
-/*     MPI_ASSERT(false); */
-/*     int rank; */
-/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-/*     /1* static deque<shared_ptr<lastaligned>> q; *1/ */
-/*     /1* DEBUG("onlineAlignment called at rank: %d\n", rank); *1/ */
-/*     appendReplayTrace(); */
-/*     size_t i = 0, j = 0; */ 
-/*     size_t funcId = 0; */
-/*     if(!q.empty()) { */
-/*         i = q.back()->origIndex; */
-/*         j = q.back()->repIndex; */
-/*         funcId = q.back()->funcId; */
-/*         q.pop_back(); */
-/*     } */
-/*     /1* DEBUG0("online alignment starting\n"); *1/ */
-/*     deque<shared_ptr<lastaligned>> rq; */
-/*     rq = greedyalignmentOnline(recordTraces, replayTraces, q, i, j, funcId, rank, isaligned, lastind); */
-/*     MPI_ASSERT(lastind != numeric_limits<size_t>::max()); */
-/*     /1* DEBUG0("lastind: %lu at %d\n", lastind, __LINE__); *1/ */
-/*     /1* if(rank == 0) { *1/ */
-/*         /1* cerr << "printing rq at the end\n" << rq << endl; *1/ */
-/*     /1* } *1/ */
-/*     /1* DEBUG("online alignment done at rank: %d\n", rank); *1/ */
-/*     return rq; */
-/* } */
-
 deque<shared_ptr<lastaligned>> onlineAlignment(
         deque<shared_ptr<lastaligned>>& q, 
         bool& isaligned, 
@@ -834,7 +846,11 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("onlineAlignment called at rank: %d\n", rank); */
-    appendReplayTrace(loopTrees);
+    //appendReplayTrace(loopTrees);
+    appendTraces(
+            loopTrees, 
+            replayTracesRaw, 
+            replayTraces);
     /* print(replayTraces, 0); */
     
     size_t i = 0, j = 0; 
@@ -878,28 +894,6 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
     return rq;
 }
 
-/* void appendReplayTrace() { */
-/*     int rank; */
-/*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-/*     static unsigned long index = 0; */
-/*     if(replayTraces.size() == 0) { */
-/*         /1* DEBUG0("makeHierarchyMain called at %lu\n", index); *1/ */
-/*         MPI_ASSERT(index == 0); */
-/*         replayTraces = makeHierarchyMain(replayTracesRaw, index); */
-/*         /1* if(rank == 0) { *1/ */
-/*             /1* print(replayTraces, 0); *1/ */
-/*         /1* } *1/ */
-/*     } else { */
-/*         /1* DEBUG0("addHierarchy called at %lu\n", index); *1/ */
-/*         addHierarchy(replayTraces, replayTracesRaw, index); */
-/*         /1* if(rank == 0) { *1/ */
-/*         /1*     print(replayTraces, 0); *1/ */
-/*         /1* } *1/ */
-/*     } */
-
-/*     return; */
-/* } */
-
 void appendReplayTrace(unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -921,6 +915,29 @@ void appendReplayTrace(unordered_map<string, loopNode *>& loopTrees) {
         /* } */
     }
 
+    return;
+}
+
+void appendTraces(
+        unordered_map<string, loopNode *>& loopTrees,
+        vector<vector<string>>& rawTraces,
+        vector<shared_ptr<element>>& traces) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    static unsigned long index = 0;
+    if(traces.size() == 0) {
+        MPI_ASSERT(index == 0);
+        traces = makeHierarchyMain(
+                rawTraces, 
+                index, 
+                loopTrees);
+    } else {
+        addHierarchy(
+                traces, 
+                rawTraces, 
+                index, 
+                loopTrees);
+    }
     return;
 }
 

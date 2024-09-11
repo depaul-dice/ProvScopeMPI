@@ -86,10 +86,14 @@ std::deque<std::shared_ptr<lastaligned>> onlineAlignment(
         size_t& lastind, 
         std::unordered_map<std::string, loopNode *>& loopNodes);
 
-/* void appendReplayTrace(); */
 void appendReplayTrace(
         std::unordered_map<std::string, loopNode *>& loopNodes);
 
+void appendTraces(
+        std::unordered_map<std::string, loopNode *>& loopTrees,
+        std::vector<std::vector<std::string>>& rawTraces,
+        std::vector<std::shared_ptr<element>>& traces);
+ 
 // these functions below DO NOT consider loops at all
 std::vector<std::shared_ptr<element>> makeHierarchyMain(
         std::vector<std::vector<std::string>>& traces, unsigned long& index);

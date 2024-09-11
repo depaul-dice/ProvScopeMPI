@@ -111,7 +111,8 @@ void printNodeInfo(Agnode_t* node, Agraph_t* subgraph) {
 }
 
 // here you need to manipulate ret to get the correct values
-pair<string, loopNode *> parseCluster(Agraph_t* subgraph, const std::string& prefix = "") {
+pair<string, loopNode *> parseCluster(
+        Agraph_t* subgraph, const std::string& prefix = "") {
     pair<string, loopNode *> ret;
     string subgraphName = agnameof(subgraph);
     /* logger << prefix << "Cluster: " << subgraphName << endl; */

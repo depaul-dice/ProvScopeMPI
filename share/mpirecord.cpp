@@ -1,3 +1,8 @@
+/*
+ * CAUTION: loop trees are created at the static analysis phase,
+ * so if you wish to know the location of the node, you need to read it here too.
+ */
+
 #include "mpirecordreplay.h"
 
 static map<MPI_Request *, string> __requests;
@@ -5,7 +10,10 @@ static map<MPI_Request *, string> __requests;
 FILE *recordFile = nullptr;
 FILE *traceFile = nullptr;
 static unsigned long nodecnt = 0;
-/* extern "C" void printBBname(const char *name); */
+static unordered_map<string, loopNode *> loopTrees;
+
+extern vector<vector<string>> recordTracesRaw;
+extern vector<shared_ptr<element>> recordTraces;
 
 #ifdef DEBUG_MODE
 /* FILE *recordtraceFile = nullptr; */
@@ -68,12 +76,16 @@ int MPI_Init(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
+    string loopTreeFileName = "loops.dot";
+    loopTrees = parseDotFile(loopTreeFileName);
+    for(auto lt: loopTrees) {
+        lt.second->fixExclusives();
+    }
+
     return ret;
 }
 
-int MPI_Finalize(
-    void
-) {
+int MPI_Finalize(void) {
     //DEBUG0("MPI_Finalize\n");
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -102,11 +114,27 @@ int MPI_Recv(
 ) {
     //DEBUG0("MPI_Recv:from %d\n", source); 
     if(!original_MPI_Recv) {
-        original_MPI_Recv = reinterpret_cast<int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Status *)>(dlsym(RTLD_NEXT, "MPI_Recv"));
+        original_MPI_Recv = reinterpret_cast<
+            int (*)(
+                    void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm, 
+                    MPI_Status *)>(
+                        dlsym(RTLD_NEXT, "MPI_Recv"));
     }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Recv(buf, count, datatype, source, tag, comm, status);
+    int ret = original_MPI_Recv(
+            buf, 
+            count, 
+            datatype, 
+            source, 
+            tag, 
+            comm, 
+            status);
     int source_rank = status->MPI_SOURCE;
 
     fprintf(recordFile, "MPI_Recv:%d:%d:%lu\n", 
@@ -117,6 +145,48 @@ int MPI_Recv(
             rank, 
             source_rank);
     
+    return ret;
+}
+
+int MPI_Send(
+    const void *buf, 
+    int count, 
+    MPI_Datatype datatype, 
+    int dest, 
+    int tag, 
+    MPI_Comm comm
+) {
+    //DEBUG0("MPI_Send:to %d\n", dest);
+    if(!original_MPI_Send) {
+        original_MPI_Send = reinterpret_cast<
+            int (*)(
+                    const void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm)>(
+                        dlsym(RTLD_NEXT, "MPI_Send"));
+    }
+    appendTraces(
+            loopTrees, 
+            recordTracesRaw, 
+            recordTraces);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int ret = original_MPI_Send(
+            buf, 
+            count, 
+            datatype, 
+            dest, 
+            tag, 
+            comm);
+    /*
+    fprintf(recordFile, "MPI_Send:%d:%d:%lu\n", 
+            rank, 
+            dest, 
+            nodecnt);
+    */
     return ret;
 }
 
@@ -168,10 +238,37 @@ int MPI_Isend(
 ) {
     DEBUG0("MPI_Isend:%p\n", request);
     if(!original_MPI_Isend) {
-        original_MPI_Isend = reinterpret_cast<int (*)(const void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Request *)>(dlsym(RTLD_NEXT, "MPI_Isend"));
+        original_MPI_Isend = reinterpret_cast<
+            int (*)(
+                    const void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm, 
+                    MPI_Request *)>(
+                        dlsym(RTLD_NEXT, "MPI_Isend"));
     }
+    /*
+     * 1. create traces as of now
+     * 2. get the latest node
+     * 3. append it to the buffer
+     */ 
+    appendTraces(
+            loopTrees, 
+            recordTracesRaw, 
+            recordTraces);
+    
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(datatype == MPI_INT) {
+        
+    } else if(datatype == MPI_BYTE) {
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    } else {
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
     int ret = original_MPI_Isend(
             buf, 
             count, 
