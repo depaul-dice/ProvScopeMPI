@@ -12,8 +12,11 @@ FILE *traceFile = nullptr;
 static unsigned long nodecnt = 0;
 static unordered_map<string, loopNode *> loopTrees;
 
-extern vector<vector<string>> recordTracesRaw;
-extern vector<shared_ptr<element>> recordTraces;
+vector<vector<string>> recordTracesRaw;
+/*
+ * recordTraces are defined at alignment.cpp
+ */
+extern vector<shared_ptr<element>> recordTraces; 
 
 #ifdef DEBUG_MODE
 /* FILE *recordtraceFile = nullptr; */
@@ -65,6 +68,10 @@ int MPI_Init(
     int rank;
     DEBUG0("MPI_Init\n");
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    /*
+     * open the message exchange record file
+     */
     string filename = ".record" + to_string(rank) + ".txt";  
     recordFile = fopen(filename.c_str(), "w");
     if(recordFile == nullptr) {
@@ -72,6 +79,9 @@ int MPI_Init(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
+    /*
+     * open the trace file
+     */
     filename = ".record" + to_string(rank) + ".tr";
     traceFile = fopen(filename.c_str(), "w");
     if(traceFile == nullptr) {
@@ -79,11 +89,20 @@ int MPI_Init(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
+    /*
+     * parse the loop tree file
+     */ 
     string loopTreeFileName = "loops.dot";
     loopTrees = parseDotFile(loopTreeFileName);
     for(auto lt: loopTrees) {
         lt.second->fixExclusives();
     }
+    
+    /*
+     * initialize recordTracesRaw and recordTraces
+     */
+    recordTracesRaw = vector<vector<string>>();
+    recordTraces = vector<shared_ptr<element>>();
 
     return ret;
 }

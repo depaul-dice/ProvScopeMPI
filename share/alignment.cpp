@@ -3,8 +3,6 @@
 
 using namespace std;
 
-// recordTracesRaw should not be seen by mpireproduce.cpp
-vector<vector<string>> recordTracesRaw;
 vector<shared_ptr<element>> recordTraces;
 vector<vector<string>> replayTracesRaw; // this is necessary for bbprinter
 vector<shared_ptr<element>> replayTraces;
@@ -452,7 +450,8 @@ vector<shared_ptr<element>> makeHierarchyMain(
  *  1. Every function starts from entry except for main 
  *  2. Let's not take anything in unless the main function has started
  *  3. Let's not take anything in after the main function has ended
- *  4. Even if the function name is the same, if we reach the new entry node, we recursively call the function
+ *  4. Even if the function name is the same, 
+ *      if we reach the new entry node, we recursively call the function
  */
 vector<shared_ptr<element>> makeHierarchy(
         vector<vector<string>>& traces, unsigned long& index) {
@@ -460,18 +459,14 @@ vector<shared_ptr<element>> makeHierarchy(
     bool isEntry, isExit;
     string bbname, funcname;
     funcname = traces[index][0];
-    /* DEBUG0("makeHierarchy for %s, at index: %lu\n", funcname.c_str(), index); */
-    /* DEBUG0("funcname: %s: %lu\n", funcname.c_str(), index); */
     do {
         MPI_ASSERT(index < traces.size());
         bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         MPI_ASSERT(traces[index][0] == funcname);
         MPI_ASSERT(traces[index].size() == 3 
                 || traces[index].size() == 4);
-        /* DEBUG0("bbname: %s\n", bbname.c_str()); */
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
-        /* shared_ptr<element> eptr = make_shared<element>(isEntry, isExit, bbname); */
         shared_ptr<element> eptr;
         if(traces[index].size() == 4) {
             eptr = make_shared<element>(
@@ -590,10 +585,6 @@ void addHierarchy(
         if(index >= traces.size()) break;
         MPI_ASSERT(traces[index].size() > 0);
         string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
-        /* if(parent) { */
-            /* DEBUG0("parent->bb(): %s, parent->bb == bb: %d \n", parent->bb().c_str(), parent->bb() == bb); */
-        /* } */
-        
         
         /* 
          * we need to think of two cases in case we are in the entry node of a current loop 
@@ -800,11 +791,13 @@ void addHierarchy(
             }
             if(currloop->entry == bb) {
                 cerr << "we are facing this situation now: " << bb << endl;
-                // the situation is... 
-                // 1. the last node was an exit bb of the function
-                // 2. and now the current trace is an entry of the loop
-                // if the parent is the virtual node of this loop, you need to make another virtual node for this iterations
-                // if not, you stil need to make another virtual node
+                /* 
+                 * the situation is... 
+                 * 1. the last node was an exit bb of the function
+                 * 2. and now the current trace is an entry of the loop
+                 * if the parent is the virtual node of this loop, you need to make another virtual node for this iterations
+                 * if not, you stil need to make another virtual node
+                */
                 MPI_ASSERT(false);
             }
         } else {
@@ -859,26 +852,13 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
         unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* DEBUG("onlineAlignment called at rank: %d\n", rank); */
-    //appendReplayTrace(loopTrees);
     appendTraces(
             loopTrees, 
             replayTracesRaw, 
             replayTraces);
-    /* print(replayTraces, 0); */
     
     size_t i = 0, j = 0; 
     size_t funcId = 0; 
-    /* if(rank ==  0) { */
-        /* shared_ptr<element> recelement, repelement; */
-        /* DEBUG("q.size(): %lu\n", q.size()); */
-        /* for(unsigned i = 0; i < q.size(); i++) { */
-            /* DEBUG("origIndex: %lu, repIndex: %lu, funcId: %lu\n", q[i]->origIndex, q[i]->repIndex, q[i]->funcId); */
-            //recelement = recordTraces[q[i]->origIndex];
-            //repelement = replayTraces[q[i]->repIndex];
-            //cerr << recelement->bb() << " " << repelement->bb() << " " << q[i]->funcId << endl; 
-        /* } */
-    /* } */
     if(!q.empty()) { 
          i = q.back()->origIndex; 
          j = q.back()->repIndex; 
@@ -900,11 +880,6 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
             isaligned, 
             lastind); 
     MPI_ASSERT(lastind != numeric_limits<size_t>::max()); 
-    /* DEBUG0("lastind: %lu at %d\n", lastind, __LINE__); */
-    //if(rank == 0) { 
-    //    cerr << "printing rq at the end\n" << rq << endl; 
-    //} 
-    /* DEBUG("online alignment done at rank: %d\n", rank); */
     return rq;
 }
 

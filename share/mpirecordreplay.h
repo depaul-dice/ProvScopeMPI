@@ -21,7 +21,6 @@
 #include "alignment.h"
 #include "loops.h"
 
-
 using namespace std;
 
 static int (*original_MPI_Init)(
