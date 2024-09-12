@@ -15,6 +15,11 @@
 #include "tools.h"
 #include "loops.h"
 
+enum class TraceType {
+    RECORD = 0,
+    REPLAY = 1
+};
+
 class element {
 public:
     element() = delete;
@@ -82,18 +87,21 @@ std::deque<std::shared_ptr<lastaligned>> onlineAlignment(
         std::deque<std::shared_ptr<lastaligned>>& q, 
         bool& isaligned, 
         size_t& lastind, 
-        std::unordered_map<std::string, loopNode *>& loopNodes);
+        std::unordered_map<std::string, loopNode *>& loopTrees);
 
 void appendReplayTrace(
-        std::unordered_map<std::string, loopNode *>& loopNodes);
+        std::unordered_map<std::string, loopNode *>& loopTrees);
 
 void appendTraces(
         std::unordered_map<std::string, loopNode *>& loopTrees,
         std::vector<std::vector<std::string>>& rawTraces,
         std::vector<std::shared_ptr<element>>& traces);
  
-std::string getLastNodes(
-        std::vector<std::shared_ptr<element>>& traces);
+void appendTraces(
+        std::unordered_map<std::string, loopNode *>& loopTrees,
+        TraceType traceType);
+ 
+std::string getLastNodes(TraceType traceType);
 
 // these functions below DO NOT consider loops at all
 std::vector<std::shared_ptr<element>> makeHierarchyMain(
@@ -144,4 +152,6 @@ std::vector<std::string> getmsgs(
         std::vector<std::string> &orders, 
         const size_t lastind, 
         unsigned& order_index);
+
+void appendRecordTracesRaw(std::vector<std::string> rawRecordTrace);
 #endif // ALIGNMENT_H

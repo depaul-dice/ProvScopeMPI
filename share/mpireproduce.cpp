@@ -223,7 +223,15 @@ int MPI_Recv(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (!original_MPI_Recv) {
-        original_MPI_Recv = (int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Status *)) dlsym(RTLD_NEXT, "MPI_Recv");
+        original_MPI_Recv = (int (*)(
+                    void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm, 
+                    MPI_Status *)) dlsym(
+                        RTLD_NEXT, "MPI_Recv");
     }
     /* DEBUG0("MPI_Recv:%s:%d\n", orders[__order_index].c_str(), __order_index); */
     bool isaligned = true;

@@ -12,11 +12,9 @@ FILE *traceFile = nullptr;
 static unsigned long nodecnt = 0;
 static unordered_map<string, loopNode *> loopTrees;
 
-vector<vector<string>> recordTracesRaw;
-/*
- * recordTraces are defined at alignment.cpp
- */
-extern vector<shared_ptr<element>> recordTraces; 
+Logger logger;
+
+#define MSG_SIZE 256
 
 #ifdef DEBUG_MODE
 /* FILE *recordtraceFile = nullptr; */
@@ -28,12 +26,6 @@ extern vector<shared_ptr<element>> recordTraces;
 
 
 extern "C" void printBBname(const char *name) {
-
-    if(!original_printBBname) {
-        original_printBBname = reinterpret_cast<void (*)(const char *)>(
-                dlsym(RTLD_NEXT, "printBBname"));
-    }
-
     int rank, flag1, flag2;
     MPI_Initialized(&flag1);
     MPI_Finalized(&flag2);
@@ -47,8 +39,7 @@ extern "C" void printBBname(const char *name) {
                 nodecnt++);
         RECORDTRACE("%s\n", name);
         string str(name);
-        recordTracesRaw.push_back(
-                parse(str, ':'));
+        appendRecordTracesRaw(parse(str, ':'));
     }
     return;
 }
@@ -98,12 +89,6 @@ int MPI_Init(
         lt.second->fixExclusives();
     }
     
-    /*
-     * initialize recordTracesRaw and recordTraces
-     */
-    recordTracesRaw = vector<vector<string>>();
-    recordTraces = vector<shared_ptr<element>>();
-
     return ret;
 }
 
@@ -134,7 +119,7 @@ int MPI_Recv(
     MPI_Comm comm, 
     MPI_Status *status
 ) {
-    //DEBUG0("MPI_Recv:from %d\n", source); 
+    DEBUG0("MPI_Recv:from %d\n", source); 
     if(!original_MPI_Recv) {
         original_MPI_Recv = reinterpret_cast<
             int (*)(
@@ -147,49 +132,21 @@ int MPI_Recv(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Recv"));
     }
-    if(!original_MPI_Probe) {
-        original_MPI_Probe = reinterpret_cast<
-            int (*)(
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Probe"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret = 0;
     if(datatype == MPI_INT) {
-        /*
-         * first finding out the message length
-         * then receiving the message
-         */
-        ret = original_MPI_Probe(
-                source, 
-                tag, 
-                comm, 
-                status);
-        if(ret != MPI_SUCCESS) {
-            fprintf(stderr, "MPI_Probe failed at rank: %d\n", rank);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-        int message_length;
-        MPI_Get_count(
-                status, 
-                MPI_CHAR, 
-                &message_length);
-
-        char tmpBuffer[message_length];
+        char tmpBuffer[MSG_SIZE];
         ret = original_MPI_Recv(
                 (void *)tmpBuffer, 
-                count, 
+                MSG_SIZE,
                 MPI_CHAR, 
                 source, 
                 tag, 
                 comm, 
                 status);
-        // the delimiter is '|'
         string tmpStr(tmpBuffer);
+        // the delimiter is '|'
         auto msgs = parse(tmpStr, '|');
         for(int i = 0; i < count; i++) {
             ((int *)buf)[i] = stoi(msgs[i]);
@@ -228,7 +185,7 @@ int MPI_Send(
     int tag, 
     MPI_Comm comm
 ) {
-    //DEBUG0("MPI_Send:to %d\n", dest);
+    DEBUG0("MPI_Send:to %d\n", dest);
     if(!original_MPI_Send) {
         original_MPI_Send = reinterpret_cast<
             int (*)(
@@ -240,21 +197,25 @@ int MPI_Send(
                     MPI_Comm)>(
                         dlsym(RTLD_NEXT, "MPI_Send"));
     }
-    appendTraces(
-            loopTrees, 
-            recordTracesRaw, 
-            recordTraces);
-    string lastNodes = getLastNodes(recordTraces);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    appendTraces(
+            loopTrees, TraceType::RECORD);
+    string lastNodes = getLastNodes(TraceType::RECORD);
     int ret = 0;
     if(datatype == MPI_INT) {
         stringstream ss;
         for(int i = 0; i < count; i++) {
             ss << ((int *)buf)[i] << '|';
         }
-        ss << '|' << lastNodes;
+        ss << lastNodes;
         string str = ss.str();
+        if(str.size() + 1 >= MSG_SIZE) {
+            fprintf(stderr, "message size is too large\n%s\n", str.c_str());
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        fprintf(stderr, "sending message at %s, at rank:%d\n", 
+                lastNodes.c_str(), rank);
         ret = original_MPI_Send(
                 str.c_str(), 
                 str.size() + 1, 
@@ -365,10 +326,8 @@ int MPI_Isend(
                         dlsym(RTLD_NEXT, "MPI_Isend"));
     }
     appendTraces(
-            loopTrees, 
-            recordTracesRaw, 
-            recordTraces);
-    string lastNodes = getLastNodes(recordTraces);
+            loopTrees, TraceType::RECORD);
+    string lastNodes = getLastNodes(TraceType::RECORD);
     
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

@@ -3,6 +3,10 @@
 
 using namespace std;
 
+/*
+ * recordTracesRaw should not be visible to mpireproduce.cpp
+ */
+vector<vector<string>> recordTracesRaw;
 vector<shared_ptr<element>> recordTraces;
 vector<vector<string>> replayTracesRaw; // this is necessary for bbprinter
 vector<shared_ptr<element>> replayTraces;
@@ -17,8 +21,6 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
         unsigned long& index, 
         unordered_map<string, loopNode *>& loopTrees, 
         loopNode *currloop);
-/* element::element(bool isEntry, bool isExit, string& bb) : isEntry(isEntry), isExit(isExit), bb(bb), funcs(vector<vector<shared_ptr<element>>>()) { */
-/* } */
 
 element::element(
         bool isEntry, 
@@ -51,6 +53,9 @@ element::element(
     isLoop(isLoop){
 }
 
+/*
+ * this is an initialization for a loop node
+ */
 element::element(
         int id, 
         string& funcname, 
@@ -928,11 +933,31 @@ void appendTraces(
     return;
 }
 
-string getLastNodes(vector<shared_ptr<element>>& traces) {
+void appendTraces(
+        unordered_map<string, loopNode *>& loopTrees,
+        TraceType traceType) {
+    if(traceType == TraceType::RECORD) {
+        appendTraces(
+                loopTrees, 
+                recordTracesRaw, 
+                recordTraces);
+    } else if (traceType == TraceType::REPLAY) {
+        appendTraces(
+                loopTrees, 
+                replayTracesRaw, 
+                replayTraces);
+    }
+}
+
+static string getLastNodes(vector<shared_ptr<element>>& traces) {
+    MPI_ASSERT(traces.size() > 0);
     stringstream ss;
     shared_ptr<element> curr = traces.back();
     do {
-        ss << '/' << curr->bb() << ':' << curr->index;
+        ss << '/' << curr->bb(); 
+        if(curr->isLoop) {
+            ss << ":loop:" << curr->index; 
+        }
         if(curr->funcs.size() == 0) {
             MPI_ASSERT(!curr->isLoop);
             break;
@@ -941,6 +966,15 @@ string getLastNodes(vector<shared_ptr<element>>& traces) {
         }
     } while (true);
     return ss.str();
+}
+
+string getLastNodes(TraceType traceType) {
+    if(traceType == TraceType::RECORD) {
+        return getLastNodes(recordTraces);
+    } else if (traceType == TraceType::REPLAY) {
+        return getLastNodes(replayTraces);
+    }
+    return "";
 }
 
 static inline void create_map(
@@ -1530,4 +1564,8 @@ vector<string> getmsgs(
         ind = stoul(msgs.back());
     } while(lastind > ind);
     return msgs;
+}
+
+void appendRecordTracesRaw(vector<string> rawRecordTrace) {
+    recordTracesRaw.push_back(rawRecordTrace);
 }

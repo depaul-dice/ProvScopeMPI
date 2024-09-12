@@ -18,8 +18,8 @@
 #include <memory>
 
 #include "tools.h"
-#include "alignment.h"
 #include "loops.h"
+#include "alignment.h"
 
 using namespace std;
 
