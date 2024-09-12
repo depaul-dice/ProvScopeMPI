@@ -10,6 +10,7 @@
 #include <stack>
 #include <limits>
 #include <deque>
+#include <sstream>
 
 #include "tools.h"
 #include "loops.h"
@@ -21,8 +22,6 @@ public:
     element& operator=(const element &e) = default; 
     ~element() = default;
 
-    /* element(bool isEntry, bool isExit, std::string& bb); */
-    /* element(bool isEntry, bool isExit, int id, std::string& funcname); */
     element(
             bool isEntry, 
             bool isExit, 
@@ -79,7 +78,6 @@ struct lastaligned {
 
 typedef struct lastaligned lastaligned;
 
-/* std::deque<std::shared_ptr<lastaligned>> onlineAlignment(std::deque<std::shared_ptr<lastaligned>>& q, bool& isaligned, size_t& lastind); */
 std::deque<std::shared_ptr<lastaligned>> onlineAlignment(
         std::deque<std::shared_ptr<lastaligned>>& q, 
         bool& isaligned, 
@@ -94,6 +92,9 @@ void appendTraces(
         std::vector<std::vector<std::string>>& rawTraces,
         std::vector<std::shared_ptr<element>>& traces);
  
+std::string getLastNodes(
+        std::vector<std::shared_ptr<element>>& traces);
+
 // these functions below DO NOT consider loops at all
 std::vector<std::shared_ptr<element>> makeHierarchyMain(
         std::vector<std::vector<std::string>>& traces, unsigned long& index);

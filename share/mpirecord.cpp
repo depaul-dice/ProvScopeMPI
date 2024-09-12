@@ -43,6 +43,9 @@ extern "C" void printBBname(const char *name) {
                 name, 
                 nodecnt++);
         RECORDTRACE("%s\n", name);
+        string str(name);
+        recordTracesRaw.push_back(
+                parse(str, ':'));
     }
     return;
 }
@@ -125,16 +128,66 @@ int MPI_Recv(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Recv"));
     }
+    if(!original_MPI_Probe) {
+        original_MPI_Probe = reinterpret_cast<
+            int (*)(
+                    int, 
+                    int, 
+                    MPI_Comm, 
+                    MPI_Status *)>(
+                        dlsym(RTLD_NEXT, "MPI_Probe"));
+    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Recv(
-            buf, 
-            count, 
-            datatype, 
-            source, 
-            tag, 
-            comm, 
-            status);
+    int ret = 0;
+    if(datatype == MPI_INT) {
+        /*
+         * first finding out the message length
+         * then receiving the message
+         */
+        ret = original_MPI_Probe(
+                source, 
+                tag, 
+                comm, 
+                status);
+        if(ret != MPI_SUCCESS) {
+            fprintf(stderr, "MPI_Probe failed at rank: %d\n", rank);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        int message_length;
+        MPI_Get_count(
+                status, 
+                MPI_CHAR, 
+                &message_length);
+
+        char tmpBuffer[message_length];
+        ret = original_MPI_Recv(
+                (void *)tmpBuffer, 
+                count, 
+                MPI_CHAR, 
+                source, 
+                tag, 
+                comm, 
+                status);
+        // the delimiter is '|'
+        string tmpStr(tmpBuffer);
+        auto msgs = parse(tmpStr, '|');
+        for(int i = 0; i < count; i++) {
+            ((int *)buf)[i] = stoi(msgs[i]);
+        } 
+        fprintf(stderr, "received message at %s, at rank:%d\n", 
+                msgs.back().c_str(), rank);
+    } else {
+        char type_name[MPI_MAX_OBJECT_NAME];
+        int name_length;
+        MPI_Type_get_name(
+                datatype, 
+                type_name, 
+                &name_length);
+        fprintf(stderr, "unsupported datatype: %s, at rank:%d\n", 
+                type_name, rank);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     int source_rank = status->MPI_SOURCE;
 
     fprintf(recordFile, "MPI_Recv:%d:%d:%lu\n", 
@@ -172,15 +225,35 @@ int MPI_Send(
             loopTrees, 
             recordTracesRaw, 
             recordTraces);
+    string lastNodes = getLastNodes(recordTraces);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Send(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
-            comm);
+    int ret = 0;
+    if(datatype == MPI_INT) {
+        stringstream ss;
+        for(int i = 0; i < count; i++) {
+            ss << ((int *)buf)[i] << '|';
+        }
+        ss << '|' << lastNodes;
+        string str = ss.str();
+        ret = original_MPI_Send(
+                str.c_str(), 
+                str.size() + 1, 
+                MPI_CHAR, 
+                dest, 
+                tag, 
+                comm);
+    } else {
+        char type_name[MPI_MAX_OBJECT_NAME];
+        int name_length;
+        MPI_Type_get_name(
+                datatype, 
+                type_name, 
+                &name_length);
+        fprintf(stderr, "unsupported datatype: %s, at rank:%d\n", 
+                type_name, rank);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     /*
     fprintf(recordFile, "MPI_Send:%d:%d:%lu\n", 
             rank, 
@@ -201,18 +274,41 @@ int MPI_Irecv(
 ) {
     DEBUG0("MPI_Irecv:%p\n", request);
     if(!original_MPI_Recv) {
-        original_MPI_Irecv = reinterpret_cast<int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Request *)>(dlsym(RTLD_NEXT, "MPI_Irecv"));
+        original_MPI_Irecv = reinterpret_cast<
+            int (*)(
+                    void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm, 
+                    MPI_Request *)>(
+                        dlsym(RTLD_NEXT, "MPI_Irecv"));
     }
+
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Irecv(
-            buf, 
-            count, 
-            datatype, 
-            source, 
-            tag, 
-            comm, 
-            request);
+    int ret = 0;
+    if(datatype == MPI_INT) {
+        ret = original_MPI_Irecv(
+                buf, 
+                count, 
+                MPI_CHAR, 
+                source, 
+                tag, 
+                comm, 
+                request);
+    } else {
+        char type_name[MPI_MAX_OBJECT_NAME];
+        int name_length;
+        MPI_Type_get_name(
+                datatype, 
+                type_name, 
+                &name_length);
+        fprintf(stderr, "unsupported datatype: %s, at rank:%d\n", 
+                type_name, rank);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     // I just need to keep track of the request
     fprintf(recordFile, "MPI_Irecv:%d:%d:%p:%lu\n",
             rank, 
@@ -249,34 +345,42 @@ int MPI_Isend(
                     MPI_Request *)>(
                         dlsym(RTLD_NEXT, "MPI_Isend"));
     }
-    /*
-     * 1. create traces as of now
-     * 2. get the latest node
-     * 3. append it to the buffer
-     */ 
     appendTraces(
             loopTrees, 
             recordTracesRaw, 
             recordTraces);
+    string lastNodes = getLastNodes(recordTraces);
     
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    stringstream ss;
+    int ret = 0;
     if(datatype == MPI_INT) {
-        
-    } else if(datatype == MPI_BYTE) {
-        MPI_Abort(MPI_COMM_WORLD, 1);
+        for(int i = 0; i < count; i++) {
+            ss << ((int *)buf)[i] << '|';
+        }
+        ss << '|' << lastNodes;
+        string str = ss.str();
+        ret = original_MPI_Isend(
+                (void *)str.c_str(), 
+                str.size() + 1, 
+                MPI_CHAR, 
+                dest, 
+                tag, 
+                comm, 
+                request);
     } else {
+        char type_name[MPI_MAX_OBJECT_NAME];
+        int name_length;
+        MPI_Type_get_name(
+                datatype, 
+                type_name, 
+                &name_length);
+        fprintf(stderr, "unsupported datatype:%s, at rank:%d\n", 
+                type_name, rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    int ret = original_MPI_Isend(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
-            comm, 
-            request);
     // I just need to keep track of the request
     fprintf(recordFile, "MPI_Isend:%d:%d:%p:%lu\n", 
             rank, 
@@ -291,8 +395,13 @@ int MPI_Isend(
     return ret;
 }
 
-// This is an MPI_Isend that needs the receiver to be ready by the time it is called.
-// Otherwise, it creates an undefined behavior (e.g. lost messages, program crash, data corruption, etc.).
+/* 
+ * This is an MPI_Isend that needs the receiver to be ready 
+ * by the time it is called. Otherwise, it creates an undefined behavior 
+ * (e.g. lost messages, program crash, data corruption, etc.).
+ * We will simply abort when this function is called as of now 
+ * (and implement as necessary).
+ */
 int MPI_Irsend(
     const void *buf, 
     int count, 
@@ -302,6 +411,9 @@ int MPI_Irsend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
+    fprintf(stderr, "MPI_Irsend is not supported yet\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+
     DEBUG0("MPI_Irsend:%p\n", request);
     if(!original_MPI_Irsend) {
         original_MPI_Irsend = reinterpret_cast<

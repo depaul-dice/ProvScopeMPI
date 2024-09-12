@@ -129,7 +129,9 @@ bool lastaligned::isSuccess() {
 }
 
 ostream& operator<<(ostream& os, const lastaligned& l) {
-    os << "funcId: " << l.funcId << ", origIndex: " << l.origIndex << ", repIndex: " << l.repIndex;
+    os << "funcId: " << l.funcId << 
+        ", origIndex: " << l.origIndex << 
+        ", repIndex: " << l.repIndex;
     return os;
 }
 
@@ -268,7 +270,6 @@ vector<shared_ptr<element>> makeHierarchyLoop(
     return functionalTraces; 
 }
 
-
 vector<shared_ptr<element>> __makeHierarchyLoop(
         vector<vector<string>>& traces, 
         unsigned long& index, 
@@ -381,10 +382,12 @@ vector<shared_ptr<element>> makeHierarchyMain(
         unsigned long &index, 
         unordered_map<string, loopNode *>& loopTrees) {
     vector<shared_ptr<element>> functionalTraces;
-    bool isEntry = false, isExit = false;
+    bool isEntry = false, 
+         isExit = false;
     string funcname = "main";
     MPI_ASSERT(loopTrees.find(funcname) != loopTrees.end());
-    loopNode *loopTree = loopTrees[funcname], *child = nullptr;
+    loopNode *loopTree = loopTrees[funcname], 
+             *child = nullptr;
     string bbname;
     while(index < traces.size() 
             && funcname != traces[index][0]) {
@@ -463,7 +466,8 @@ vector<shared_ptr<element>> makeHierarchy(
         MPI_ASSERT(index < traces.size());
         bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         MPI_ASSERT(traces[index][0] == funcname);
-        MPI_ASSERT(traces[index].size() == 3 || traces[index].size() == 4);
+        MPI_ASSERT(traces[index].size() == 3 
+                || traces[index].size() == 4);
         /* DEBUG0("bbname: %s\n", bbname.c_str()); */
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
@@ -530,7 +534,8 @@ void addHierarchy(
     MPI_ASSERT(functionalTraces[0]->funcname == "main");
     MPI_ASSERT(functionalTraces.back()->funcname == "main");
     shared_ptr<element> curr = functionalTraces.back();
-    loopNode *currloop = nullptr, *tmploop = nullptr;
+    loopNode *currloop = nullptr, 
+             *tmploop = nullptr;
 
     /* 
      * we are first setting the cursor to the end of the functionalTraces here
@@ -574,8 +579,13 @@ void addHierarchy(
          * if we are at the entry of a new function (we assume that there's no loop to the entry here),
          * we need to make a hierarchy of the new function
          */
-        while(index < traces.size() && traces[index][1] == "entry") {
-            curr->funcs.push_back(makeHierarchyLoop(traces, index, loopTrees));
+        while(index < traces.size() 
+                && traces[index][1] == "entry") {
+            curr->funcs.push_back(
+                    makeHierarchyLoop(
+                        traces, 
+                        index, 
+                        loopTrees));
         }
         if(index >= traces.size()) break;
         MPI_ASSERT(traces[index].size() > 0);
@@ -634,7 +644,8 @@ void addHierarchy(
                 parent = nullptr;
             }
 
-            MPI_ASSERT(currloop->nodes.size() > 0 && currloop->parent);
+            MPI_ASSERT(currloop->nodes.size() > 0 
+                    && currloop->parent);
             currloop = currloop->parent;
         }
 
@@ -649,7 +660,8 @@ void addHierarchy(
         /*
          * if we are going into a new loop here
          */
-        while((tmploop = isNewLoop(bb, currloop)) != nullptr) {
+        while((tmploop = isNewLoop(bb, currloop)) 
+                != nullptr) {
             /*
              * here you will create a loop iterations through __makeHierarchyLoop
              * but this iterations are at the same level as the children of the parent
@@ -782,7 +794,8 @@ void addHierarchy(
              * need to update the looptrees as well 
              */
             currloop = loopTrees[curr->funcname];
-            while((tmploop = isNewLoop(curr->content(), currloop)) != nullptr) {
+            while((tmploop = isNewLoop(curr->content(), currloop)) 
+                    != nullptr) {
                 currloop = tmploop;
             }
             if(currloop->entry == bb) {
@@ -803,7 +816,8 @@ void addHierarchy(
     }
 }
 
-void print(vector<shared_ptr<element>>& functionalTraces, unsigned depth) {
+void print(
+        vector<shared_ptr<element>>& functionalTraces, unsigned depth) {
     for(auto& eptr : functionalTraces) {
         for(unsigned i = 0; i < depth; i++) {
             fprintf(stderr, "\t"); 
@@ -894,25 +908,23 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
     return rq;
 }
 
-void appendReplayTrace(unordered_map<string, loopNode *>& loopTrees) {
+void appendReplayTrace(
+        unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     static unsigned long index = 0;
-    /* DEBUG0("index at %lu\n", index); */
     if(replayTraces.size() == 0) {
-        /* DEBUG0("makeHierarchyMain called at %lu\n", index); */
         MPI_ASSERT(index == 0);
-        replayTraces = makeHierarchyMain(replayTracesRaw, index, loopTrees);
-        /* if(rank == 0) { */
-            /* print(replayTraces, 0); */
-        /* } */
+        replayTraces = makeHierarchyMain(
+                replayTracesRaw, 
+                index, 
+                loopTrees);
     } else {
-        /* DEBUG0("addHierarchy called at %lu\n", index); */
-        addHierarchy(replayTraces, replayTracesRaw, index, loopTrees);
-        /* DEBUG0("returning append replay trace\n"); */
-        /* if(rank == 0) { */
-        /*     print(replayTraces, 0); */
-        /* } */
+        addHierarchy(
+                replayTraces, 
+                replayTracesRaw, 
+                index, 
+                loopTrees);
     }
 
     return;
@@ -941,7 +953,25 @@ void appendTraces(
     return;
 }
 
-static inline void create_map(unordered_map<string, vector<size_t>>& bbMap, vector<shared_ptr<element>>& reproduced, size_t& j) {
+string getLastNodes(vector<shared_ptr<element>>& traces) {
+    stringstream ss;
+    shared_ptr<element> curr = traces.back();
+    do {
+        ss << '/' << curr->bb() << ':' << curr->index;
+        if(curr->funcs.size() == 0) {
+            MPI_ASSERT(!curr->isLoop);
+            break;
+        } else {
+            curr = curr->funcs.back().back();
+        }
+    } while (true);
+    return ss.str();
+}
+
+static inline void create_map(
+        unordered_map<string, vector<size_t>>& bbMap, 
+        vector<shared_ptr<element>>& reproduced, 
+        size_t& j) {
     for(unsigned k = j; k < reproduced.size(); k++) {
         if(bbMap.find(reproduced[k]->bb()) == bbMap.end()) {
             bbMap[reproduced[k]->bb()] = vector<size_t>();
@@ -951,7 +981,11 @@ static inline void create_map(unordered_map<string, vector<size_t>>& bbMap, vect
     return;
 }
 
-static inline bool matchbbmap(unordered_map<string, vector<size_t>>& bbMap, vector<shared_ptr<element>>& original, size_t& i, size_t& j) {
+static inline bool matchbbmap(
+        unordered_map<string, vector<size_t>>& bbMap, 
+        vector<shared_ptr<element>>& original, 
+        size_t& i, 
+        size_t& j) {
     for(unsigned k = i; k < original.size(); k++) {
         if(bbMap.find(original[k]->bb()) != bbMap.end()) {
             for(auto l: bbMap[original[k]->bb()]) {
@@ -967,16 +1001,26 @@ static inline bool matchbbmap(unordered_map<string, vector<size_t>>& bbMap, vect
 }
 
 
-static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, size_t& initi, size_t& initj, const int& rank, bool&isaligned, size_t& lastind) {
+static pair<size_t, size_t> __greedyalignmentOnline(
+        vector<shared_ptr<element>>& original, 
+        vector<shared_ptr<element>>& reproduced, 
+        vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, 
+        size_t& initi, 
+        size_t& initj, 
+        const int& rank, 
+        bool&isaligned, 
+        size_t& lastind) {
     /* DEBUG0("__greedyalignmentOnline at i: %lu, j: %lu, ", \ */
             /* initi, initj); */
     /* DEBUG0("__greedyalignmentOnline at %s, i: %lu, j: %lu, ", \ */
             /* original[initi]->bb().c_str(), initi, initj); */
     size_t i = initi, j = initj;
     unordered_map<string, vector<size_t>> bbMap;
-    while(i < original.size() && j < reproduced.size()) {
+    while(i < original.size() 
+            && j < reproduced.size()) {
         if(original[i]->bb() == reproduced[j]->bb()) {
-            aligned.push_back(make_pair(original[i], reproduced[j]));
+            aligned.push_back(
+                    make_pair(original[i], reproduced[j]));
             i++; j++;
         } else {
             /* if(i != initi || j != initj) { */
@@ -1047,19 +1091,29 @@ static pair<size_t, size_t> __greedyalignmentOnline(vector<shared_ptr<element>>&
         lastind = original[i - 1]->index;
         /* DEBUG0("at __greedyalignment %d lastind updated: %lu\n", rank, lastind); */
         MPI_ASSERT(lastind != numeric_limits<size_t>::max());
-        return make_pair(numeric_limits<size_t>::max(), numeric_limits<size_t>::max());
+        return make_pair(
+                numeric_limits<size_t>::max(), numeric_limits<size_t>::max());
     }
 }
 
 static bool issuccessful(pair<size_t, size_t> p) {
-    return p.first == numeric_limits<size_t>::max() && p.second == numeric_limits<size_t>::max();
+    return p.first == numeric_limits<size_t>::max() 
+        && p.second == numeric_limits<size_t>::max();
 }
 
 // this function is just to make sure
-static bool islastaligned(vector<shared_ptr<element>>& original, vector<shared_ptr<element>>& reproduced, size_t i, size_t j) {
+static bool islastaligned(
+        vector<shared_ptr<element>>& original, 
+        vector<shared_ptr<element>>& reproduced, 
+        size_t i, 
+        size_t j) {
     unordered_map<string, vector<size_t>> bbMap;
     create_map(bbMap, reproduced, j);
-    return matchbbmap(bbMap, original, i, j);
+    return matchbbmap(
+            bbMap, 
+            original, 
+            i, 
+            j);
 }
 
 /*
@@ -1151,12 +1205,22 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
      * for every control flow graphs, these conditions suffice as not going further down 
      * in this function
      */
-    if(!rq.empty() && !(rq.back()->isSuccess())) {
+    if(!rq.empty() 
+            && !(rq.back()->isSuccess())) {
         /* DEBUG0("at %s, we did not proceed this time 1, \ */
                 /* funcId: %lu, i: %lu, j: %lu\n", \ */
                 /* original[i]->bb().c_str(), funcId, i, j); */
-        MPI_ASSERT(islastaligned(original, reproduced, i, j));
-        rq.push_back(make_shared<lastaligned>(funcId, i, j));
+        MPI_ASSERT(
+                islastaligned(
+                    original, 
+                    reproduced, 
+                    i, 
+                    j));
+        rq.push_back(
+                make_shared<lastaligned>(
+                    funcId, 
+                    i, 
+                    j));
         return rq;
     }
 
