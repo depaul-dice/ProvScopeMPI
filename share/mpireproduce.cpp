@@ -154,34 +154,15 @@ int MPI_Init(
     fclose(fp);
 
     MPI_ASSERT(rawTraces.size() > 0);
-    /* for(unsigned i = 0; i < rawTraces.size(); i++) { */
-        /* DEBUG0("%s:%s:%s\n", 
-         * rawTraces[i][0].c_str(), 
-         * rawTraces[i][1].c_str(), 
-         * rawTraces[i][2].c_str()); */
-    /* } */
-
 
     string looptreefile = "loops.dot";
     __looptrees = parseDotFile(looptreefile);
-    /* DEBUG0("done with parsing\n"); */
     for(auto lt: __looptrees) {
         lt.second->fixExclusives();
     }
 
-    //if(rank == 0) {
-    //    for(auto lt: __looptrees) {
-    //        lt.second->print(cerr, lt.first);
-    //    }
-    //}
-
     unsigned long index = 0;
     recordTraces = makeHierarchyMain(rawTraces, index, __looptrees); 
-    /* if(rank == 0) { */
-        /* print(recordTraces, 0); */
-    /* } */
-
-    //setup_signal_hander();
 
     return ret;
 }
@@ -201,7 +182,6 @@ int MPI_Finalize(
     size_t lastind = 0;
     __q = onlineAlignment(__q, isaligned, lastind, __looptrees);
     // doesn't matter and just finalize it
-    /* DEBUG0("onine alignment done\n"); */
     for(auto it = __looptrees.begin(); it != __looptrees.end(); it++) {
         delete it->second;
     }
@@ -289,7 +269,16 @@ int MPI_Irecv(
 ) {
     /* DEBUG0("MPI_Irecv\n"); */
     if(!original_MPI_Recv) {
-        original_MPI_Irecv = reinterpret_cast<int (*)(void *, int, MPI_Datatype, int, int, MPI_Comm, MPI_Request *)>(dlsym(RTLD_NEXT, "MPI_Irecv"));
+        original_MPI_Irecv = reinterpret_cast<
+            int (*)(
+                    void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm, 
+                    MPI_Request *)>(
+                        dlsym(RTLD_NEXT, "MPI_Irecv"));
     }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

@@ -20,6 +20,7 @@
 #include "tools.h"
 #include "loops.h"
 #include "alignment.h"
+#include "messagePool.h"
 
 using namespace std;
 
