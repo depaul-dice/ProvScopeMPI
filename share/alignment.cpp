@@ -956,7 +956,7 @@ static string getLastNodes(vector<shared_ptr<element>>& traces) {
     do {
         ss << '/' << curr->bb(); 
         if(curr->isLoop) {
-            ss << ":loop:" << curr->index; 
+            ss << ':' << curr->index; 
         }
         if(curr->funcs.size() == 0) {
             MPI_ASSERT(!curr->isLoop);

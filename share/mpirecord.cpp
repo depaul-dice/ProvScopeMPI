@@ -11,6 +11,7 @@ FILE *recordFile = nullptr;
 FILE *traceFile = nullptr;
 static unsigned long nodecnt = 0;
 static unordered_map<string, loopNode *> loopTrees;
+static unordered_set<MPI_Request *> sendRequests;
 
 Logger logger;
 MessagePool messagePool;
@@ -160,8 +161,10 @@ int MPI_Recv(
                 datatype, 
                 type_name, 
                 &name_length);
-        fprintf(stderr, "unsupported datatype: %s, at rank:%d\n", 
-                type_name, rank);
+        fprintf(stderr, "unsupported datatype: %s, at rank:%d, line # %d\n", 
+                type_name, 
+                rank,
+                __LINE__);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     int source_rank = status->MPI_SOURCE;
@@ -214,8 +217,10 @@ int MPI_Send(
             fprintf(stderr, "message size is too large\n%s\n", str.c_str());
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
-        fprintf(stderr, "sending message at %s, at rank:%d\n", 
-                lastNodes.c_str(), rank);
+        fprintf(stderr, "sending message at %s, length: %lu, at rank:%d\n", 
+                str.c_str(), 
+                str.size(),
+                rank);
         ret = original_MPI_Send(
                 str.c_str(), 
                 str.size() + 1, 
@@ -230,8 +235,10 @@ int MPI_Send(
                 datatype, 
                 type_name, 
                 &name_length);
-        fprintf(stderr, "unsupported datatype: %s, at rank:%d\n", 
-                type_name, rank);
+        fprintf(stderr, "unsupported datatype: %s, at rank:%d, line # %d\n", 
+                type_name, 
+                rank,
+                __LINE__);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     /*
@@ -288,13 +295,29 @@ int MPI_Irecv(
                 source);
         ret = original_MPI_Irecv(
                 tmpBuf, 
-                count, 
+                MSG_SIZE, 
                 MPI_CHAR, 
                 source, 
                 tag, 
                 comm, 
                 request);
-        
+    } else if (datatype == MPI_CHAR) { 
+        void *tmpBuf = messagePool.addMessage(
+                request, 
+                buf, 
+                datatype,
+                count, 
+                tag,
+                comm,
+                source);
+        ret = original_MPI_Irecv(
+                tmpBuf, 
+                MSG_SIZE, 
+                MPI_CHAR, 
+                source, 
+                tag, 
+                comm, 
+                request);
     } else {
         char type_name[MPI_MAX_OBJECT_NAME];
         int name_length;
@@ -302,8 +325,10 @@ int MPI_Irecv(
                 datatype, 
                 type_name, 
                 &name_length);
-        fprintf(stderr, "unsupported datatype: %s, at rank:%d\n", 
-                type_name, rank);
+        fprintf(stderr, "unsupported datatype: %s, at rank:%d, line # %d\n",
+                type_name, 
+                rank,
+                __LINE__);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     // I just need to keep track of the request
@@ -354,8 +379,37 @@ int MPI_Isend(
         for(int i = 0; i < count; i++) {
             ss << ((int *)buf)[i] << '|';
         }
-        ss << '|' << lastNodes;
+        ss << lastNodes;
         string str = ss.str();
+        MPI_ASSERT(str.size() + 1 < MSG_SIZE);
+        ret = original_MPI_Isend(
+                (void *)str.c_str(), 
+                str.size() + 1, 
+                MPI_CHAR, 
+                dest, 
+                tag, 
+                comm, 
+                request);
+    } else if(datatype == MPI_CHAR) {
+        /*
+         * just treat it as an int 
+         */
+        for(int i = 0; i < count; i++) {
+            if(((char *)buf)[i] == '|') {
+                fprintf(stderr, "message contains delimiter '|'\n");
+                MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+        }
+        for(int i = 0; i < count; i++) {
+            ss << ((int *)buf)[i] << '|';
+        }
+        ss << lastNodes;
+        string str = ss.str();
+        MPI_ASSERT(str.size() + 1 < MSG_SIZE);
+        fprintf(stderr, "sending message at %s, length: %lu, at rank:%d\n", 
+                str.c_str(), 
+                str.size(),
+                rank);
         ret = original_MPI_Isend(
                 (void *)str.c_str(), 
                 str.size() + 1, 
@@ -371,10 +425,13 @@ int MPI_Isend(
                 datatype, 
                 type_name, 
                 &name_length);
-        fprintf(stderr, "unsupported datatype:%s, at rank:%d\n", 
-                type_name, rank);
+        fprintf(stderr, "unsupported datatype:%s, at rank:%d, line # %d\n", 
+                type_name, 
+                rank, 
+                __LINE__);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    sendRequests.insert(request);
 
     // I just need to keep track of the request
     fprintf(recordFile, "MPI_Isend:%d:%d:%p:%lu\n", 
@@ -459,7 +516,11 @@ int MPI_Cancel(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_ASSERT(__requests.find(request) != __requests.end());
-    messagePool.deleteMessage(request);
+    if(sendRequests.find(request) != sendRequests.end()) {
+        sendRequests.erase(request);
+    } else { 
+        messagePool.deleteMessage(request);
+    }
     int ret = original_MPI_Cancel(request);
     // I just need to keep track that it is cancelled
     fprintf(recordFile, "MPI_Cancel:%d:%p:%lu\n", 
@@ -507,8 +568,12 @@ int MPI_Test(
      * record if the request was completed or not 
      */
     if(*flag) {
-        string lastNode = messagePool.loadMessage(request);
-        fprintf(stderr, "received at %s\n", lastNode.c_str());
+        if(sendRequests.find(request) != sendRequests.end()) {
+            sendRequests.erase(request);
+        } else {
+            string lastNode = messagePool.loadMessage(request);
+            fprintf(stderr, "received at %s\n", lastNode.c_str());
+        }
         fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS:%d:%lu\n", \
                 rank, 
                 request, 
@@ -631,14 +696,19 @@ int MPI_Testsome(
         }
     }
 
+    DEBUG0("MPI_Testsome:%d:%d", rank, *outcount);
     fprintf(recordFile, "MPI_Testsome:%d:%d", rank, *outcount);
     RECORDTRACE("MPI_Testsome:%d:%d", rank, *outcount);
     if(*outcount > 0) {
         string lastNodes;
         for(int i = 0; i < *outcount; i++) {
             int ind = array_of_indices[i];
-            lastNodes = messagePool.loadMessage(&array_of_requests[ind]);
-            fprintf(stderr, "received at %s\n", lastNodes.c_str()); 
+            if(sendRequests.find(&array_of_requests[ind]) != sendRequests.end()) {
+                sendRequests.erase(&array_of_requests[ind]);
+            } else {
+                lastNodes = messagePool.loadMessage(&array_of_requests[ind]);
+                fprintf(stderr, "received at %s\n", lastNodes.c_str());
+            }
             MPI_ASSERT(
                     __requests.find(&array_of_requests[ind]) != __requests.end());
             fprintf(recordFile, ":%p:%d", 
