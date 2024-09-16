@@ -22,8 +22,6 @@
 #include "alignment.h"
 #include "messagePool.h"
 
-using namespace std;
-
 static int (*original_MPI_Init)(
     int *argc, 
     char ***argv
