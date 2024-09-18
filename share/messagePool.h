@@ -82,34 +82,25 @@ public:
             MPI_Status *status = nullptr);
     
     /*
-     * This simply updates the member called count on MPI_Status of the message request
+     * This function looks into the peeked_ vector and manipulates status accordingly
+     * returns -1 if not found
      */
-    void updateStatusCount(
-            MPI_Request *request,
-            MPI_Status *status);
-
-    /*
-     * This function is simply used when 
-     * MPI_Request * is not available
-     */
-    void updateStatusCount(
-            int source,
+    int peekPeekedMessage(
+            int src,
             int tag,
             MPI_Comm comm,
             MPI_Status *status);
-
     /*
      * This function adds an element to peeked_ vector
-     * it returns count
+     * CAUTION: this function does NOT manipulate status in any way
+     * (as you can see that it's not included in the argument)
      */
-    int addPeekedMessage(
-            void *realBuf, 
-            MPI_Datatype dataType, 
+    void addPeekedMessage(
+            void *buf, 
             int count,
             int tag,
             MPI_Comm comm,
-            int src,
-            MPI_Status *status);
+            int src);
  
     /*
      * This loads the buf with the message from peeked_ vector
@@ -123,7 +114,8 @@ public:
         int count,
         int tag,
         MPI_Comm comm,
-        int src);
+        int src,
+        int *retSrc = nullptr);
 
     /*
      * This function deletes the message buffer

@@ -27,7 +27,6 @@ MessagePool messagePool;
 #define RECORDTRACE(...)
 #endif
 
-
 extern "C" void printBBname(const char *name) {
     int rank, flag1, flag2;
     MPI_Initialized(&flag1);
@@ -137,64 +136,60 @@ int MPI_Recv(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG("MPI_Recv:from %d at rank:%d\n", source, rank); 
-    int ret = 0;
+    MPI_Status stat;
+    int ind = messagePool.peekPeekedMessage(
+            source, 
+            tag, 
+            comm, 
+            &stat);
+    /*
+     * if it is successful, then load the message
+     * and record and return
+     */
+    int ret;
+    if(ind != -1) { 
+        ret = messagePool.loadPeekedMessage(
+                buf, 
+                datatype,
+                count,
+                tag,
+                comm,
+                source);
+        fprintf(recordFile, "MPI_Recv:%d:%d:%lu\n", 
+                rank, 
+                stat.MPI_SOURCE, 
+                nodecnt);
+     
+        return ret;
+    }
+
+    /*
+     * if it is not successful, then call the actual MPI_Recv
+     * update status and buf accordingly
+     */
     char tmpBuffer[MSG_SIZE];
     int size;
     MPI_Type_size(datatype, &size);
+    ret = original_MPI_Recv(
+            (void *)tmpBuffer, 
+            MSG_SIZE, 
+            MPI_CHAR, 
+            source, 
+            tag, 
+            comm, 
+            status);
+    string tmpStr(tmpBuffer);
+    auto msgs = parse(tmpStr, '|');
+    MPI_ASSERT(msgs.size() <= count + 2);
     if(datatype == MPI_INT) {
-        ret = original_MPI_Recv(
-                (void *)tmpBuffer, 
-                MSG_SIZE,
-                MPI_CHAR, 
-                source, 
-                tag, 
-                comm, 
-                status);
-        string tmpStr(tmpBuffer);
-        // the delimiter is '|'
-        auto msgs = parse(tmpStr, '|');
-        MPI_ASSERT(msgs.size() <= count + 1);
-        for(int i = 0; i < count; i++) {
+        for(int i = 0; i < msgs.size() - 2; i++) {
             ((int *)buf)[i] = stoi(msgs[i]);
         } 
-        
-        fprintf(stderr, "received message at %s, at rank:%d\n", 
-                msgs.back().c_str(), rank);
-        if(status != MPI_STATUS_IGNORE) {
-            status->_ucount = count * size;
-        }
     } else if(datatype == MPI_CHAR 
             || datatype == MPI_BYTE) {
-        ret = original_MPI_Recv(
-                (void *)tmpBuffer, 
-                MSG_SIZE, 
-                MPI_CHAR, 
-                source, 
-                tag, 
-                comm, 
-                status);
-        string tmpStr(tmpBuffer);
-        auto msgs = parse(tmpStr, '|');
-        MPI_ASSERT(msgs.size() <= count + 1);
-        int i;
-        
-        /*
-         * manipulating the count manually
-         */
-        if(status != MPI_STATUS_IGNORE) {
-            status->_ucount = count * size;
+        for(int i = 0; i < msgs.size() - 2; i++) {
+            ((char *)buf)[i] = (char)stoi(msgs[i]);
         }
-        for(i = 0; i < count; i++) {
-            if(msgs[i].size() > 1) {
-                if(status != MPI_STATUS_IGNORE) {
-                    status->_ucount = i * size;
-                }
-                break;
-            }
-            ((char *)buf)[i] = msgs[i][0];
-        }
-        fprintf(stderr, "received message at %s, at rank:%d\n", 
-                msgs[i].c_str(), rank);
     } else {
         char type_name[MPI_MAX_OBJECT_NAME];
         int name_length;
@@ -208,15 +203,23 @@ int MPI_Recv(
                 __LINE__);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    /*
+     * manipulating count manually
+     */
+    fprintf(stderr, "received message at %s and size: %d, at rank:%d\n", 
+            msgs[count].c_str(), 
+            stoi(msgs.back().c_str()), 
+            rank);
+
+    if(status != MPI_STATUS_IGNORE) {
+        status->_ucount = (msgs.size() - 2) * size;
+    }
     int source_rank = status->MPI_SOURCE;
 
     fprintf(recordFile, "MPI_Recv:%d:%d:%lu\n", 
             rank, 
             source_rank, 
             nodecnt);
-    RECORDTRACE("MPI_Recv:%d:%d\n", 
-            rank, 
-            source_rank);
     
     return ret;
 }
@@ -248,11 +251,13 @@ int MPI_Send(
     string lastNodes = getLastNodes(TraceType::RECORD);
     int ret = 0;
     stringstream ss;
+    int size;
+    MPI_Type_size(datatype, &size);
     if(datatype == MPI_INT) {
         for(int i = 0; i < count; i++) {
             ss << ((int *)buf)[i] << '|';
         }
-        ss << lastNodes;
+        ss << lastNodes << '|' << size;
         string str = ss.str();
         if(str.size() + 1 >= MSG_SIZE) {
             fprintf(stderr, "message size is too large\n%s\n", str.c_str());
@@ -276,7 +281,7 @@ int MPI_Send(
             c = ((char *)buf)[i];
             ss << (int)c << '|';
         }
-        ss << lastNodes;
+        ss << lastNodes << '|' << size;
         string str = ss.str();
         if(str.size() + 1 >= MSG_SIZE) {
             fprintf(stderr, "message size is too large\n%s\n", str.c_str());
@@ -423,13 +428,15 @@ int MPI_Isend(
     
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int size;
+    MPI_Type_size(datatype, &size);
     stringstream ss;
     int ret = 0;
     if(datatype == MPI_INT) {
         for(int i = 0; i < count; i++) {
             ss << ((int *)buf)[i] << '|';
         }
-        ss << lastNodes;
+        ss << lastNodes << '|' << size;
         string str = ss.str();
         MPI_ASSERT(str.size() + 1 < MSG_SIZE);
         ret = original_MPI_Isend(
@@ -455,7 +462,7 @@ int MPI_Isend(
             char c = ((char *)buf)[i];
             ss << (int)c << '|';
         }
-        ss << lastNodes;
+        ss << lastNodes << '|' << size;
         string str = ss.str();
         MPI_ASSERT(str.size() + 1 < MSG_SIZE);
         fprintf(stderr, "sending message at %s, length: %lu, at rank:%d\n", 
@@ -958,6 +965,28 @@ int MPI_Waitall(
     return ret;
 }
 
+// helper function to record mpi probe
+void recordMPIProbe (
+        int rank,
+        int source,
+        int tag,
+        MPI_Status *status) {
+    if(source == MPI_ANY_SOURCE) {
+        fprintf(recordFile, "MPI_Probe:%d:%d:%d:%d:%lu\n", 
+                rank, 
+                source, 
+                tag, 
+                status->MPI_SOURCE, 
+                nodecnt);
+    } else {
+        fprintf(recordFile, "MPI_Probe:%d:%d:%d:%lu\n", 
+                rank, 
+                source, 
+                tag, 
+                nodecnt);
+    }
+}
+
 // not sure if these are actually necessary
 // we can check for MPI_Comm too later
 int MPI_Probe (
@@ -967,7 +996,9 @@ int MPI_Probe (
     MPI_Status *status
 ) {
     int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG0("MPI_Probe:%d\n", source);
+    /*
     if(!original_MPI_Probe) {
         original_MPI_Probe = reinterpret_cast<
             int (*)(
@@ -977,45 +1008,89 @@ int MPI_Probe (
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Probe"));
     }
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Status stat;
-    int ret = original_MPI_Probe(
+    */
+    if(!original_MPI_Recv) {
+        original_MPI_Recv = reinterpret_cast<
+            int (*)(
+                    void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm, 
+                    MPI_Status *)>(
+                        dlsym(RTLD_NEXT, "MPI_Recv"));
+    }
+    /*
+     * first, let's check if we have any appropriate message at peeked
+     * if so, set the status to be appropriate values
+     * CAUTION: status cannot be nullptr or STATUS_IGNORE 
+     * (otherwise why would you call probe?)
+     */
+    int ret = messagePool.peekPeekedMessage(source, tag, comm, status);
+
+    /*
+     * if successful, record it and return without actually calling the function
+     */
+    if(ret != -1) {
+        recordMPIProbe(rank, source, tag, status);
+        return MPI_SUCCESS;
+    }
+
+    /*
+     * if it's NOT successful, you need to call MPI_Recv instead
+     * then add it to the peeked message pool
+     */
+    char tmpBuf[MSG_SIZE]; 
+    ret = original_MPI_Recv(
+            tmpBuf, 
+            MSG_SIZE, 
+            MPI_CHAR, 
             source, 
             tag, 
             comm, 
-            &stat);
-    if(status != MPI_STATUS_IGNORE) {
-        memcpy(status, &stat, sizeof(MPI_Status)); 
-        messagePool.updateStatusCount(
-                source,
-                tag,
-                comm,
-                status);
-    }
-    if(source == MPI_ANY_SOURCE) {
-        fprintf(recordFile, "MPI_Probe:%d:%d:%d:%d:%lu\n", 
-                rank, 
-                source, 
-                tag, 
-                stat.MPI_SOURCE, 
-                nodecnt);
-        RECORDTRACE("MPI_Probe:%d:%d:%d:%d\n", 
-                rank, 
-                source, 
-                tag, 
-                stat.MPI_SOURCE);
-    } else {
-        fprintf(recordFile, "MPI_Probe:%d:%d:%d:%lu\n", 
-                rank, 
-                source, 
-                tag, 
-                nodecnt);
-        RECORDTRACE("MPI_Probe:%d:%d:%d\n", 
-                rank, 
-                source, 
-                tag);
-    }
+            status);
+    MPI_ASSERT(ret == MPI_SUCCESS);
+    messagePool.addPeekedMessage(
+            tmpBuf, 
+            MSG_SIZE, 
+            tag, 
+            comm, 
+            source);
+
+    /*
+     * update status' ucount manually
+     */
+    string tmpStr(tmpBuf);
+    auto tokens = parse(tmpStr, '|');
+    MPI_ASSERT(tokens.size() >= 2);
+    int size = stoi(tokens.back());
+    status->_ucount = (tokens.size() - 2) * size;
+
+    recordMPIProbe(rank, source, tag, status);
     return ret;
+}
+
+void recordMPIIprobeSuccess(
+        int rank,
+        int source,
+        int tag,
+        MPI_Status *stat) {
+    if(source == MPI_ANY_SOURCE) {
+        fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:SUCCESS:%d:%lu\n", 
+                rank, 
+                source, 
+                tag, 
+                stat->MPI_SOURCE, 
+                nodecnt);
+    } else {
+        fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:SUCCESS:%lu\n", 
+                rank, 
+                source, 
+                tag, 
+                nodecnt);
+    }
+
 }
 
 int MPI_Iprobe (
@@ -1026,6 +1101,10 @@ int MPI_Iprobe (
     MPI_Status *status
 ) {
     int rank;
+    /*
+     * if the actual function call is still not set
+     * set them
+     */
     if(!original_MPI_Iprobe) {
         original_MPI_Iprobe = reinterpret_cast<
             int (*)(
@@ -1036,15 +1115,55 @@ int MPI_Iprobe (
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Iprobe"));
     }
+    if(!original_MPI_Recv) {
+        original_MPI_Recv = reinterpret_cast<
+            int (*)(
+                    void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm, 
+                    MPI_Status *)>(
+                        dlsym(RTLD_NEXT, "MPI_Recv"));
+    }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG("MPI_Iprobe:%d, at rank:%d\n", source, rank);
+
+    /*
+     * we first look at the peeked messages
+     * if we have appropriate message, we don't even call the function
+     * and return
+     */
     MPI_Status stat;
-    int ret = original_MPI_Iprobe(
+    int ret = messagePool.peekPeekedMessage(
+            source, 
+            tag, 
+            comm, 
+            &stat);
+    if(ret != -1) {
+        *flag = 1;  
+        recordMPIIprobeSuccess(
+                rank, 
+                source, 
+                tag, 
+                &stat);
+        if(status != MPI_STATUS_IGNORE) {
+            memcpy(
+                    status, 
+                    &stat, 
+                    sizeof(MPI_Status));
+        }
+        return MPI_SUCCESS;
+    }
+
+    ret = original_MPI_Iprobe(
             source, 
             tag, 
             comm, 
             flag, 
             &stat);
+    MPI_ASSERT(ret == MPI_SUCCESS);
     if(status != MPI_STATUS_IGNORE) {
         memcpy(
                 status, 
@@ -1052,47 +1171,46 @@ int MPI_Iprobe (
                 sizeof(MPI_Status));
     }
     if(*flag) {
-        if(status != MPI_STATUS_IGNORE){
-            messagePool.updateStatusCount(
-                    source,
-                    tag,
-                    comm,
-                    status);
-        }
-        if(source == MPI_ANY_SOURCE) {
-            fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:SUCCESS:%d:%lu\n", 
-                    rank, 
-                    source, 
-                    tag, 
-                    stat.MPI_SOURCE, 
-                    nodecnt);
-            RECORDTRACE("MPI_Iprobe:%d:%d:%d:SUCCESS:%d\n", 
-                    rank, 
-                    source, 
-                    tag, 
-                    stat.MPI_SOURCE);
-        } else {
-            fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:SUCCESS:%lu\n", 
-                    rank, 
-                    source, 
-                    tag, 
-                    nodecnt);
-            RECORDTRACE("MPI_Iprobe:%d:%d:%d:SUCCESS\n", 
-                    rank, 
-                    source, 
-                    tag);
-        }
         /*
-         * when successful and it is not a sendRequest, 
-         * you need to look at the message and get the count
+         * if iprobe found any message, 
+         * receive it and add it to peeked messages
          */
+        char tmpBuf[MSG_SIZE];
+        original_MPI_Recv(
+                tmpBuf, 
+                MSG_SIZE, 
+                MPI_CHAR, 
+                source, 
+                tag, 
+                comm, 
+                status);
+        messagePool.addPeekedMessage(
+                tmpBuf,
+                MSG_SIZE,
+                tag,
+                comm,
+                source);
+                
+        /* record the result of Iprobe */
+        recordMPIIprobeSuccess(
+                rank, 
+                source, 
+                tag, 
+                &stat);
+
+        if(status != MPI_STATUS_IGNORE) {
+        /* update status' ucount manually */
+            auto tokens = parse(string(tmpBuf), '|');
+            MPI_ASSERT(tokens.size() >= 2);
+            int size = stoi(tokens.back());
+            status->_ucount = (tokens.size() - 2) * size;
+        }
     } else {
         fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:FAIL:%lu\n", 
                 rank, 
                 source, 
                 tag, 
                 nodecnt);
-        /* RECORDTRACE("MPI_Iprobe:%d:%d:%d:FAIL\n", rank, source, tag); */
     }
     return ret;
 }

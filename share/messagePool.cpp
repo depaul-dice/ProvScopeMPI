@@ -23,13 +23,13 @@ MessageBuffer::MessageBuffer(
     src_(src),
     isSend_(isSend),
     timestamp_(timestamp){
-        if(isSend_ == false) {
-            realBuf_ = malloc(sizeof(char) * msgSize);
-        }
-        if(timestamp_ == ULONG_MAX) {
-            fprintf(stderr, "timestamp overflow\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
+    if(isSend_ == false) {
+        realBuf_ = malloc(sizeof(char) * msgSize);
+    }
+    if(timestamp_ == ULONG_MAX) {
+        fprintf(stderr, "timestamp overflow\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 }
 
 MessageBuffer::~MessageBuffer() {
@@ -101,7 +101,7 @@ string MessagePool::loadMessage(
     string msg((char *)(msgBuf->realBuf_));
     cerr << msg << endl;
     vector<string> tokens = parse(msg, '|');
-    if(tokens.size() != msgBuf->count_ + 1) {
+    if(tokens.size() != msgBuf->count_ + 2) {
         fprintf(stderr, "tokens.size(): %lu, count: %d\n", 
                 tokens.size(), msgBuf->count_);
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -134,103 +134,57 @@ string MessagePool::loadMessage(
     return tokens.back(); 
 }
 
-void MessagePool::updateStatusCount(
-        MPI_Request *request, MPI_Status *status) {
-    MPI_ASSERT(pool_.find(request) != pool_.end());
-    MPI_ASSERT(status != nullptr);
-    MessageBuffer *msgBuf = pool_[request];
-    /*
-     * if the request is a send request, do NOT do anything
-     */
-    if(msgBuf->isSend_) {
-        return;
-    }
-    string msg((char *)(msgBuf->realBuf_));
-    vector<string> tokens = parse(msg, '|');
-    MPI_ASSERT(tokens.size() <= msgBuf->count_ + 1);
-    int size;
-    MPI_Type_size(msgBuf->dataType_, &size);
-    if(tokens.size() == msgBuf->count_ + 1) {
-        status->_ucount = msgBuf->count_ * size;
-    } else {
-        for(unsigned i = 0; i < msgBuf->count_; i++) {
-            if(tokens[i].size() > 1) {
-                status->_ucount = i * size;
-                break;
-            }
-        }
-    }
-}
-
-/*
- * will be deleted
- */
-void  MessagePool::updateStatusCount(
-        int source, 
-        int tag, 
-        MPI_Comm comm, 
+int MessagePool::peekPeekedMessage(
+        int src,
+        int tag,
+        MPI_Comm comm,
         MPI_Status *status) {
-    MPI_ASSERT(status != nullptr);
-    unsigned long minTimestamp = ULONG_MAX;
-    MPI_Request *minRequest = nullptr;
-    for(auto it = pool_.begin(); it != pool_.end(); it++) {
-        if((it->second->src_ == source
-                || source == MPI_ANY_SOURCE)
-                && it->second->tag_ == tag
-                && it->second->comm_ == comm) {
-            if(it->second->timestamp_ < minTimestamp) {
-                minTimestamp = it->second->timestamp_;
-                minRequest = it->first;
-                fprintf(stderr, "minTimestamp: %lu, minRequest: %p\n", 
-                        minTimestamp, minRequest);
-            }
+    MPI_ASSERT(status != nullptr
+            && status != MPI_STATUS_IGNORE);
+    for(unsigned long i = 0; i < peeked_.size(); i++) {
+        int cmpResult;
+        MPI_Comm_compare(comm, peeked_[i]->comm_, &cmpResult);
+        if(tag == peeked_[i]->tag_
+                && cmpResult == MPI_IDENT 
+                && (src == peeked_[i]->src_
+                    || src == MPI_ANY_SOURCE)) {
+            auto tokens = parse(string((char *)(peeked_[i]->buf_)), '|');
+            int size = stoi(tokens.back());
+
+            /*
+             * currently we only update these 4 members, 
+             * but could add more as needed
+             */
+            status->_ucount = (tokens.size() - 2) * size;
+            status->MPI_SOURCE = peeked_[i]->src_;
+            status->MPI_TAG = peeked_[i]->tag_;
+            status->MPI_ERROR = MPI_SUCCESS;
+
+            return i;
         }
     }
-    if(minRequest == nullptr) {
-        fprintf(stderr, "message not found for source: %d, tag: %d\n",
-            source, tag); 
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-    updateStatusCount(minRequest, status);
+    return -1;
 }
-
-int MessagePool::addPeekedMessage(
-        void *realBuf, 
-        MPI_Datatype dataType, 
+ 
+void MessagePool::addPeekedMessage(
+        void *buf, 
         int count,
         int tag,
         MPI_Comm comm,
-        int src,
-        MPI_Status *status) {
-    MPI_ASSERT(realBuf != nullptr);
-    void *buf;
-    string str((char *)realBuf);
-    vector<string> tokens = parse(str, '|');
-    if(dataType == MPI_INT) {
-        buf = malloc(sizeof(int) * tokens.size() - 1);
-        for(unsigned i = 0; i < tokens.size() - 1; i++) {
-            ((int *)buf)[i] = stoi(tokens[i]);
-        }
-    } else if(dataType == MPI_CHAR
-            || dataType == MPI_BYTE) {
-        buf = malloc(sizeof(char) * tokens.size() - 1);     
-        for(unsigned i = 0; i < tokens.size() - 1; i++) {
-            MPI_ASSERT(tokens[i].size() == 1);
-            ((char *)buf)[i] = tokens[i][0];
-        }
-    } else {
-        fprintf(stderr, "Unsupported data type at addPeekedMessage\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-    if(count != tokens.size() - 1) {
-        fprintf(stderr, "tokens.size(): %lu, count: %d, it's not the same!!\n", 
-                tokens.size(), count);
-        count = tokens.size() - 1;
-    }
+        int src) {
+    MPI_ASSERT(buf != nullptr);
+    MPI_ASSERT(src != MPI_ANY_SOURCE);
+
+    char *heapBuf = (char *)malloc(count);
+    strncpy(heapBuf, (char *)buf, count);
+    /*
+     * we are pushing it back as a raw format
+     * when we load, we formalize it
+     */ 
     peeked_.push_back(new MessageBuffer(
                 nullptr, 
-                buf, 
-                dataType, 
+                (void *)heapBuf, 
+                MPI_CHAR, 
                 count, 
                 tag, 
                 comm,
@@ -238,14 +192,6 @@ int MessagePool::addPeekedMessage(
                 false,
                 timestamp_++));
 
-    if(status == nullptr) {
-        return tokens.size() - 1;
-    }
-    // else
-    int size;
-    MPI_Type_size(dataType, &size);
-    status->_ucount = (tokens.size() - 1) * size; 
-    return tokens.size() - 1;
 }
 
 int MessagePool::loadPeekedMessage(
@@ -254,28 +200,35 @@ int MessagePool::loadPeekedMessage(
         int count,
         int tag,
         MPI_Comm comm,
-        int src) {
+        int src,
+        int *retSrc) {
     for(auto it = peeked_.begin(); it != peeked_.end(); it++) {
-        if(dataType == (*it)->dataType_
-                && count >= (*it)->count_
+        int cmpResult;
+        MPI_Comm_compare(comm, (*it)->comm_, &cmpResult);
+        if(count >= (*it)->count_
                 && tag == (*it)->tag_
-                && comm == (*it)->comm_
+                && cmpResult == MPI_IDENT 
                 && (src == (*it)->src_
                     || src == MPI_ANY_SOURCE)) {
+            auto tokens = parse(string((char *)(*it)->buf_), '|');
+            MPI_ASSERT(tokens.size() == count + 2);
             if(dataType == MPI_INT) {
                 for(int i = 0; i < count; i++) {
-                    ((int *)buf)[i] = ((int *)(*it)->buf_)[i];
+                    ((int *)buf)[i] = stoi(tokens[i]);
                 }
             } else if(dataType == MPI_CHAR
                     || dataType == MPI_BYTE) {
                 for(int i = 0; i < count; i++) {
-                    ((char *)buf)[i] = ((char *)(*it)->buf_)[i];
+                    ((char *)buf)[i] = (char)stoi(tokens[i]);
                 }
             } else {
                 fprintf(stderr, "Unsupported data type at loadPeekedMessage\n");
                 MPI_Abort(MPI_COMM_WORLD, 1);
             }
-            int rv = (*it)->count_;
+            int rv = count;
+            if(retSrc != nullptr) {
+                *retSrc = (*it)->src_;
+            }
             delete *it;
             peeked_.erase(it);
             return rv;

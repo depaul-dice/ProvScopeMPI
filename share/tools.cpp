@@ -44,7 +44,7 @@ void close_debugfile() {
 
 #endif // DEBUG_MODE
 
-vector<string> parse(string& line, char delimit) {
+vector<string> parse(string line, char delimit) {
     vector<string> res;
     string tmp = "";
     for (unsigned i = 0; i < line.size(); i++) {
