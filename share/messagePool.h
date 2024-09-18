@@ -70,6 +70,12 @@ public:
             bool isSend = false);
 
     /*
+     * This peeks the message buffer from the pool
+     */
+    MessageBuffer *peekMessage(
+            MPI_Request *request);
+
+    /*
      * Given that the message is already delivered, this function should load the original buffer
      * and return the string that represents the node timing
      * throws an exception if the request is not found

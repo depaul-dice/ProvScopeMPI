@@ -168,8 +168,6 @@ int MPI_Recv(
      * update status and buf accordingly
      */
     char tmpBuffer[MSG_SIZE];
-    int size;
-    MPI_Type_size(datatype, &size);
     ret = original_MPI_Recv(
             (void *)tmpBuffer, 
             MSG_SIZE, 
@@ -178,6 +176,7 @@ int MPI_Recv(
             tag, 
             comm, 
             status);
+    MPI_ASSERT(ret == MPI_SUCCESS);
     string tmpStr(tmpBuffer);
     auto msgs = parse(tmpStr, '|');
     MPI_ASSERT(msgs.size() <= count + 2);
@@ -212,6 +211,8 @@ int MPI_Recv(
             rank);
 
     if(status != MPI_STATUS_IGNORE) {
+        int size;
+        MPI_Type_size(datatype, &size);
         status->_ucount = (msgs.size() - 2) * size;
     }
     int source_rank = status->MPI_SOURCE;
@@ -345,7 +346,23 @@ int MPI_Irecv(
 
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int ret = 0;
+    int ret;
+    /*
+     * let's not support the case where there exists a peeked message
+     * for now
+     */
+    MPI_Status stat;
+    ret = messagePool.peekPeekedMessage(
+            source, 
+            tag, 
+            comm, 
+            &stat);
+    if(ret != -1) {
+        fprintf(stderr, "we don't support the case where there's \
+                a peeked message for MPI_Irecv.\n\
+                Aborting...\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     /*
      * 1. Create a new buffer for the request
      * 2. Call irecv with the new buffer
@@ -392,10 +409,6 @@ int MPI_Irecv(
             source, 
             request, 
             nodecnt);
-    RECORDTRACE("MPI_Irecv:%d:%d:%p\n", 
-            rank, 
-            source, 
-            request);
     __requests[request] = "MPI_Irecv";
     return ret;
 }
@@ -573,7 +586,6 @@ int MPI_Irsend(
 int MPI_Cancel(
     MPI_Request *request
 ) {
-    DEBUG0("MPI_Cancel:%p\n", request);
     if(!original_MPI_Cancel) {
         original_MPI_Cancel = reinterpret_cast<
             int (*)(
@@ -590,9 +602,6 @@ int MPI_Cancel(
             rank, 
             request, 
             nodecnt);
-    RECORDTRACE("MPI_Cancel:%d:%p\n", 
-            rank, 
-            request);
     __requests.erase(request);
     return ret;
 }
@@ -602,8 +611,8 @@ int MPI_Test(
     int *flag, 
     MPI_Status *status
 ) {
-    DEBUG0("MPI_Test:%p\n", request);
     int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(!original_MPI_Test) {
         original_MPI_Test = reinterpret_cast<
             int (*)(
@@ -612,11 +621,56 @@ int MPI_Test(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Test"));
     }
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    DEBUG0("MPI_Test:%p\n", request);
     MPI_ASSERT(
             __requests.find(request) != __requests.end());
+    /*
+     * first check if we have any matching peeked message
+     */
+    MessageBuffer *msgBuf = messagePool.peekMessage(request);
+    int src;
+    int ret = messagePool.loadPeekedMessage(
+            msgBuf->buf_, 
+            msgBuf->dataType_,
+            msgBuf->count_,
+            msgBuf->tag_, 
+            msgBuf->comm_, 
+            msgBuf->src_,
+            &src);
+    /*
+     * if loading of the peeked message is successful
+     * record it, update the status, and return
+     */
+    if(ret != -1) {
+        fprintf(stderr, "we currently do not support the case\
+                where there's a peeked message for MPI_Test.\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+
+        string lastNodes = messagePool.loadMessage(
+                request, 
+                status);
+        /*
+         * this must be a receive request because ret == -1
+         * so we should assert that lastNodes should not be an
+         * empty string
+         */
+        MPI_ASSERT(lastNodes.length() > 0);
+
+        fprintf(stderr, "received at %s\n", lastNodes.c_str());
+        fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS:%d:%lu\n", 
+                rank, 
+                request, 
+                src, 
+                nodecnt);
+        return MPI_SUCCESS;
+    }
+
+    /*
+     * if the peeked message is not found, then call the actual MPI_Test
+     * and update the status and record the information
+     */
     MPI_Status stat;
-    int ret = original_MPI_Test(
+    ret = original_MPI_Test(
             request, 
             flag, 
             &stat);
@@ -628,15 +682,10 @@ int MPI_Test(
     }
 
     /* 
-     * record if the request was completed or not 
+     * use the loadMessage method only if MPI_Test was successful
      */
     if(*flag) {
-        string lastNodes;
-        if (status == MPI_STATUS_IGNORE) {
-            lastNodes = messagePool.loadMessage(request);
-        } else {
-            lastNodes = messagePool.loadMessage(request, status);
-        }
+        string lastNodes = messagePool.loadMessage(request, status);
         if(lastNodes.length() > 0) {
             fprintf(stderr, "received at %s\n", lastNodes.c_str());
         }
@@ -645,19 +694,12 @@ int MPI_Test(
                 request, 
                 stat.MPI_SOURCE, 
                 nodecnt);
-        RECORDTRACE("MPI_Test:%d:%p:SUCCESS:%d\n", 
-                rank, 
-                request, 
-                stat.MPI_SOURCE);
-        /* __requests.erase(request); */
+         __requests.erase(request);
     } else {
         fprintf(recordFile, "MPI_Test:%d:%p:FAIL:%lu\n", \
                 rank, 
                 request, 
                 nodecnt);
-        RECORDTRACE("MPI_Test:%d:%p:FAIL\n", 
-                rank, 
-                request);
     }
     return ret;
 }
@@ -680,12 +722,34 @@ int MPI_Testall(
                         dlsym(RTLD_NEXT, "MPI_Testall"));
     }
 
+    /*
+     * first check if we have any matching peeked message
+     * if there are some, abort for now
+     */
+    int ret;
+    MessageBuffer *msgBuf;
+    for(int i = 0; i < count; i++) {
+        msgBuf = messagePool.peekMessage(&array_of_requests[i]);
+        ret = messagePool.loadPeekedMessage(
+                msgBuf->buf_, 
+                msgBuf->dataType_,
+                msgBuf->count_,
+                msgBuf->tag_, 
+                msgBuf->comm_, 
+                msgBuf->src_);
+        if(ret != -1) {
+            fprintf(stderr, "we currently do not support the case\
+                    where there's a peeked message for MPI_Testall.\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int outcount; 
     int indices [count];
     MPI_Status stats [count];
 
-    int ret = original_MPI_Testall(
+    ret = original_MPI_Testall(
             count, 
             array_of_requests, 
             flag, 
@@ -754,8 +818,30 @@ int MPI_Testsome(
                         dlsym(RTLD_NEXT, "MPI_Testsome"));
     }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    /*
+     * first check if we have any matching peeked message
+     * if there are some, abort for now
+     */
+    int ret;
+    MessageBuffer *msgBuf;
+    for(int i = 0; i < incount; i++) {
+        msgBuf = messagePool.peekMessage(&array_of_requests[i]);
+        ret = messagePool.loadPeekedMessage(
+                msgBuf->buf_, 
+                msgBuf->dataType_,
+                msgBuf->count_,
+                msgBuf->tag_, 
+                msgBuf->comm_, 
+                msgBuf->src_);
+        if(ret != -1) {
+            fprintf(stderr, "we currently do not support the case\
+                    where there's a peeked message for MPI_Testsome.\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+
     MPI_Status stats [incount];
-    int ret = original_MPI_Testsome(
+    ret = original_MPI_Testsome(
             incount, 
             array_of_requests, 
             outcount, 
@@ -772,7 +858,6 @@ int MPI_Testsome(
 
     DEBUG0("MPI_Testsome:%d:%d", rank, *outcount);
     fprintf(recordFile, "MPI_Testsome:%d:%d", rank, *outcount);
-    RECORDTRACE("MPI_Testsome:%d:%d", rank, *outcount);
     if(*outcount > 0) {
         string lastNodes;
         for(int i = 0; i < *outcount; i++) {
@@ -789,13 +874,10 @@ int MPI_Testsome(
                     __requests.find(&array_of_requests[ind]) != __requests.end());
             fprintf(recordFile, ":%p:%d", 
                     &(array_of_requests[ind]), array_of_statuses[i].MPI_SOURCE); 
-            RECORDTRACE(":%p:%d", 
-                    &(array_of_requests[ind]), array_of_statuses[i].MPI_SOURCE);
             /* __requests.erase(&array_of_requests[ind]); */
         }
     }
     fprintf(recordFile, ":%lu\n", nodecnt);
-    RECORDTRACE("\n");
     return ret;
 }
 
@@ -804,6 +886,7 @@ int MPI_Wait(
     MPI_Status *status
 ) {
     int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(!original_MPI_Wait) {
         original_MPI_Wait = reinterpret_cast<
             int (*)(
@@ -811,24 +894,62 @@ int MPI_Wait(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Wait"));
     }
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG0("MPI_Wait\n");
+
+    /*
+     * Look for the message buffer information in MPI_Request
+     */
+    MessageBuffer *msgBuf = messagePool.peekMessage(request);
+    int src;
+    int ret = messagePool.loadPeekedMessage(
+            msgBuf->buf_, 
+            msgBuf->dataType_,
+            msgBuf->count_,
+            msgBuf->tag_, 
+            msgBuf->comm_, 
+            msgBuf->src_,
+            &src);
+    /*
+     * if the correct information is found,
+     * record the information, update the status,
+     * and return
+     */
+    if(ret != -1) {
+        fprintf(stderr, "we currently do not support the case\
+                where there's a peeked message for MPI_Wait.\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+
+        string lastNodes = messagePool.loadMessage(
+                request, status);
+        fprintf(stderr, "received at %s\n", lastNodes.c_str());
+        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu\n", 
+                rank, 
+                request, 
+                src, 
+                nodecnt);
+        MPI_ASSERT(status->MPI_ERROR == MPI_SUCCESS);
+        return MPI_SUCCESS;
+    }
+
+    /*
+     * if the correct information is not found,
+     * call the actual MPI_Wait and update the status
+     * and record the information
+     */
     MPI_Status stat;
-    int ret = original_MPI_Wait(request, &stat);
+    ret = original_MPI_Wait(request, &stat);
     if(status != MPI_STATUS_IGNORE) {
-        *status = stat;
+        memcpy(
+                status, 
+                &stat, 
+                sizeof(MPI_Status));
     }
     MPI_ASSERT(__requests.find(request) != __requests.end());
     /* string req = __requests[request]; */
     /* __requests.erase(request); */
 
     if(ret == MPI_SUCCESS) {
-        string lastNodes;
-        if (status == MPI_STATUS_IGNORE){
-            lastNodes = messagePool.loadMessage(request);
-        } else {
-            lastNodes = messagePool.loadMessage(request, status);
-        }
+        string lastNodes = messagePool.loadMessage(request, status);
         if(lastNodes.length() > 0) {
             fprintf(stderr, "received at %s\n", lastNodes.c_str());
         }
@@ -837,17 +958,11 @@ int MPI_Wait(
                 request, 
                 stat.MPI_SOURCE, 
                 nodecnt);
-        RECORDTRACE("MPI_Wait:%d:%p:SUCCESS:%d\n", 
-                rank, 
-                request, 
-                stat.MPI_SOURCE);
     } else {
         fprintf(recordFile, "MPI_Wait:%d:%p:FAIL:%lu\n", \
                 rank, 
                 request, 
                 nodecnt);
-        RECORDTRACE("MPI_Wait:%d:%p:FAIL\n", 
-                rank, request);
     }
     return ret;
 }
@@ -925,8 +1040,32 @@ int MPI_Waitall(
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     string currNodes = getLastNodes(TraceType::RECORD);
     DEBUG("MPI_Waitall, rank:%d, at %s\n", rank, currNodes.c_str());
+
+    /*
+     * you first look for the peeked messages
+     * if there's an appropriate message, we abort
+     * because we currently do not support this case
+     */
+    int ret;
+    MessageBuffer **msgBufs = new MessageBuffer*[count];
+    for(int i = 0; i < count; i++) {
+        msgBufs[i] = messagePool.peekMessage(&array_of_requests[i]);
+        ret = messagePool.loadPeekedMessage(
+                msgBufs[i]->buf_, 
+                msgBufs[i]->dataType_,
+                msgBufs[i]->count_,
+                msgBufs[i]->tag_, 
+                msgBufs[i]->comm_, 
+                msgBufs[i]->src_);
+        if(ret != -1) {
+            delete [] msgBufs;
+            fprintf(stderr, "we currently do not support the case\
+                    where there's a peeked message for MPI_Waitall.\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
     MPI_Status stats [count];
-    int ret = original_MPI_Waitall(
+    ret = original_MPI_Waitall(
             count, 
             array_of_requests, 
             stats);
@@ -937,12 +1076,7 @@ int MPI_Waitall(
             rank, count);
     DEBUG("MPI_Waitall returned: %d\n", rank);
     for(int i = 0; i < count; i++) {
-        string lastNodes;
-        if(array_of_statuses == MPI_STATUSES_IGNORE) {
-            lastNodes = messagePool.loadMessage(&array_of_requests[i]);
-        } else {
-            lastNodes = messagePool.loadMessage(&array_of_requests[i], &stats[i]);
-        }
+        string lastNodes = messagePool.loadMessage(&array_of_requests[i]);
         if(lastNodes.length() > 0) {
             fprintf(stderr, "received at %s\n", lastNodes.c_str());
         }
@@ -1060,6 +1194,8 @@ int MPI_Probe (
 
     /*
      * update status' ucount manually
+     * other member values should be correct
+     * when called MPI_Recv
      */
     string tmpStr(tmpBuf);
     auto tokens = parse(tmpStr, '|');

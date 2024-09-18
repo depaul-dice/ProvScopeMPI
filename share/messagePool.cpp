@@ -77,8 +77,21 @@ void *MessagePool::addMessage(
             isSend,
             timestamp_++);
     fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, timestamp:%lu\n", 
-            request, count, tag, src, timestamp_);
+            request, 
+            count, 
+            tag, 
+            src, 
+            timestamp_);
     return pool_[request]->realBuf_;
+}
+
+MessageBuffer *MessagePool::peekMessage(
+        MPI_Request *request) {
+    if(pool_.find(request) == pool_.end()) {
+        fprintf(stderr, "message not found for request: %p\n", request);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    return pool_[request];
 }
 
 string MessagePool::loadMessage(
@@ -99,35 +112,34 @@ string MessagePool::loadMessage(
     }
 
     string msg((char *)(msgBuf->realBuf_));
-    cerr << msg << endl;
     vector<string> tokens = parse(msg, '|');
     if(tokens.size() != msgBuf->count_ + 2) {
         fprintf(stderr, "tokens.size(): %lu, count: %d\n", 
                 tokens.size(), msgBuf->count_);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    if(status != nullptr) {
-        int size;
-        MPI_Type_size(msgBuf->dataType_, &size);
-        status->_ucount = msgBuf->count_ * size;
-    }
     if(msgBuf->dataType_ == MPI_INT) {
         for(int i = 0; i < msgBuf->count_; i++) {
             ((int *)(msgBuf->buf_))[i] = stoi(tokens[i]);
         }
-    } else if(msgBuf->dataType_ == MPI_CHAR) {
+    } else if(msgBuf->dataType_ == MPI_CHAR
+            || msgBuf->dataType_ == MPI_BYTE) {
         for(int i = 0; i < msgBuf->count_; i++) {
-            MPI_ASSERT(tokens[i].size() == 1);
-            ((char *)(msgBuf->buf_))[i] = tokens[i][0];
-        }
-    } else if(msgBuf->dataType_ == MPI_BYTE) {
-        for(int i = 0; i < msgBuf->count_; i++) {
-            MPI_ASSERT(tokens[i].size() == 1);
-            ((char *)(msgBuf->buf_))[i] = tokens[i][0];
+            ((char *)(msgBuf->buf_))[i] = (char)stoi(tokens[i]);
         }
     } else {
         fprintf(stderr, "Unsupported data type\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    if(status != nullptr 
+            && status != MPI_STATUS_IGNORE) {
+        status->MPI_SOURCE = msgBuf->src_;
+        status->MPI_TAG = msgBuf->tag_;
+        status->MPI_ERROR = MPI_SUCCESS;
+
+        int size;
+        MPI_Type_size(msgBuf->dataType_, &size);
+        status->_ucount = msgBuf->count_ * size;
     }
     delete pool_[request];
     pool_.erase(request);
