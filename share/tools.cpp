@@ -194,3 +194,52 @@ void splitNinsert(const string& str, const string& delimit, unordered_set<string
         container.insert(res);
     }
 }
+
+void recordMPIIprobeSuccess(
+        FILE *recordFile,
+        int rank,
+        int source,
+        int tag,
+        MPI_Status *stat,
+        unsigned long nodeCount) {
+    if(source == MPI_ANY_SOURCE) {
+        fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:SUCCESS:%d:%lu\n", 
+                rank, 
+                source, 
+                tag, 
+                stat->MPI_SOURCE, 
+                nodeCount);
+    } else {
+        fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:SUCCESS:%lu\n", 
+                rank, 
+                source, 
+                tag, 
+                nodeCount);
+    }
+
+}
+
+void recordMPIProbe (
+        FILE *recordFile,
+        int rank,
+        int source,
+        int tag,
+        MPI_Status *status,
+        unsigned long nodeCount) {
+    if(source == MPI_ANY_SOURCE) {
+        fprintf(recordFile, "MPI_Probe:%d:%d:%d:%d:%lu\n", 
+                rank, 
+                source, 
+                tag, 
+                status->MPI_SOURCE, 
+                nodeCount);
+    } else {
+        fprintf(recordFile, "MPI_Probe:%d:%d:%d:%lu\n", 
+                rank, 
+                source, 
+                tag, 
+                nodeCount);
+    }
+}
+
+

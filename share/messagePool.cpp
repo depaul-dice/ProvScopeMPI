@@ -56,26 +56,33 @@ void *MessagePool::addMessage(
         MPI_Comm comm,
         int src,
         bool isSend) {
-    if(pool_.find(request) != pool_.end()) {
-        fprintf(stderr, "message already exists for request: %p\n", request);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
     if(dataType != MPI_INT
             && dataType != MPI_CHAR
             && dataType != MPI_BYTE) {
         fprintf(stderr, "Unsupported data type\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    pool_[request] = new MessageBuffer(
-            request, 
-            buf, 
-            dataType, 
-            count, 
-            tag, 
-            comm,
-            src,
-            isSend,
-            timestamp_++);
+    if(pool_.find(request) == pool_.end()) {
+        pool_[request] = new MessageBuffer(
+                request, 
+                buf, 
+                dataType, 
+                count, 
+                tag, 
+                comm,
+                src,
+                isSend,
+                timestamp_++);
+    } else {
+        pool_[request]->buf_ = buf;
+        pool_[request]->dataType_ = dataType;
+        pool_[request]->count_ = count;
+        pool_[request]->tag_ = tag;
+        pool_[request]->comm_ = comm;
+        pool_[request]->src_ = src;
+        pool_[request]->isSend_ = isSend;
+        pool_[request]->timestamp_ = timestamp_++;
+    }
     fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, isSend:%d, timestamp:%lu\n", 
             request, 
             count, 
@@ -150,8 +157,6 @@ string MessagePool::loadMessage(
         MPI_Type_size(msgBuf->dataType_, &size);
         status->_ucount = msgBuf->count_ * size;
     }
-    delete pool_[request];
-    pool_.erase(request);
     return tokens.back(); 
 }
 
@@ -162,6 +167,7 @@ int MessagePool::peekPeekedMessage(
         MPI_Status *status) {
     MPI_ASSERT(status != nullptr
             && status != MPI_STATUS_IGNORE);
+    //fprintf(stderr, "peeking peeked_ size: %lu\n", peeked_.size());
     for(unsigned long i = 0; i < peeked_.size(); i++) {
         int cmpResult;
         MPI_Comm_compare(comm, peeked_[i]->comm_, &cmpResult);
@@ -180,8 +186,9 @@ int MessagePool::peekPeekedMessage(
             status->MPI_SOURCE = peeked_[i]->src_;
             status->MPI_TAG = peeked_[i]->tag_;
             status->MPI_ERROR = MPI_SUCCESS;
+            fprintf(stderr, "peeked message found: %lu\n", i);
 
-            return i;
+            return (int)i;
         }
     }
     return -1;
@@ -223,10 +230,12 @@ int MessagePool::loadPeekedMessage(
         MPI_Comm comm,
         int src,
         int *retSrc) {
+    //fprintf(stderr, "loadPeekedMessage called: %lu, tag: %d, src: %d, count: %d\n", peeked_.size(), tag, src, count);
     for(auto it = peeked_.begin(); it != peeked_.end(); it++) {
         int cmpResult;
         MPI_Comm_compare(comm, (*it)->comm_, &cmpResult);
-        if(count >= (*it)->count_
+        //fprintf(stderr, "tag: %d, src: %d, cmpResult: %d, count:%d\n", (*it)->tag_, (*it)->src_, cmpResult, (*it)->count_);
+        if(count <= (*it)->count_
                 && tag == (*it)->tag_
                 && cmpResult == MPI_IDENT 
                 && (src == (*it)->src_
@@ -252,6 +261,7 @@ int MessagePool::loadPeekedMessage(
             }
             delete *it;
             peeked_.erase(it);
+            fprintf(stderr, "loadPeekedMessage returning: %d, size: %lu\n", rv, peeked_.size());
             return rv;
         }
     }

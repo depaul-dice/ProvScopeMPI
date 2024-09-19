@@ -153,5 +153,26 @@ void mpi_equal(T a, T b) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
+
+/* 
+ * below is a recording functions for each mpi functions 
+ */
+void recordMPIIprobeSuccess(
+        FILE *recordFile,
+        int rank,
+        int source,
+        int tag,
+        MPI_Status *stat,
+        unsigned long nodeCount);
+
+// helper function to record mpi probe
+void recordMPIProbe (
+        FILE *recordFile,
+        int rank,
+        int source,
+        int tag,
+        MPI_Status *status,
+        unsigned long nodeCount);
+
 #endif // TOOLS_H
        

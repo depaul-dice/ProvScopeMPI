@@ -9,7 +9,7 @@
 
 #include "tools.h"
 
-const int msgSize = 512;
+const int msgSize = 1024;
 
 // this class does not have to be visible to users
 class MessageBuffer {
@@ -79,7 +79,6 @@ public:
      * Given that the message is already delivered, this function should load the original buffer
      * and return the string that represents the node timing
      * throws an exception if the request is not found
-     * deletes the message buffer after loading the message
      * updates the count of the status too
      * returns an empty string when the request is send and not receive
      */
