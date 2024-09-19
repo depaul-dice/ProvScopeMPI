@@ -76,11 +76,12 @@ void *MessagePool::addMessage(
             src,
             isSend,
             timestamp_++);
-    fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, timestamp:%lu\n", 
+    fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, isSend:%d, timestamp:%lu\n", 
             request, 
             count, 
             tag, 
             src, 
+            isSend,
             timestamp_);
     return pool_[request]->realBuf_;
 }
@@ -88,8 +89,12 @@ void *MessagePool::addMessage(
 MessageBuffer *MessagePool::peekMessage(
         MPI_Request *request) {
     if(pool_.find(request) == pool_.end()) {
-        fprintf(stderr, "message not found for request: %p\n", request);
-        MPI_Abort(MPI_COMM_WORLD, 1);
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        fprintf(stderr, "message not found for request at peekMessage: %p \
+                at rank:%d\n", 
+                request, rank);
+        return nullptr;
     }
     return pool_[request];
 }
@@ -97,7 +102,11 @@ MessageBuffer *MessagePool::peekMessage(
 string MessagePool::loadMessage(
         MPI_Request *request, MPI_Status *status) {
     if(pool_.find(request) == pool_.end()) {
-        fprintf(stderr, "message not found for request: %p\n", request);
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        fprintf(stderr, "message not found for request at loadMessage: %p \
+                at rank: %d\n", 
+                request, rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     MessageBuffer *msgBuf = pool_[request];

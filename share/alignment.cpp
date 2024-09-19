@@ -1474,7 +1474,7 @@ static bool __greedyalignmentOffline(vector<shared_ptr<element>>& original, vect
             aligned.push_back(make_pair(original[i], reproduced[j]));
             i++; j++;
         } else {
-            fprintf(stderr, "option 1, rank:%d, pod:%s\n", rank, original[i - 1]->bb().c_str());
+            //fprintf(stderr, "option 1, rank:%d, pod:%s\n", rank, original[i - 1]->bb().c_str());
             /* div++; */
             if(bbMap.size() == 0) create_map(bbMap, reproduced, j);
 
@@ -1489,11 +1489,11 @@ static bool __greedyalignmentOffline(vector<shared_ptr<element>>& original, vect
     }
 
     if(i < original.size()) {
-        fprintf(stderr, "option 2, rank:%d, pod:%s\n", rank, original[i - 1]->bb().c_str());
+        //fprintf(stderr, "option 2, rank:%d, pod:%s\n", rank, original[i - 1]->bb().c_str());
         /* div++; */
         return false;
     } else if(j < reproduced.size()) {
-        fprintf(stderr, "option 3, rank:%d, pod:%s\n", rank, reproduced[j - 1]->bb().c_str());
+        //fprintf(stderr, "option 3, rank:%d, pod:%s\n", rank, reproduced[j - 1]->bb().c_str());
         /* div++; */
         return false;
     } 
