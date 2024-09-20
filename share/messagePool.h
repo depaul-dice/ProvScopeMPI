@@ -9,7 +9,7 @@
 
 #include "tools.h"
 
-const int msgSize = 1024;
+const int msgSize = 4096;
 
 // this class does not have to be visible to users
 class MessageBuffer {

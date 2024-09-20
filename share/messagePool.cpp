@@ -83,6 +83,7 @@ void *MessagePool::addMessage(
         pool_[request]->isSend_ = isSend;
         pool_[request]->timestamp_ = timestamp_++;
     }
+    /*
     fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, isSend:%d, timestamp:%lu\n", 
             request, 
             count, 
@@ -90,6 +91,7 @@ void *MessagePool::addMessage(
             src, 
             isSend,
             timestamp_);
+    */
     return pool_[request]->realBuf_;
 }
 
@@ -99,9 +101,9 @@ MessageBuffer *MessagePool::peekMessage(
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         fprintf(stderr, "message not found for request at peekMessage: %p \
-                at rank:%d\n", 
+                at rank: %d\n", 
                 request, rank);
-        return nullptr;
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
     return pool_[request];
 }
@@ -186,7 +188,7 @@ int MessagePool::peekPeekedMessage(
             status->MPI_SOURCE = peeked_[i]->src_;
             status->MPI_TAG = peeked_[i]->tag_;
             status->MPI_ERROR = MPI_SUCCESS;
-            fprintf(stderr, "peeked message found: %lu\n", i);
+            //fprintf(stderr, "peeked message found: %lu\n", i);
 
             return (int)i;
         }
@@ -231,6 +233,7 @@ int MessagePool::loadPeekedMessage(
         int src,
         int *retSrc) {
     //fprintf(stderr, "loadPeekedMessage called: %lu, tag: %d, src: %d, count: %d\n", peeked_.size(), tag, src, count);
+    int ind = 0;
     for(auto it = peeked_.begin(); it != peeked_.end(); it++) {
         int cmpResult;
         MPI_Comm_compare(comm, (*it)->comm_, &cmpResult);
@@ -255,15 +258,15 @@ int MessagePool::loadPeekedMessage(
                 fprintf(stderr, "Unsupported data type at loadPeekedMessage\n");
                 MPI_Abort(MPI_COMM_WORLD, 1);
             }
-            int rv = count;
             if(retSrc != nullptr) {
                 *retSrc = (*it)->src_;
             }
             delete *it;
             peeked_.erase(it);
-            fprintf(stderr, "loadPeekedMessage returning: %d, size: %lu\n", rv, peeked_.size());
-            return rv;
+            //fprintf(stderr, "loadPeekedMessage returning: %d, size: %lu\n", rv, peeked_.size());
+            return ind;
         }
+        ind++;
     }
     // if not found, let users call MPI_Recv or MPI_Irecv
     return -1;
