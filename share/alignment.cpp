@@ -1569,6 +1569,7 @@ vector<string> getmsgs(
         unsigned& order_index) {
     size_t ind = 0;
     vector<string> msgs;
+    string nodes;
     do {
         if(order_index >= orders.size()) {
             int rank;
@@ -1576,7 +1577,15 @@ vector<string> getmsgs(
             DEBUG("order_index went beyong the size of orders, rank: %d\n", rank);
             return vector<string>();
         }
-        msgs = parse(orders[order_index++], ':'); 
+        if(orders[order_index].find('|') != string::npos) {
+            msgs = parse(orders[order_index++], '|');
+            MPI_ASSERT(msgs.size() == 2);
+            nodes = msgs.back();
+            fprintf(stderr, "nodes: %s\n", nodes.c_str());
+            msgs = parse(msgs.front(), ':'); 
+        } else {
+            msgs = parse(orders[order_index++], ':'); 
+        }
         ind = stoul(msgs.back());
     } while(lastind > ind);
     return msgs;

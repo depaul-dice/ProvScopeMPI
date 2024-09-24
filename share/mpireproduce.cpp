@@ -292,7 +292,14 @@ int MPI_Irecv(
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank); */
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
-        return original_MPI_Irecv(buf, count, datatype, source, tag, comm, request);        
+        return original_MPI_Irecv(
+                buf, 
+                count, 
+                datatype, 
+                source, 
+                tag, 
+                comm, 
+                request);        
     }
     
     vector<string> msgs = getmsgs(orders, lastind, __order_index);

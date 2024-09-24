@@ -39,7 +39,6 @@ extern "C" void printBBname(const char *name) {
                 "%s:%lu\n", 
                 name, 
                 nodecnt++);
-        RECORDTRACE("%s\n", name);
         string str(name);
         appendRecordTracesRaw(parse(str, ':'));
     }
@@ -226,10 +225,11 @@ int MPI_Recv(
     }
     int source_rank = status->MPI_SOURCE;
 
-    fprintf(recordFile, "MPI_Recv:%d:%d:%lu\n", 
+    fprintf(recordFile, "MPI_Recv:%d:%d:%lu|%s\n", 
             rank, 
             source_rank, 
-            nodecnt);
+            nodecnt,
+            msgs[msgs.size() - 2].c_str());
     
     //DEBUG("MPI_Recv return rank: %d\n", rank);
     return ret;
