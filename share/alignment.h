@@ -102,6 +102,10 @@ void appendTraces(
         TraceType traceType);
  
 std::string getLastNodes(TraceType traceType);
+std::string getVeryLastNode(TraceType traceType = TraceType::RECORD);
+std::string updateAndGetLastNodes(
+        std::unordered_map<std::string, loopNode *>& loopTrees, 
+        TraceType traceType);
 
 // these functions below DO NOT consider loops at all
 std::vector<std::shared_ptr<element>> makeHierarchyMain(

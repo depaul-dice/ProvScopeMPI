@@ -977,6 +977,22 @@ string getLastNodes(TraceType traceType) {
     return "";
 }
 
+string getVeryLastNode(TraceType traceType) {
+    vector<string> vec;
+    if(traceType == TraceType::RECORD) {
+        vec = recordTracesRaw.back();
+    } else if (traceType == TraceType::REPLAY) {
+        vec = replayTracesRaw.back();
+    }
+    return vec[0] + ":" + vec[1] + ":" + vec[2];
+}
+
+string updateAndGetLastNodes(
+        unordered_map<string, loopNode *>& loopTrees, TraceType traceType) {
+    appendTraces(loopTrees, traceType);
+    return getLastNodes(traceType);
+}
+
 static inline void create_map(
         unordered_map<string, vector<size_t>>& bbMap, 
         vector<shared_ptr<element>>& reproduced, 

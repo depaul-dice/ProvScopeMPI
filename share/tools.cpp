@@ -242,4 +242,26 @@ void recordMPIProbe (
     }
 }
 
+string convertDatatype(
+        MPI_Datatype datatype) {
+    char typeName[MPI_MAX_OBJECT_NAME];
+    int nameLength;
+    MPI_Type_get_name(
+            datatype, 
+            typeName, 
+            &nameLength);
+    return string(typeName);
+}
+
+void unsupportedDatatype(
+        int rank, 
+        int lineNum, 
+        MPI_Datatype datatype) {
+    string typeName = convertDatatype(datatype);
+    fprintf(stderr, "unsupported datatype: %s, at rank:%d, line # %d\n", 
+            typeName.c_str(), 
+            rank,
+            lineNum);
+    MPI_Abort(MPI_COMM_WORLD, 1);
+}
 

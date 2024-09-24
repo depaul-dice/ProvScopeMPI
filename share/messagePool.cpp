@@ -56,12 +56,28 @@ void *MessagePool::addMessage(
         MPI_Comm comm,
         int src,
         bool isSend) {
+    // the 2 lines below are simply for the debugging purpose, 
+    // delete it for the prod
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(dataType != MPI_INT
             && dataType != MPI_CHAR
-            && dataType != MPI_BYTE) {
-        fprintf(stderr, "Unsupported data type\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
+            && dataType != MPI_BYTE
+            && dataType != MPI_DOUBLE
+            && dataType != MPI_LONG_LONG_INT) {
+        unsupportedDatatype(rank, __LINE__, dataType);
     }
+    /*
+    if(isSend == false) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        fprintf(stderr, "addMessage at rank: %d, request: %p, message: %s\n", 
+                rank, 
+                request, 
+                (char *)buf);
+    }
+    */
+
     if(pool_.find(request) == pool_.end()) {
         pool_[request] = new MessageBuffer(
                 request, 
@@ -84,19 +100,22 @@ void *MessagePool::addMessage(
         pool_[request]->timestamp_ = timestamp_++;
     }
     /*
-    fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, isSend:%d, timestamp:%lu\n", 
-            request, 
-            count, 
-            tag, 
-            src, 
-            isSend,
-            timestamp_);
+    if(isSend == false && src == 1 && rank == 3) {
+        fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, isSend:%d, timestamp:%lu\n", 
+                request, 
+                count, 
+                tag, 
+                src, 
+                isSend,
+                timestamp_);
+    }
     */
     return pool_[request]->realBuf_;
 }
 
 MessageBuffer *MessagePool::peekMessage(
         MPI_Request *request) {
+    /*
     if(pool_.find(request) == pool_.end()) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -104,6 +123,10 @@ MessageBuffer *MessagePool::peekMessage(
                 at rank: %d\n", 
                 request, rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    */
+    if(pool_.find(request) == pool_.end()) {
+        return nullptr;
     }
     return pool_[request];
 }
@@ -119,9 +142,6 @@ string MessagePool::loadMessage(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     MessageBuffer *msgBuf = pool_[request];
-    MPI_ASSERT(msgBuf->dataType_ == MPI_INT 
-            || msgBuf->dataType_ == MPI_CHAR
-            || msgBuf->dataType_ == MPI_BYTE);
 
     if(msgBuf->isSend_) {
         delete pool_[request];
@@ -132,10 +152,25 @@ string MessagePool::loadMessage(
     string msg((char *)(msgBuf->realBuf_));
     vector<string> tokens = parse(msg, '|');
     if(tokens.size() != msgBuf->count_ + 2) {
-        fprintf(stderr, "tokens.size(): %lu, count: %d\n", 
-                tokens.size(), msgBuf->count_);
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
+        string typeName = convertDatatype(msgBuf->dataType_); 
+        string lastNodes = updateAndGetLastNodes(
+        fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\nmessage: %s\n", 
+                tokens.size(), 
+                msgBuf->count_, 
+                msgBuf->isSend_,
+                typeName.c_str(),
+                rank, 
+                request,
+                msgBuf->src_,
+                msg.c_str());
+
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    int size;
+    MPI_Type_size(msgBuf->dataType_, &size);
+    MPI_ASSERT(stoi(tokens.back()) == size);
     if(msgBuf->dataType_ == MPI_INT) {
         for(int i = 0; i < msgBuf->count_; i++) {
             ((int *)(msgBuf->buf_))[i] = stoi(tokens[i]);
@@ -145,9 +180,18 @@ string MessagePool::loadMessage(
         for(int i = 0; i < msgBuf->count_; i++) {
             ((char *)(msgBuf->buf_))[i] = (char)stoi(tokens[i]);
         }
+    } else if(msgBuf->dataType_ == MPI_DOUBLE) {
+        for(int i = 0; i < msgBuf->count_; i++) {
+            ((double *)(msgBuf->buf_))[i] = stod(tokens[i]);
+        }
+    } else if(msgBuf->dataType_ == MPI_LONG_LONG_INT) {
+        for(int i = 0; i < msgBuf->count_; i++) {
+            ((long long int *)(msgBuf->buf_))[i] = stoll(tokens[i]);
+        }
     } else {
-        fprintf(stderr, "Unsupported data type\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        unsupportedDatatype(rank, __LINE__, msgBuf->dataType_);
     }
     if(status != nullptr 
             && status != MPI_STATUS_IGNORE) {
@@ -159,7 +203,7 @@ string MessagePool::loadMessage(
         MPI_Type_size(msgBuf->dataType_, &size);
         status->_ucount = msgBuf->count_ * size;
     }
-    return tokens.back(); 
+    return tokens[tokens.size() - 2]; 
 }
 
 int MessagePool::peekPeekedMessage(
@@ -254,9 +298,18 @@ int MessagePool::loadPeekedMessage(
                 for(int i = 0; i < count; i++) {
                     ((char *)buf)[i] = (char)stoi(tokens[i]);
                 }
+            } else if(dataType == MPI_DOUBLE) {
+                for(int i = 0; i < count; i++) {
+                    ((double *)buf)[i] = stod(tokens[i]);
+                }
+            } else if(dataType == MPI_LONG_LONG_INT) {
+                for(int i = 0; i < count; i++) {
+                    ((long long int *)buf)[i] = stoll(tokens[i]);
+                }
             } else {
-                fprintf(stderr, "Unsupported data type at loadPeekedMessage\n");
-                MPI_Abort(MPI_COMM_WORLD, 1);
+                int rank;
+                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+                unsupportedDatatype(rank, __LINE__, dataType);
             }
             if(retSrc != nullptr) {
                 *retSrc = (*it)->src_;

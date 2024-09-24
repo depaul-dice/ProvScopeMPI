@@ -8,8 +8,9 @@
 #include <climits>
 
 #include "tools.h"
+#include "alignment.h"
 
-const int msgSize = 4096;
+const int msgSize = 8192;
 
 // this class does not have to be visible to users
 class MessageBuffer {

@@ -31,9 +31,10 @@
         mpi_equal(A, B); \
     } while(0)
 
+#define DEBUG(...) fprintf(stderr, __VA_ARGS__)
+
 #ifdef DEBUG_MODE
 
-#define DEBUG(...) fprintf(stderr, __VA_ARGS__)
 #define DEBUG0(...) \
     do { \
         int rank; \
@@ -165,7 +166,9 @@ void recordMPIIprobeSuccess(
         MPI_Status *stat,
         unsigned long nodeCount);
 
-// helper function to record mpi probe
+/* 
+ * helper function to record mpi probe
+ */
 void recordMPIProbe (
         FILE *recordFile,
         int rank,
@@ -173,6 +176,13 @@ void recordMPIProbe (
         int tag,
         MPI_Status *status,
         unsigned long nodeCount);
+
+std::string convertDatatype(MPI_Datatype datatype);
+
+void unsupportedDatatype(
+        int rank, 
+        int lineNum, 
+        MPI_Datatype datatype);
 
 #endif // TOOLS_H
        
