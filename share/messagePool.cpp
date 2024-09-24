@@ -155,7 +155,6 @@ string MessagePool::loadMessage(
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
         string typeName = convertDatatype(msgBuf->dataType_); 
-        string lastNodes = updateAndGetLastNodes(
         fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\nmessage: %s\n", 
                 tokens.size(), 
                 msgBuf->count_, 
