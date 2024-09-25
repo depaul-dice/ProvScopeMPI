@@ -26,6 +26,14 @@
         } \
     } while(0)
 
+#define FUNCGUARD() \
+    do { \
+        int rank; \
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
+        fprintf(stderr, "rank: %d, %s is not supported now\n", rank, __func__); \
+        MPI_Abort(MPI_COMM_WORLD, 1); \
+    } while(0)
+
 #define MPI_EQUAL(A, B) \
     do { \
         mpi_equal(A, B); \
