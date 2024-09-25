@@ -9,6 +9,11 @@
 #include <string>
 #include <sstream>
 
+#include "tools.h"
+#include "messagePool.h"
+
+class MessagePool;
+
 /* 
  * below is a recording functions for each mpi functions 
  */
@@ -38,9 +43,42 @@ std::stringstream convertData2StringStream(
         MPI_Datatype datatype, 
         int count);
 
+void convertMsgs2Buf(
+        void *buf, 
+        MPI_Datatype datatype, 
+        int count,
+        std::vector<std::string>& msgs, 
+        int lineNum,
+        int rank);
+
 void unsupportedDatatype(
         int rank, 
         int lineNum, 
         MPI_Datatype datatype);
 
+/*
+ * this should be defined at mpirecordreplay.h
+ */
+extern int (*original_MPI_Recv)(
+        void *buf, 
+        int count, 
+        MPI_Datatype datatype, 
+        int source, 
+        int tag, 
+        MPI_Comm comm, 
+        MPI_Status *status);
+/*
+ * the function below is to abstract the message conversion
+ */
+int __MPI_Recv(
+        void *buf, 
+        int count, 
+        MPI_Datatype datatype, 
+        int source, 
+        int tag, 
+        MPI_Comm comm, 
+        MPI_Status *status,
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        int nodeCnt = 0);
 #endif // MESSAGETOOLS_H

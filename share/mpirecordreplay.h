@@ -32,7 +32,7 @@ static int (*original_MPI_Finalize)(
     void
 ) = nullptr;
 
-static int (*original_MPI_Recv)(
+int (*original_MPI_Recv)(
     void *buf, 
     int count, 
     MPI_Datatype datatype, 

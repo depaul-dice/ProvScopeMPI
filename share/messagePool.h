@@ -8,6 +8,7 @@
 #include <climits>
 
 #include "tools.h"
+#include "messageTools.h"
 #include "alignment.h"
 
 const int msgSize = 8192;
