@@ -439,29 +439,12 @@ int MPI_Isend(
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int size;
     MPI_Type_size(datatype, &size);
-    stringstream ss;
     int ret = 0;
-    if(datatype == MPI_INT) {
-        for(int i = 0; i < count; i++) {
-            ss << ((int *)buf)[i] << '|';
-        }
-    } else if(datatype == MPI_CHAR
-            || datatype == MPI_BYTE) {
-        for(int i = 0; i < count; i++) {
-            char c = ((char *)buf)[i];
-            ss << (int)c << '|';
-        }
-    } else if(datatype == MPI_DOUBLE) {
-        for(int i = 0; i < count; i++) {
-            ss << ((double *)buf)[i] << '|';
-        }
-    } else if(datatype == MPI_LONG_LONG_INT) {
-        for(int i = 0; i < count; i++) {
-            ss << ((long long int *)buf)[i] << '|';
-        }
-    } else {
-        unsupportedDatatype(rank, __LINE__, datatype);
-    }
+    stringstream ss = convertData2StringStream(
+            buf, 
+            datatype, 
+            count, 
+            __LINE__);
     ss << lastNodes << '|' << size;
     string str = ss.str();
     /*

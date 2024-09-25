@@ -325,7 +325,8 @@ int MPI_Send(
     stringstream ss = convertData2StringStream(
             buf, 
             datatype, 
-            count);
+            count,
+            __LINE__);
     ss << currNodes << '|' << size;
     string message = ss.str();
     int ret = original_MPI_Send(
@@ -445,22 +446,50 @@ int MPI_Isend(
     int rank;
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Isend(
+    stringstream ss = convertData2StringStream(
             buf, 
-            count, 
             datatype, 
+            count,
+            __LINE__);
+    int size;
+    MPI_Type_size(datatype, &size);
+    string currNodes = updateAndGetLastNodes(
+            __looptrees, TraceType::REPLAY);
+    ss << currNodes << '|' << size;
+    string message = ss.str();
+    if(message.size() + 1 >= msgSize) {
+        fprintf(stderr, "Error: message size is too large, length: %lu\n%s\n", 
+                message.size(), message.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    int ret = original_MPI_Isend(
+            (void *)(message.c_str()), 
+            message.size() + 1, 
+            MPI_CHAR, 
             dest, 
             tag, 
             comm, 
             request);
-    bool isaligned = true;
-    size_t lastind = 0;
+
+    messagePool.addMessage(
+            request,
+            (void *)buf,
+            datatype,
+            count,
+            tag,
+            comm,
+            dest,
+            true /* isSend */);
+        
+    bool isAligned = true;
+    size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
-            lastind, 
+            isAligned, 
+            lastInd, 
             __looptrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank); */
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
@@ -471,7 +500,7 @@ int MPI_Isend(
     // I just need to keep track of the request
     vector<string> msgs = getmsgs(
             orders, 
-            lastind, 
+            lastInd, 
             __order_index);
     /* DEBUG0("MPI_Isend: %s -> %p: %s\n", msgs[3].c_str(), request, orders[__order_index - 1].c_str()); */
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Isend");

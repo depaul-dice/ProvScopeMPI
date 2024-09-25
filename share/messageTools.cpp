@@ -63,7 +63,8 @@ string convertDatatype(
 stringstream convertData2StringStream(
         const void *buf, 
         MPI_Datatype datatype,
-        int count) {
+        int count,
+        int lineNum) {
     stringstream ss;
     if(datatype == MPI_INT) {
         int *data = (int *)buf;
@@ -87,7 +88,10 @@ stringstream convertData2StringStream(
             ss << data[i] << '|';
         }
     } else {
-        unsupportedDatatype(-1, __LINE__, datatype);
+        unsupportedDatatype(
+                -1, 
+                lineNum, 
+                datatype);
     }
     return ss;
 }

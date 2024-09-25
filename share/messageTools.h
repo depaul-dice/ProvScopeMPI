@@ -41,7 +41,8 @@ std::string convertDatatype(MPI_Datatype datatype);
 std::stringstream convertData2StringStream(
         const void *data, 
         MPI_Datatype datatype, 
-        int count);
+        int count,
+        int lineNum);
 
 /*
  * lineNum and rank is for unsupportedDatatype function
