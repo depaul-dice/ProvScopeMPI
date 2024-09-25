@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <string>
+#include <sstream>
 #include <unordered_set>
 #include <set>
 #include <mpi.h>
@@ -162,35 +163,6 @@ void mpi_equal(T a, T b) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
-
-/* 
- * below is a recording functions for each mpi functions 
- */
-void recordMPIIprobeSuccess(
-        FILE *recordFile,
-        int rank,
-        int source,
-        int tag,
-        MPI_Status *stat,
-        unsigned long nodeCount);
-
-/* 
- * helper function to record mpi probe
- */
-void recordMPIProbe (
-        FILE *recordFile,
-        int rank,
-        int source,
-        int tag,
-        MPI_Status *status,
-        unsigned long nodeCount);
-
-std::string convertDatatype(MPI_Datatype datatype);
-
-void unsupportedDatatype(
-        int rank, 
-        int lineNum, 
-        MPI_Datatype datatype);
 
 #endif // TOOLS_H
        

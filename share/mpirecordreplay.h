@@ -21,6 +21,7 @@
 #include "loops.h"
 #include "alignment.h"
 #include "messagePool.h"
+#include "messageTools.h"
 
 static int (*original_MPI_Init)(
     int *argc, 

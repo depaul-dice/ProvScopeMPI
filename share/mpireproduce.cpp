@@ -224,7 +224,6 @@ int MPI_Recv(
     MPI_Comm comm, 
     MPI_Status *status
 ) {
-    FUNCGUARD();
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (!original_MPI_Recv) {
@@ -239,17 +238,19 @@ int MPI_Recv(
                         RTLD_NEXT, "MPI_Recv");
     }
     /* DEBUG0("MPI_Recv:%s:%d\n", orders[__order_index].c_str(), __order_index); */
-    bool isaligned = true;
-    size_t lastind = 0;
+    bool isAligned = true;
+    size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
-            lastind, 
+            isAligned, 
+            lastInd, 
             __looptrees);
     vector<string> msgs;
-    if(!isaligned) {
+    if(!isAligned) {
         DEBUG("at rank %d, the alignment was not successful at MPI_Recv\n", rank);
-        // don't control anything
+        /*
+         * you still need to convert the message into the way it should be
+         */
         return original_MPI_Recv(
                 buf, 
                 count, 
@@ -261,7 +262,7 @@ int MPI_Recv(
     } 
     msgs = getmsgs(
             orders, 
-            lastind, 
+            lastInd, 
             __order_index);
     int src = stoi(msgs[2]);
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Recv");
@@ -284,6 +285,53 @@ int MPI_Recv(
             status);
 }
 
+/*
+ * in this function, there is no need of alignment
+ * you just need to reformat the message and send it in the suitable way
+ * by piggybacking the current node
+ */
+int MPI_Send(
+    const void *buf, 
+    int count, 
+    MPI_Datatype datatype, 
+    int dest, 
+    int tag, 
+    MPI_Comm comm
+) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (!original_MPI_Send) {
+        original_MPI_Send = (int (*)(
+                    const void *, 
+                    int, 
+                    MPI_Datatype, 
+                    int, 
+                    int, 
+                    MPI_Comm)) dlsym(
+                        RTLD_NEXT, "MPI_Send");
+    }
+    string currNodes = updateAndGetLastNodes(
+            __looptrees, 
+            TraceType::REPLAY);
+    int size;
+    MPI_Type_size(datatype, &size);
+    fprintf(stderr, "currNodes: %s\n", currNodes.c_str());
+    stringstream ss = convertData2StringStream(
+            buf, 
+            datatype, 
+            count);
+    ss << currNodes << '|' << size;
+    string message = ss.str();
+    int ret = original_MPI_Send(
+            message.c_str(), 
+            message.size() + 1, 
+            MPI_CHAR, 
+            dest, 
+            tag, 
+            comm);
+    return ret;
+}
+
 int MPI_Irecv(
     void *buf, 
     int count, 
@@ -293,6 +341,7 @@ int MPI_Irecv(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
+    FUNCGUARD();
     /* DEBUG0("MPI_Irecv\n"); */
     if(!original_MPI_Recv) {
         original_MPI_Irecv = reinterpret_cast<
@@ -374,6 +423,7 @@ int MPI_Isend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
+    FUNCGUARD();
     if(!original_MPI_Isend) {
         original_MPI_Isend = reinterpret_cast<
             int (*)(
