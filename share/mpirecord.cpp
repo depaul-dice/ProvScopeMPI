@@ -158,7 +158,12 @@ int MPI_Recv(
                 rank, 
                 stat.MPI_SOURCE, 
                 nodecnt);
-     
+        if(status != MPI_STATUS_IGNORE) {
+            memcpy(
+                    status, 
+                    &stat, 
+                    sizeof(MPI_Status));
+        }
         return ret;
     }
 

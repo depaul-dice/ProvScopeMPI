@@ -43,6 +43,11 @@ std::stringstream convertData2StringStream(
         MPI_Datatype datatype, 
         int count);
 
+/*
+ * lineNum and rank is for unsupportedDatatype function
+ * this function is to abstract the message receipt when 
+ * the datatype varies
+ */
 void convertMsgs2Buf(
         void *buf, 
         MPI_Datatype datatype, 
@@ -80,5 +85,6 @@ int __MPI_Recv(
         MPI_Status *status,
         MessagePool &messagePool,
         FILE *recordFile = nullptr,
-        int nodeCnt = 0);
+        unsigned long nodeCnt = 0);
+ 
 #endif // MESSAGETOOLS_H

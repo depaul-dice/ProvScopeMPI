@@ -33,6 +33,7 @@ static unordered_map<string, loopNode *> __looptrees;
 deque<shared_ptr<lastaligned>> __q;
 // TODO: delete this logger as it's just not really necessary
 Logger logger;
+MessagePool messagePool;
 
 // let's do the alignment before here
 // this is currently faulty because it could lead to a loop of fault
@@ -246,19 +247,22 @@ int MPI_Recv(
             lastInd, 
             __looptrees);
     vector<string> msgs;
+    int ret;
     if(!isAligned) {
         DEBUG("at rank %d, the alignment was not successful at MPI_Recv\n", rank);
         /*
          * you still need to convert the message into the way it should be
          */
-        return original_MPI_Recv(
+        ret = __MPI_Recv(
                 buf, 
                 count, 
                 datatype, 
                 source, 
                 tag, 
                 comm, 
-                status);
+                status,
+                messagePool);
+        return ret;
     } 
     msgs = getmsgs(
             orders, 
@@ -275,14 +279,16 @@ int MPI_Recv(
     }
     MPI_ASSERTNALIGN(source == src);
     
-    return original_MPI_Recv(
+    ret = __MPI_Recv(
             buf, 
             count, 
             datatype, 
             source, 
             tag, 
             comm, 
-            status);
+            status,
+            messagePool);
+    return ret;
 }
 
 /*
@@ -315,7 +321,7 @@ int MPI_Send(
             TraceType::REPLAY);
     int size;
     MPI_Type_size(datatype, &size);
-    fprintf(stderr, "currNodes: %s\n", currNodes.c_str());
+    //fprintf(stderr, "currNodes: %s\n", currNodes.c_str());
     stringstream ss = convertData2StringStream(
             buf, 
             datatype, 

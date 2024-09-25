@@ -62,29 +62,29 @@ string convertDatatype(
 
 stringstream convertData2StringStream(
         const void *buf, 
-        int count, 
-        MPI_Datatype datatype) {
+        MPI_Datatype datatype,
+        int count) {
     stringstream ss;
     if(datatype == MPI_INT) {
         int *data = (int *)buf;
         for(int i = 0; i < count; i++) {
-            ss << data[i] << "|";
+            ss << data[i] << '|';
         }
     } else if(datatype == MPI_LONG_LONG_INT) {
         long long int *data = (long long int *)buf;
         for(int i = 0; i < count; i++) {
-            ss << data[i] << "|";
+            ss << data[i] << '|';
         }
     } else if(datatype == MPI_DOUBLE) {
         double *data = (double *)buf;
         for(int i = 0; i < count; i++) {
-            ss << data[i] << "|";
+            ss << data[i] << '|';
         }
     } else if(datatype == MPI_CHAR
             || datatype == MPI_BYTE) {
         char *data = (char *)buf;
         for(int i = 0; i < count; i++) {
-            ss << data[i] << "|";
+            ss << data[i] << '|';
         }
     } else {
         unsupportedDatatype(-1, __LINE__, datatype);
@@ -149,12 +149,12 @@ int __MPI_Recv(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_ASSERT(original_MPI_Recv != nullptr);
-    MPI_ASSERT(status != MPI_STATUS_IGNORE);
+    MPI_Status localStatus;
     int ind = messagePool.peekPeekedMessage(
             source,
             tag,
             comm,
-            status);
+            &localStatus);
     int ret;
     if(ind != -1) {
         ret = messagePool.loadPeekedMessage(
@@ -165,6 +165,18 @@ int __MPI_Recv(
                 comm,
                 source);
         MPI_ASSERT(ret == -1);
+        if(status != MPI_STATUS_IGNORE) {
+            memcpy(
+                    status, 
+                    &localStatus, 
+                    sizeof(MPI_Status));
+        }
+        if(recordFile != nullptr) {
+            fprintf(recordFile, "MPI_Recv:%d:%d:%lu\n",
+                    rank,
+                    status->MPI_SOURCE,
+                    nodeCnt);
+        }
         return ret;
     }
     char tmpBuffer[msgSize];
@@ -175,7 +187,7 @@ int __MPI_Recv(
             source, 
             tag, 
             comm, 
-            status);
+            &localStatus);
     MPI_ASSERT(ret == MPI_SUCCESS);
     string tmpStr(tmpBuffer);
     auto msgs = parse(tmpStr, '|');
@@ -189,6 +201,7 @@ int __MPI_Recv(
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    fprintf(stderr, "received message from send at %s\n", msgs[msgs.size() - 2].c_str());
     convertMsgs2Buf(
             buf,
             datatype,
@@ -202,7 +215,14 @@ int __MPI_Recv(
     // checking if the counts are the same
     MPI_ASSERT(size == sizeFromMsgs);
     // manipulating count manually
-    status->_ucount = (msgs.size() - 2) * size;
+
+    if(status != MPI_STATUS_IGNORE) {
+        memcpy(
+                status, 
+                &localStatus, 
+                sizeof(MPI_Status));
+        status->_ucount = (msgs.size() - 2) * size;
+    }
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Recv:%d:%d:%lu|%s\n",
                 rank,
