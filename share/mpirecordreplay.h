@@ -81,7 +81,7 @@ static int (*original_MPI_Irsend)(
     MPI_Request *request
 ) = nullptr;
 
-static int (*original_MPI_Test)(
+int (*original_MPI_Test)(
     MPI_Request *request, 
     int *flag, 
     MPI_Status *status
@@ -115,7 +115,7 @@ static int (*original_MPI_Test_cancelled)(
     int *flag
 ) = nullptr;
 
-static int (*original_MPI_Wait)(
+int (*original_MPI_Wait)(
     MPI_Request *request, 
     MPI_Status *status
 ) = nullptr;

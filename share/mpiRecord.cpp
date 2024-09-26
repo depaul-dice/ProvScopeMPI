@@ -849,11 +849,12 @@ int MPI_Wait(
         string lastNodes = messagePool.loadMessage(
                 request, status);
         //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu\n", 
+        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu|%s\n", 
                 rank, 
                 request, 
                 src, 
-                nodecnt);
+                nodecnt,
+                lastNodes.c_str());
         MPI_ASSERT(status->MPI_ERROR == MPI_SUCCESS);
         return MPI_SUCCESS;
     }
@@ -881,13 +882,14 @@ int MPI_Wait(
         if(lastNodes.length() > 0) {
             //fprintf(stderr, "received at %s\n", lastNodes.c_str());
         }
-        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu\n", \
+        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu|%s\n",
                 rank, 
                 request, 
                 stat.MPI_SOURCE, 
-                nodecnt);
+                nodecnt,
+                lastNodes.c_str());
     } else {
-        fprintf(recordFile, "MPI_Wait:%d:%p:FAIL:%lu\n", \
+        fprintf(recordFile, "MPI_Wait:%d:%p:FAIL:%lu\n",
                 rank, 
                 request, 
                 nodecnt);

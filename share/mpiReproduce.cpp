@@ -634,7 +634,6 @@ int MPI_Test(
     int *flag, 
     MPI_Status *status
 ) {
-    FUNCGUARD();
     /* DEBUG0("MPI_Test"); */
     if(!original_MPI_Wait) {
         original_MPI_Wait = reinterpret_cast<
@@ -644,15 +643,15 @@ int MPI_Test(
     }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    DEBUG0(":%d:%p", rank, request);
-    bool isaligned = true;
-    size_t lastind = 0;
+    //DEBUG0(":%d:%p", rank, request);
+    bool isAligned = true;
+    size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
-            lastind, 
+            isAligned, 
+            lastInd, 
             __looptrees);
-    if(!isaligned) {
+    if(!isAligned) {
         if(!original_MPI_Test) {
             original_MPI_Test = reinterpret_cast<
                 int (*)(
@@ -663,15 +662,16 @@ int MPI_Test(
         }
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Test\n", rank); */
         // don't control anything
-        return original_MPI_Test(
+        return __MPI_Test(
                 request, 
                 flag, 
-                status);
+                status,
+                messagePool);
     }
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getmsgs(
             orders, 
-            lastind, 
+            lastInd, 
             __order_index);
     MPI_ASSERT(msgs[0] == "MPI_Test");
     MPI_ASSERT(stoi(msgs[1]) == rank);
@@ -682,8 +682,10 @@ int MPI_Test(
         // call wait and make sure it succeeds
         /* DEBUG0(":SUCCESS\n"); */
         int src = stoi(msgs[4]);
-        ret = original_MPI_Wait(
-                request, status);
+        ret = __MPI_Wait(
+                request,
+                status,
+                messagePool);
         if(__isends.find(request) != __isends.end()) {
             __isends.erase(request);
         }

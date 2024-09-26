@@ -82,6 +82,16 @@ extern int (*original_MPI_Irecv)(
         int tag, 
         MPI_Comm comm, 
         MPI_Request *request);
+
+extern int (*original_MPI_Wait)(
+        MPI_Request *request, 
+        MPI_Status *status);
+
+extern int (*original_MPI_Test)(
+        MPI_Request *request, 
+        int *flag, 
+        MPI_Status *status);
+
 /*
  * the function below is to abstract the message conversion
  */
@@ -109,4 +119,18 @@ int __MPI_Irecv(
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
  
+int __MPI_Wait(
+        MPI_Request *request, 
+        MPI_Status *status,
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
+
+int __MPI_Test(
+        MPI_Request *request, 
+        int *flag, 
+        MPI_Status *status,
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
 #endif // MESSAGETOOLS_H
