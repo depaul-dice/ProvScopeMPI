@@ -3,7 +3,7 @@
  * so if you wish to know the location of the node, you need to read it here too.
  */
 
-#include "mpirecordreplay.h"
+#include "mpiRecordReplay.h"
 
 using namespace std;
 

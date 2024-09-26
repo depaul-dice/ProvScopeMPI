@@ -5,7 +5,7 @@
  * 2. We don't mix the blocking calls with non-blocking calls <- subject to relaxation
  */
 
-#include "mpirecordreplay.h"
+#include "mpiRecordReplay.h"
 
 using namespace std;
 

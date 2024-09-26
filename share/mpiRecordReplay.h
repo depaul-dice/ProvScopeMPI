@@ -95,14 +95,14 @@ static int (*original_MPI_Testany)(
     MPI_Status *status
 ) = nullptr;
 
-static int (*original_MPI_Testall)(
+int (*original_MPI_Testall)(
     int count, 
     MPI_Request array_of_requests[], 
     int *flag, 
     MPI_Status array_of_statuses[]
 ) = nullptr;
 
-static int (*original_MPI_Testsome)(
+int (*original_MPI_Testsome)(
     int incount, 
     MPI_Request array_of_requests[], 
     int *outcount, 
@@ -127,7 +127,7 @@ static int (*original_MPI_Waitany)(
     MPI_Status *status
 ) = nullptr;
 
-static int (*original_MPI_Waitall)(
+int (*original_MPI_Waitall)(
     int count, 
     MPI_Request array_of_requests[], 
     MPI_Status array_of_statuses[]

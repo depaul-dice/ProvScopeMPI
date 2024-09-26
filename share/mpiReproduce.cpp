@@ -5,7 +5,7 @@
  * 2. We don't mix the blocking calls with non-blocking calls <- subject to relaxation
  */
 
-#include "mpirecordreplay.h"
+#include "mpiRecordReplay.h"
 
 using namespace std;
 
@@ -1389,6 +1389,7 @@ int MPI_Startall (
 int MPI_Request_free (
     MPI_Request *request
 ) {
+    FUNCGUARD();
     DEBUG0("MPI_Request_free:%p\n", request);
     if(!original_MPI_Request_free) {
         original_MPI_Request_free = reinterpret_cast<

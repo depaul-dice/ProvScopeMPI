@@ -92,6 +92,17 @@ extern int (*original_MPI_Test)(
         int *flag, 
         MPI_Status *status);
 
+extern int (*original_MPI_Waitall)(
+        int count, 
+        MPI_Request array_of_requests[], 
+        MPI_Status array_of_statuses[]);
+
+extern int (*original_MPI_Testall)(
+        int count, 
+        MPI_Request array_of_requests[], 
+        int *flag, 
+        MPI_Status array_of_statuses[]);
+
 /*
  * the function below is to abstract the message conversion
  */
@@ -133,4 +144,22 @@ int __MPI_Test(
         MessagePool &messagePool,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
+
+int __MPI_Waitall(
+        int count, 
+        MPI_Request array_of_requests[], 
+        MPI_Status array_of_statuses[],
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
+
+int __MPI_Testall(
+        int count, 
+        MPI_Request array_of_requests[], 
+        int *flag, 
+        MPI_Status array_of_statuses[],
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
+
 #endif // MESSAGETOOLS_H
