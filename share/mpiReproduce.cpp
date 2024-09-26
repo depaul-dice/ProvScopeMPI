@@ -348,7 +348,6 @@ int MPI_Irecv(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    FUNCGUARD();
     /* DEBUG0("MPI_Irecv\n"); */
     if(!original_MPI_Recv) {
         original_MPI_Irecv = reinterpret_cast<
@@ -367,30 +366,33 @@ int MPI_Irecv(
     // I need to look into the source first
     /* int ret = original_MPI_Irecv(buf, count, datatype, source, tag, comm, request); */
     // I just need to keep track of the request
-    bool isaligned = true;
-    size_t lastind = 0;
+    bool isAligned = true;
+    size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
-            lastind, 
+            isAligned, 
+            lastInd, 
             __looptrees);
-    if(!isaligned) {
+    int ret;
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank); */
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
-        return original_MPI_Irecv(
+        ret = __MPI_Irecv(
                 buf, 
                 count, 
                 datatype, 
                 source, 
                 tag, 
                 comm, 
-                request);        
+                request,
+                messagePool);
+        return ret;
     }
     
     vector<string> msgs = getmsgs(
             orders, 
-            lastind, 
+            lastInd, 
             __order_index);
 
     /* DEBUG0("MPI_Irecv: %s -> %p: %s\t", msgs[3].c_str(), request, orders[__order_index - 1].c_str()); */
@@ -411,14 +413,16 @@ int MPI_Irecv(
     } else {
         /* DEBUG0(":%d\n", source); */
     }
-    return original_MPI_Irecv(
+    ret = __MPI_Irecv(
             buf, 
             count, 
             datatype, 
             source, 
             tag, 
             comm, 
-            request);
+            request,
+            messagePool);
+    return ret;
 }
 
 int MPI_Isend(

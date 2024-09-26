@@ -73,6 +73,15 @@ extern int (*original_MPI_Recv)(
         int tag, 
         MPI_Comm comm, 
         MPI_Status *status);
+
+extern int (*original_MPI_Irecv)(
+        void *buf, 
+        int count, 
+        MPI_Datatype datatype, 
+        int source, 
+        int tag, 
+        MPI_Comm comm, 
+        MPI_Request *request);
 /*
  * the function below is to abstract the message conversion
  */
@@ -84,6 +93,18 @@ int __MPI_Recv(
         int tag, 
         MPI_Comm comm, 
         MPI_Status *status,
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
+
+int __MPI_Irecv(
+        void *buf, 
+        int count, 
+        MPI_Datatype datatype, 
+        int source, 
+        int tag, 
+        MPI_Comm comm, 
+        MPI_Request *request,
         MessagePool &messagePool,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);

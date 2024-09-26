@@ -193,26 +193,13 @@ int MPI_Recv(
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    if(datatype == MPI_INT) {
-        for(int i = 0; i < msgs.size() - 2; i++) {
-            ((int *)buf)[i] = stoi(msgs[i]);
-        } 
-    } else if(datatype == MPI_CHAR 
-            || datatype == MPI_BYTE) {
-        for(int i = 0; i < msgs.size() - 2; i++) {
-            ((char *)buf)[i] = (char)stoi(msgs[i]);
-        }
-    } else if(datatype == MPI_DOUBLE) {
-        for(int i = 0; i < msgs.size() - 2; i++) {
-            ((double *)buf)[i] = stod(msgs[i]);
-        }
-    } else if(datatype == MPI_LONG_LONG_INT) {
-        for(int i = 0; i < msgs.size() - 2; i++) {
-            ((long long int *)buf)[i] = stoll(msgs[i]);
-        }
-    } else {
-        unsupportedDatatype(rank, __LINE__, datatype);
-    }
+    convertMsgs2Buf(
+            buf,
+            datatype,
+            count,
+            msgs,
+            __LINE__,
+            rank);
     /*
      * manipulating count manually
      */
@@ -265,32 +252,14 @@ int MPI_Send(
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
     int ret = 0;
-    stringstream ss;
     int size;
     MPI_Type_size(datatype, &size);
     //MPI_ASSERT(count > 0);
-    if(datatype == MPI_INT) {
-        for(int i = 0; i < count; i++) {
-            ss << ((int *)buf)[i] << '|';
-        }
-    } else if (datatype == MPI_CHAR
-            || datatype == MPI_BYTE) {
-        char c;
-        for(int i = 0; i < count; i++) {
-            c = ((char *)buf)[i];
-            ss << (int)c << '|';
-        }
-    } else if (datatype == MPI_DOUBLE) {
-        for(int i = 0; i < count; i++) {
-            ss << ((double *)buf)[i] << '|';
-        }
-    } else if (datatype == MPI_LONG_LONG_INT) {
-        for(int i = 0; i < count; i++) {
-            ss << ((long long int *)buf)[i] << '|';
-        }
-    } else {
-        unsupportedDatatype(rank, __LINE__, datatype);
-    }
+    stringstream ss = convertData2StringStream(
+            buf, 
+            datatype, 
+            count, 
+            __LINE__);
     ss << lastNodes << '|' << size;
     string str = ss.str();
     if(str.size() + 1 >= MSG_SIZE) {

@@ -51,7 +51,7 @@ static int (*original_MPI_Send)(
     MPI_Comm comm
 ) = nullptr;
 
-static int (*original_MPI_Irecv)(
+int (*original_MPI_Irecv)(
     void *buf, 
     int count, 
     MPI_Datatype datatype, 
