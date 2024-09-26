@@ -926,8 +926,10 @@ int MPI_Wait(
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Wait\n", rank); */
         // don't control anything
-        return original_MPI_Wait(
-                request, status);
+        return __MPI_Wait(
+                request, 
+                status,
+                messagePool);
     }
     // I just need to keep track that it is cancelled
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
@@ -940,8 +942,10 @@ int MPI_Wait(
     MPI_ASSERTNALIGN(__requests.find(msgs[2]) != __requests.end());
     int src = stoi(msgs[4]);
     // let's first call wait and see if the message is from the source 
-    int ret = original_MPI_Wait(
-            request, status);
+    int ret = __MPI_Wait(
+            request, 
+            status,
+            messagePool);
     MPI_ASSERT(ret == MPI_SUCCESS);
     // if we have the message earlier, or if the message is not from the right source, let's alternate the source
     MPI_ASSERTNALIGN(status->MPI_SOURCE == src);
