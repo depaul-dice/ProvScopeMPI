@@ -192,8 +192,7 @@ string MessagePool::loadMessage(
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         unsupportedDatatype(rank, __LINE__, msgBuf->dataType_);
     }
-    if(status != nullptr 
-            && status != MPI_STATUS_IGNORE) {
+    if(status != MPI_STATUS_IGNORE) {
         status->MPI_SOURCE = msgBuf->src_;
         status->MPI_TAG = msgBuf->tag_;
         status->MPI_ERROR = MPI_SUCCESS;

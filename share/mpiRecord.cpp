@@ -248,7 +248,7 @@ int MPI_Send(
     }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    //DEBUG("MPI_Send:to %d, at %d\n", dest, rank);
+    DEBUG("MPI_Send:to %d, at %d\n", dest, rank);
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
     int ret = 0;
@@ -426,11 +426,14 @@ int MPI_Isend(
                 request);
     }
     */
-    if(str.size() + 1 >= MSG_SIZE) {
+
+    if(str.size() + 1 >= msgSize) {
         fprintf(stderr, "message size is too large, length: %lu\n%s\n", 
                 str.length(), str.c_str());
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    DEBUG("MPI_ISend:to %d, at %d, msg: %s\n", dest, rank, str.c_str());
+
     ret = original_MPI_Isend(
             (void *)str.c_str(), 
             str.size() + 1, 
@@ -998,12 +1001,18 @@ int MPI_Waitall(
             count, 
             array_of_requests, 
             stats);
+    if(array_of_statuses != MPI_STATUSES_IGNORE) {
+        memcpy(
+                array_of_statuses, 
+                stats, 
+                sizeof(MPI_Status) * count);
+    }
     MPI_ASSERT(ret == MPI_SUCCESS);
     fprintf(recordFile, "MPI_Waitall:%d:%d", 
             rank, count);
     for(int i = 0; i < count; i++) {
         //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
-        string lastNodes = messagePool.loadMessage(&array_of_requests[i]);
+        string lastNodes = messagePool.loadMessage(&array_of_requests[i], &array_of_statuses[i]);
         /*
         if(lastNodes.length() > 0) {
             //fprintf(stderr, "received at %s\n", lastNodes.c_str());
@@ -1020,12 +1029,6 @@ int MPI_Waitall(
                     stats[i].MPI_SOURCE,
                     &array_of_requests[i],
                     (char *)(msgBufs[i]->realBuf_));
-        }
-        if(array_of_statuses != MPI_STATUSES_IGNORE) {
-            memcpy(
-                    &array_of_statuses[i], 
-                    &stats[i], 
-                    sizeof(MPI_Status));
         }
         fprintf(recordFile, ":%p:%d", 
                 &array_of_requests[i], stats[i].MPI_SOURCE);
@@ -1044,10 +1047,9 @@ int MPI_Probe (
     MPI_Comm comm, 
     MPI_Status *status
 ) {
+    FUNCGUARD();
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    fprintf(stderr, "MPI_Probe not supported yet\n");
-    MPI_Abort(MPI_COMM_WORLD, 1);
     /*
     if(!original_MPI_Probe) {
         original_MPI_Probe = reinterpret_cast<
@@ -1232,17 +1234,18 @@ int MPI_Iprobe (
          */
         MPI_Status statRecv;
         char tmpBuf[MSG_SIZE];
-        original_MPI_Recv(
+        ret = original_MPI_Recv(
                 tmpBuf, 
-                MSG_SIZE, 
+                msgSize, 
                 MPI_CHAR, 
                 statIprobe.MPI_SOURCE, 
                 tag, 
                 comm, 
                 &statRecv);
+        MPI_ASSERT(ret == MPI_SUCCESS);
         messagePool.addPeekedMessage(
                 tmpBuf,
-                MSG_SIZE,
+                msgSize,
                 tag,
                 comm,
                 statRecv.MPI_SOURCE);
@@ -1254,6 +1257,9 @@ int MPI_Iprobe (
                     rank, statRecv.MPI_SOURCE, tag, statRecv._ucount);
              */
             auto tokens = parse(string(tmpBuf), '|');
+            if(tokens.size() < 2) {
+                fprintf(stderr, "tokens.size() < 2, %s\n", tmpBuf);
+            }
             MPI_ASSERT(tokens.size() >= 2);
             int size = stoi(tokens.back());
             status->_ucount = (tokens.size() - 2) * size;
@@ -1291,9 +1297,7 @@ int MPI_Send_init (
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    DEBUG("MPI_Send_init:%d not supported yet\n", dest);
-    MPI_Abort(MPI_COMM_WORLD, 1);
-
+    FUNCGUARD();
     int rank;
     DEBUG0("MPI_Send_init:%d:%p\n", dest, request);
     if(!original_MPI_Send_init) {
@@ -1340,9 +1344,7 @@ int MPI_Recv_init (
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    DEBUG("MPI_Recv_init:%d, not supported yet\n", source);
-    MPI_Abort(MPI_COMM_WORLD, 1);
-
+    FUNCGUARD();
     int rank;
     //DEBUG0("MPI_Recv_init:%d:%p\n", source, request);
     if(!original_MPI_Recv_init) {
@@ -1384,9 +1386,7 @@ int MPI_Startall (
     int count, 
     MPI_Request array_of_requests[]
 ) {
-    DEBUG("MPI_Startall:%d not supported yet\n", count);
-    MPI_Abort(MPI_COMM_WORLD, 1);
-
+    FUNCGUARD();
     int rank;
     if(!original_MPI_Startall) {
         original_MPI_Startall = reinterpret_cast<
@@ -1417,6 +1417,7 @@ int MPI_Startall (
 int MPI_Request_free (
     MPI_Request *request
 ) {
+    FUNCGUARD();
     int rank;
     if(!original_MPI_Request_free) {
         original_MPI_Request_free = reinterpret_cast<
