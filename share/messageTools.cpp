@@ -83,9 +83,9 @@ stringstream convertData2StringStream(
         }
     } else if(datatype == MPI_CHAR
             || datatype == MPI_BYTE) {
-        int *data = (int *)buf;
         for(int i = 0; i < count; i++) {
-            ss << data[i] << '|';
+            char c = ((char *)buf)[i];
+            ss << (int)c << '|';
         }
     } else {
         unsupportedDatatype(
