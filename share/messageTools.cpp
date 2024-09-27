@@ -565,14 +565,14 @@ int __MPI_Waitall(
                 sizeof(MPI_Status) * count);
     }
     MPI_ASSERT(ret == MPI_SUCCESS);
-    if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Waitall:%d:%d",
-                rank, count);
-    }
     for(int i = 0; i < count; i++) {
         string lastNodes = messagePool.loadMessage(
                 &array_of_requests[i], 
                 &array_of_statuses[i]);
+    }
+    if(recordFile != nullptr) {
+        fprintf(recordFile, ":%d:%d\n", 
+                rank, count);
     }
     return MPI_SUCCESS;
 }

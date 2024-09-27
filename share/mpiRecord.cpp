@@ -979,7 +979,10 @@ int MPI_Waitall(
     for(int i = 0; i < count; i++) {
         ss << &array_of_requests[i] << '|';
     }
-    DEBUG("MPI_Waitall, rank:%d, at %s for requests: %s\n", rank, lastNode.c_str(), ss.str().c_str());
+    DEBUG("MPI_Waitall, rank:%d, at %s for requests: %s\n", 
+            rank, 
+            lastNode.c_str(), 
+            ss.str().c_str());
 
     /*
      * you first look for the peeked messages

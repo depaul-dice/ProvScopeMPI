@@ -765,10 +765,11 @@ int MPI_Testall (
         int ret;
         MPI_Status stats[count];
         /* while(!flag) { */
-        ret = original_MPI_Waitall(
+        ret = __MPI_Waitall(
                 count, 
                 array_of_requests, 
-                stats);
+                stats,
+                messagePool);
         MPI_ASSERTNALIGN(ret == MPI_SUCCESS);
         /* } */
 
@@ -1029,7 +1030,6 @@ int MPI_Waitall(
     MPI_Request array_of_requests[], 
     MPI_Status array_of_statuses[]
 ) {
-    FUNCGUARD();
     if(!original_MPI_Waitall) {
         original_MPI_Waitall = reinterpret_cast<
             int (*)(
@@ -1051,10 +1051,11 @@ int MPI_Waitall(
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitall\n", rank); */
         // don't control anything
-        return original_MPI_Waitall(
+        return __MPI_Waitall(
                 count, 
                 array_of_requests, 
-                array_of_statuses);
+                array_of_statuses,
+                messagePool);
     } 
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getmsgs(
@@ -1067,10 +1068,11 @@ int MPI_Waitall(
     MPI_ASSERTNALIGN(stoi(msgs[2]) == count);
     MPI_Status stats[count];
 
-    int ret = original_MPI_Waitall(
+    int ret = __MPI_Waitall(
             count, 
             array_of_requests, 
-            stats);
+            stats,
+            messagePool);
     MPI_ASSERT(ret == MPI_SUCCESS);
     for(int i = 0; i < count; i++) {
         // first taking care of statuses
