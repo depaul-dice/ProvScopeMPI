@@ -146,6 +146,12 @@ int MPI_Recv(
      */
     int ret;
     if(ind != -1) { 
+        if(status != MPI_STATUS_IGNORE) {
+            memcpy(
+                    status, 
+                    &stat, 
+                    sizeof(MPI_Status));
+        }
         ret = messagePool.loadPeekedMessage(
                 buf, 
                 datatype,
@@ -158,12 +164,8 @@ int MPI_Recv(
                 rank, 
                 stat.MPI_SOURCE, 
                 nodecnt);
-        if(status != MPI_STATUS_IGNORE) {
-            memcpy(
-                    status, 
-                    &stat, 
-                    sizeof(MPI_Status));
-        }
+        fprintf(stderr, "MPI_Recv returning status with ucount: %lu\n", 
+                status->_ucount);
         return ret;
     }
 
@@ -222,6 +224,8 @@ int MPI_Recv(
             source_rank, 
             nodecnt,
             msgs[msgs.size() - 2].c_str());
+    fprintf(stderr, "MPI_Recv returning status with ucount: %lu\n", 
+            status->_ucount);
     
     //DEBUG("MPI_Recv return rank: %d\n", rank);
     return ret;
@@ -363,7 +367,7 @@ int MPI_Irecv(
             false /* isSend */);
     ret = original_MPI_Irecv(
             tmpBuf, 
-            MSG_SIZE, 
+            msgSize, 
             MPI_CHAR /* datatype */,
             source, 
             tag, 
@@ -432,7 +436,13 @@ int MPI_Isend(
                 str.length(), str.c_str());
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    DEBUG("MPI_ISend:to %d, at %d, msg: %s\n", dest, rank, str.c_str());
+    string typeName = convertDatatype(datatype);
+    DEBUG("MPI_ISend:to %d, at %d, datatype: %s, count: %d, msg: %s\n", 
+            dest, 
+            rank, 
+            typeName.c_str(), 
+            count, 
+            str.c_str());
 
     ret = original_MPI_Isend(
             (void *)str.c_str(), 
@@ -997,10 +1007,12 @@ int MPI_Waitall(
     }
 
     MPI_Status stats [count];
+    fprintf(stderr, "MPI_Waitall:%d:%d\n", rank, count);
     ret = original_MPI_Waitall(
             count, 
             array_of_requests, 
             stats);
+    fprintf(stderr, "MPI_Waitall:%d:%d returned\n", rank, count);
     if(array_of_statuses != MPI_STATUSES_IGNORE) {
         memcpy(
                 array_of_statuses, 
@@ -1012,7 +1024,8 @@ int MPI_Waitall(
             rank, count);
     for(int i = 0; i < count; i++) {
         //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
-        string lastNodes = messagePool.loadMessage(&array_of_requests[i], &array_of_statuses[i]);
+        string lastNodes = messagePool.loadMessage(
+                &array_of_requests[i], &array_of_statuses[i]);
         /*
         if(lastNodes.length() > 0) {
             //fprintf(stderr, "received at %s\n", lastNodes.c_str());
@@ -1207,6 +1220,8 @@ int MPI_Iprobe (
                     &statIprobe, 
                     sizeof(MPI_Status));
         }
+        fprintf(stderr, "did it work here, let's stop here, rank: %d\n", rank);
+        MPI_Abort(MPI_COMM_WORLD, 1);
         /*
         DEBUG("MPI_Iprobe at rank: %d, source: %d, tag: %d, ucount:%lu\n", 
                 rank, source, tag, statIprobe._ucount);
@@ -1242,6 +1257,9 @@ int MPI_Iprobe (
                 tag, 
                 comm, 
                 &statRecv);
+        fprintf(stderr, "we received a message at rank: %d, src: %d, tag: %d\n%s\n", 
+                rank, statRecv.MPI_SOURCE, tag, tmpBuf);
+        MPI_ASSERT(statIprobe.MPI_SOURCE == statRecv.MPI_SOURCE);
         MPI_ASSERT(ret == MPI_SUCCESS);
         messagePool.addPeekedMessage(
                 tmpBuf,
@@ -1257,9 +1275,6 @@ int MPI_Iprobe (
                     rank, statRecv.MPI_SOURCE, tag, statRecv._ucount);
              */
             auto tokens = parse(string(tmpBuf), '|');
-            if(tokens.size() < 2) {
-                fprintf(stderr, "tokens.size() < 2, %s\n", tmpBuf);
-            }
             MPI_ASSERT(tokens.size() >= 2);
             int size = stoi(tokens.back());
             status->_ucount = (tokens.size() - 2) * size;
