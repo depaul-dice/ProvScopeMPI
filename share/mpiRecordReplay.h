@@ -185,7 +185,7 @@ static int (*original_MPI_Startall)(
     MPI_Request array_of_requests[]
 ) = nullptr;
 
-static int (*original_MPI_Cancel)(
+int (*original_MPI_Cancel)(
     MPI_Request *request
 ) = nullptr;
 

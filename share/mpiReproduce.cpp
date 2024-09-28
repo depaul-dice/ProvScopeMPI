@@ -434,7 +434,6 @@ int MPI_Isend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    FUNCGUARD();
     if(!original_MPI_Isend) {
         original_MPI_Isend = reinterpret_cast<
             int (*)(
@@ -587,7 +586,6 @@ int MPI_Irsend(
 int MPI_Cancel(
     MPI_Request *request
 ) {
-    FUNCGUARD();
     /* DEBUG("MPI_Cancel:%p\n", request); */
     if(!original_MPI_Cancel) {
         original_MPI_Cancel = reinterpret_cast<
@@ -597,7 +595,8 @@ int MPI_Cancel(
     int rank;
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Cancel(request);
+    int ret = __MPI_Cancel(
+            request, messagePool);
     bool isaligned = true;
     size_t lastind = 0;
     __q = onlineAlignment(
@@ -810,7 +809,6 @@ int MPI_Testsome(
     int array_of_indices[], 
     MPI_Status array_of_statuses[]
 ) {
-    FUNCGUARD();
     // record which of the requests were filled in this
     int myrank;
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);

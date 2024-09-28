@@ -110,6 +110,9 @@ extern int (*original_MPI_Testsome)(
         int array_of_indices[], 
         MPI_Status array_of_statuses[]);
 
+extern int (*original_MPI_Cancel)(
+        MPI_Request *request);
+
 /*
  * the function below is to abstract the message conversion
  */
@@ -178,4 +181,11 @@ int __MPI_Testsome(
         MessagePool &messagePool,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
+
+int __MPI_Cancel(
+        MPI_Request *request,
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
+
 #endif // MESSAGETOOLS_H

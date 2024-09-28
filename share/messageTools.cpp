@@ -789,3 +789,22 @@ int __MPI_Testsome(
     }
     return ret;
 }
+
+int __MPI_Cancel(
+        MPI_Request *request,
+        MessagePool &messagePool,
+        FILE *recordFile,
+        unsigned long nodeCnt) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_ASSERT(original_MPI_Cancel != nullptr);
+    messagePool.deleteMessage(request);
+    int ret = original_MPI_Cancel(request);
+    if(recordFile != nullptr) {
+        fprintf(recordFile, "MPI_Cancel:%d:%p:%lu\n", 
+                rank, 
+                request, 
+                nodeCnt);
+    }
+    return ret;
+}
