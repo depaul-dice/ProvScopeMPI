@@ -730,11 +730,12 @@ int MPI_Testall (
         }
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Testall\n", rank); */
         // don't control anything
-        return original_MPI_Testall(
+        return __MPI_Testall(
                 count, 
                 array_of_requests, 
                 flag, 
-                array_of_statuses);
+                array_of_statuses,
+                messagePool);
     }
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getmsgs(
@@ -880,8 +881,10 @@ int MPI_Testsome(
             ind = req - array_of_requests;
             MPI_ASSERTNALIGN(0 <= ind 
                     && ind < incount);
-            ret = original_MPI_Wait(
-                    req, &stat);
+            ret = __MPI_Wait(
+                    req, 
+                    &stat,
+                    messagePool);
             MPI_ASSERTNALIGN(ret == MPI_SUCCESS);
             __requests.erase(msgs[3 + 2 * i]);
             array_of_indices[i] = ind;

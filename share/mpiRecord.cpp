@@ -805,14 +805,14 @@ int MPI_Testsome(
             int ind = array_of_indices[i];
             //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
             lastNodes = messagePool.loadMessage(
-                    &array_of_requests[ind], &array_of_statuses[i]);
+                    &array_of_requests[ind], &array_of_statuses[ind]);
             if(lastNodes.length() > 0) {
                 //fprintf(stderr, "received at %s\n", lastNodes.c_str());
             }
             MPI_ASSERT(
                     __requests.find(&array_of_requests[ind]) != __requests.end());
             fprintf(recordFile, ":%p:%d", 
-                    &(array_of_requests[ind]), array_of_statuses[i].MPI_SOURCE); 
+                    &(array_of_requests[ind]), array_of_statuses[ind].MPI_SOURCE); 
             /* __requests.erase(&array_of_requests[ind]); */
         }
     }

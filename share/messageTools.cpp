@@ -680,3 +680,112 @@ int __MPI_Testall(
     fprintf(recordFile, ":%lu\n", nodeCnt);
     return ret;
 }
+
+int __MPI_Testsome(
+        int incount, 
+        MPI_Request array_of_requests[], 
+        int *outcount, 
+        int array_of_indices[], 
+        MPI_Status array_of_statuses[],
+        MessagePool &messagePool,
+        FILE *recordFile,
+        unsigned long nodeCnt) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_ASSERT(original_MPI_Testsome != nullptr);
+    int ret;
+    /*
+     * first check if we have any matching peeked message
+     */
+    for(int i = 0; i < incount; i++) {
+        MessageBuffer *msgBuf = messagePool.peekMessage(&array_of_requests[i]);
+        int src;
+        ret = messagePool.loadPeekedMessage(
+                msgBuf->buf_, 
+                msgBuf->dataType_,
+                msgBuf->count_,
+                msgBuf->tag_, 
+                msgBuf->comm_, 
+                msgBuf->src_,
+                &src);
+        /*
+         * if loading of the peeked message is successful
+         * record it, update the status, and return
+         */
+        if(ret != -1) {
+            fprintf(stderr, "we currently do not support the case\
+                    where there's a peeked message for MPI_Testsome.\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+
+            //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
+            string lastNodes = messagePool.loadMessage(
+                    &array_of_requests[i], 
+                    &array_of_statuses[i]);
+            /*
+             * this must be a receive request because ret == -1
+             * so we should assert that lastNodes should not be an
+             * empty string
+             */
+            MPI_ASSERT(lastNodes.length() > 0);
+
+            //fprintf(stderr, "received at %s\n", lastNodes.c_str());
+            if(recordFile != nullptr) {
+                fprintf(recordFile, "MPI_Testsome:%d:%p:SUCCESS:%d:%lu\n", 
+                        rank, 
+                        &array_of_requests[i], 
+                        src, 
+                        nodeCnt);
+            }
+        }
+    }
+
+    /*
+     * if the peeked message is not found, then call the actual MPI_Testsome
+     * and update the status and record the information
+     */
+    MPI_Status localStats[incount];
+    ret = original_MPI_Testsome(
+            incount, 
+            array_of_requests,
+            outcount,
+            array_of_indices,
+            localStats);
+    MPI_ASSERT(ret == MPI_SUCCESS);
+    if(array_of_statuses != MPI_STATUSES_IGNORE) {
+        memcpy(
+                array_of_statuses, 
+                localStats, 
+                sizeof(MPI_Status) * incount);
+    } 
+
+    // below this part is not done yet, IMPLEMENT!!
+    if(recordFile != nullptr) {
+        fprintf(recordFile, "MPI_Testsome:%d:%d", 
+                rank, *outcount);
+    }
+    if(*outcount > 0) {
+        string lastNodes;
+        int ind;
+        for(int i = 0; i < *outcount; i++) {
+            ind = array_of_indices[i];
+            lastNodes = messagePool.loadMessage(
+                    &array_of_requests[array_of_indices[ind]], 
+                    &array_of_statuses[array_of_indices[ind]]);
+        }
+        /*
+        if(lastNodes.length() > 0) {
+            fprintf(stderr, "received at %s\n", lastNodes.c_str());
+        }
+        */
+        if(recordFile != nullptr) {
+            fprintf(recordFile, "%p:%d", 
+                    &array_of_requests[array_of_indices[ind]], 
+                    array_of_statuses[array_of_indices[ind]].MPI_SOURCE);
+        }
+    }
+    if(recordFile != nullptr) {
+        fprintf(recordFile, "%lu\n", 
+                nodeCnt);
+    }
+    return ret;
+}
