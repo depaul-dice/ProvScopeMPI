@@ -17,8 +17,6 @@ static unordered_map<string, loopNode *> loopTrees;
 Logger logger;
 MessagePool messagePool;
 
-#define MSG_SIZE 8192 
-
 #ifdef DEBUG_MODE
 /* FILE *recordtraceFile = nullptr; */
 /* #define RECORDTRACE(...) \ */
@@ -173,10 +171,10 @@ int MPI_Recv(
      * if it is not successful, then call the actual MPI_Recv
      * update status and buf accordingly
      */
-    char tmpBuffer[MSG_SIZE];
+    char tmpBuffer[msgSize];
     ret = original_MPI_Recv(
             (void *)tmpBuffer, 
-            MSG_SIZE, 
+            msgSize, 
             MPI_CHAR, 
             source, 
             tag, 
@@ -266,7 +264,7 @@ int MPI_Send(
             __LINE__);
     ss << lastNodes << '|' << size;
     string str = ss.str();
-    if(str.size() + 1 >= MSG_SIZE) {
+    if(str.size() + 1 >= msgSize) {
         fprintf(stderr, "message size is too large, length: %lu\n%s\n", 
                 str.length(), str.c_str());
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -437,12 +435,14 @@ int MPI_Isend(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     string typeName = convertDatatype(datatype);
+    /*
     DEBUG("MPI_ISend:to %d, at %d, datatype: %s, count: %d, msg: %s\n", 
             dest, 
             rank, 
             typeName.c_str(), 
             count, 
             str.c_str());
+    */
 
     ret = original_MPI_Isend(
             (void *)str.c_str(), 
@@ -1115,11 +1115,11 @@ int MPI_Probe (
      * if it's NOT successful, you need to call MPI_Recv instead
      * then add it to the peeked message pool
      */
-    char tmpBuf[MSG_SIZE]; 
+    char tmpBuf[msgSize]; 
     MPI_Status stat;
     ret = original_MPI_Recv(
             tmpBuf, 
-            MSG_SIZE, 
+            msgSize, 
             MPI_CHAR, 
             source, 
             tag, 
@@ -1134,7 +1134,7 @@ int MPI_Probe (
     MPI_ASSERT(ret == MPI_SUCCESS);
     messagePool.addPeekedMessage(
             tmpBuf, 
-            MSG_SIZE, 
+            msgSize, 
             tag, 
             comm, 
             stat.MPI_SOURCE);
@@ -1251,7 +1251,7 @@ int MPI_Iprobe (
          * receive it and add it to peeked messages
          */
         MPI_Status statRecv;
-        char tmpBuf[MSG_SIZE];
+        char tmpBuf[msgSize];
         ret = original_MPI_Recv(
                 tmpBuf, 
                 msgSize, 

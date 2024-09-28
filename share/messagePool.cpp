@@ -90,6 +90,10 @@ void *MessagePool::addMessage(
                 isSend,
                 timestamp_++);
     } else {
+        /*
+         * clearing out the realBuf_, so that it doesn't print the garbage
+         */
+        memset(pool_[request]->realBuf_, 0, msgSize);
         pool_[request]->buf_ = buf;
         pool_[request]->dataType_ = dataType;
         pool_[request]->count_ = count;
