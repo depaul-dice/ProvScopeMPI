@@ -1025,97 +1025,117 @@ static inline bool matchbbmap(
     return false;
 }
 
-
+/*
+ * This function is the core of the alignment when they are in the same function
+ * or in the same loop
+ * when the misalignment is found, we first fill up the map of the traces of the
+ * reproduced execution, and then we try to match the traces in the original 
+ * exection. 
+ * CAUTION: we do not have to think about the loop iterations here, because that's
+ * already taken care of
+ */
 static pair<size_t, size_t> __greedyalignmentOnline(
         vector<shared_ptr<element>>& original, 
         vector<shared_ptr<element>>& reproduced, 
         vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, 
-        size_t& initi, 
-        size_t& initj, 
+        size_t& initI, 
+        size_t& initJ, 
         const int& rank, 
-        bool&isaligned, 
-        size_t& lastind) {
-    /* DEBUG0("__greedyalignmentOnline at i: %lu, j: %lu, ", \ */
-            /* initi, initj); */
-    /* DEBUG0("__greedyalignmentOnline at %s, i: %lu, j: %lu, ", \ */
-            /* original[initi]->bb().c_str(), initi, initj); */
-    size_t i = initi, j = initj;
+        bool& isAligned, 
+        size_t& lastInd,
+        bool isLoop = false) {
+    /*
+     * we set the i and j to be at the initial values so that we don't have to find 
+     * the same points of divergence redundantly.
+     */
+    size_t i = initI, j = initJ;
+    /*
+     * we initialize bbMap here in case the misalignment happens
+     */
     unordered_map<string, vector<size_t>> bbMap;
     while(i < original.size() 
             && j < reproduced.size()) {
         if(original[i]->bb() == reproduced[j]->bb()) {
+            /*
+             * in case the nodes are the same, we push them to the aligned vector
+             * and increment the i and j to move onto the next nodes for checking 
+             * alignments
+             */
             aligned.push_back(
                     make_pair(original[i], reproduced[j]));
             i++; j++;
         } else {
-            /* if(i != initi || j != initj) { */
+            /*
+             * in case the nodes are not the same, we first fill up the map of the 
+             * reproduced traces (in case they are not filled up already), 
+             * and then we try to match the traces in the original execution
+             */
             printf("pod: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank);
-            /* if(original[i - 1]->bb() == reproduced[j - 1]->bb()) { */
-                /* string bb = original[i - 1]->bb(); */
-                /* if(rank == 0) { */
-                /* for(unsigned i = 0; i < reproduced.size(); i++) { */
-                    /* DEBUG0("reproduced[%u]: %s\n", i, reproduced[i]->bb().c_str()); */    
-                /* } */ 
-                /* } */
-                /* printf("pod: %s, rank: %d\n", bb.c_str(), rank); */
-            /* } */
-            /* if(divs.find(bb) == divs.end()) { */
-                /* divs[original[i - 1]->bb()] = unordered_set<string>(); */
-            /* } */
-            /* } */
             size_t oldj = j, oldi = i;
-            if(bbMap.size() == 0) create_map(bbMap, reproduced, j);
+
+            /*
+             * filling up the bbMap for the reproduced execution here
+             */
+            if(bbMap.size() == 0) {
+                create_map(bbMap, reproduced, j);
+            }
             if(!matchbbmap(bbMap, original, i, j)) {
-                // never aligned here
-                lastind = original[oldi]->index;
-                /* DEBUG0("at __greedyalignment lastind updated: %lu\n", lastind); */
-                MPI_ASSERT(lastind != numeric_limits<size_t>::max());
-                /* DEBUG0("never aligned at i: %lu, j: %lu, from %s\n", oldi, oldj, original[oldi - 1]->bb().c_str()); */
-                /* if(rank == 0) { */
-                    /* DEBUG0("original\n"); */
-                    /* printsurface(original); */
-                    /* DEBUG0("reproduced\n"); */
-                    /* printsurface(reproduced); */
-                /* } */
-                isaligned = false;
+                /*
+                 * here we never aligned until the end
+                 * so we set the lastInd to the last index of the original execution <- why tho?
+                 */
+                lastInd = original[oldi]->index;
+                MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
+                isAligned = false;
                 return make_pair(oldi, oldj);
             } else {
-                /* printf("pod: %s, rank: %d\n", bb.c_str(), rank); */
+                /*
+                 * if we find the same basic block here
+                 * we have already set the i and j to the point of convergence,
+                 * so move on to the next nodes by incrementing i and j
+                 */
                 printf("poc: %s, rank: %d\n", original[i]->bb().c_str(), rank);
-                /* if(divs[bb].find(original[i]->bb()) == divs[bb].end()) { */
-                    /* divs[bb] = unordered_set<string>(); */
-                /* } */
-                /* divs[bb].insert(original[i]->bb()); */
                 i++; j++;
             }
         }
     }
-    isaligned = true;
+
+    isAligned = true;
+
+    /*
+     * if we have some nodes in original, either because reproduced nodes have not finished
+     * or because we are in the loop, and original simply have more amount of nodes in the
+     * iteration, we need to return the last aligned point
+     */
     if(i < original.size()) {
-        /* DEBUG0("did not finish at i: %lu\n", i - 1); */
-        lastind = original[i - 1]->index;
-        /* DEBUG0("at __greedyalignment %d lastind updated: %lu\n", rank, lastind); */
-        /* if(lastind == numeric_limits<size_t>::max()) { */
-            /* print(original, 0); */
-            /* print(reproduced, 0); */
-        /* } */
-        MPI_ASSERT(lastind != numeric_limits<size_t>::max());
+        lastInd = original[i - 1]->index;
+        MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
         return make_pair(i - 1, j - 1);
+
+    /*
+     * Or, if this alignment is done on loop iteration, we could have more reproduced nodes,
+     * in this case, we assure that this is aligned on a loop iteration 
+     * since this is the end of the alignment, we should make the return value to be the
+     * max
+     */
+    } else if (j < reproduced.size()) {
+        MPI_ASSERT(isLoop == true);
+        lastInd = original[i - 1]->index;
+        // do we really need this?
+        MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
+        return make_pair(
+                numeric_limits<size_t>::max(), numeric_limits<size_t>::max());
+
+    /* 
+     * when both original and reproduced vectors are aligned at the end
+     * we return the max value for both i and j
+     */
     } else {
-        /* if(j != reproduced.size()) { */
-        /*     if(rank == 0) { */
-        /*         cerr << "original\n"; */
-        /*         printsurface(original); */
-        /*         cerr << "reproduced\n"; */
-        /*         printsurface(reproduced); */
-        /*         print(replayTraces, 0); */
-        /*     } */
-        /* } */
-        MPI_ASSERT(j == reproduced.size());
-        /* DEBUG0("aligned till the end\n"); */
-        lastind = original[i - 1]->index;
-        /* DEBUG0("at __greedyalignment %d lastind updated: %lu\n", rank, lastind); */
-        MPI_ASSERT(lastind != numeric_limits<size_t>::max());
+        MPI_ASSERT(i == original.size()
+                && j == reproduced.size());
+        lastInd = original[i - 1]->index;
+        // do we really need this?
+        MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
         return make_pair(
                 numeric_limits<size_t>::max(), numeric_limits<size_t>::max());
     }
@@ -1193,11 +1213,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
             if(tmpfuncId == numeric_limits<size_t>::max()) {
                 tmpfuncId = 0;
             }
-            /* if(rank == 0) { */
-                /* cerr << *la << endl; */
-            /* } */
-            /* size_t tmplastind = numeric_limits<size_t>::max(); */
-            size_t tmplastind = 0;
+            size_t tmpLastInd = 0;
             MPI_ASSERT(original[i]->funcs[funcId][0]->funcname == reproduced[j]->funcs[funcId][0]->funcname);
             /*
              * We are calling greedyalignment online here recursively
@@ -1213,11 +1229,11 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     tmpfuncId, 
                     rank, 
                     isaligned, 
-                    tmplastind,
+                    tmpLastInd,
                     original[i],
                     reproduced[j]);
-            if(lastind < tmplastind) {
-                lastind = tmplastind;
+            if(lastind < tmpLastInd) {
+                lastind = tmpLastInd;
             }
         }
     } else {
@@ -1272,17 +1288,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
             MPI_ASSERT(rq.back()->isSuccess());
             rq.pop_back();
         }
-        size_t tmpi = 0, tmpj = 0, tmplastind = 0;
-        /* DEBUG0("k: %lu, reproduced[j]->funcs.size(): %lu\n", k, reproduced[j]->funcs.size()); */
-        /* if(original[i]->funcs[k][0]->funcname != reproduced[j]->funcs[k][0]->funcname && rank == 0) { */
-            /* printsurface(original[i]->funcs[k]); */
-            /* DEBUG("////////////////////////////////////////////////////////////\n"); */
-            /* printsurface(reproduced[j]->funcs[k]); */
-            /* DEBUG("k: %lu, original[%lu]: %s, reproduced[%lu]: %s\n", k, i, original[i]->bb().c_str(), j, reproduced[j]->bb().c_str()); */
-            /* DEBUG("original[%lu]->funcs[%lu][0]->funcname: %s, reproduced[%lu]->funcs[%lu][0]->funcname: %s\n", i, k, original[i]->funcs[k][0]->funcname.c_str(), j, k, reproduced[j]->funcs[k][0]->funcname.c_str()); */
-        
-        /* } */
-        /* MPI_ASSERT(original[i]->funcs[k][0]->funcname == reproduced[j]->funcs[k][0]->funcname); */
+        size_t tmpI = 0, tmpJ = 0, tmpLastInd = 0;
         /*
          * below incorporates the case different functions being called through function pointers
          */
@@ -1296,28 +1302,16 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     original[i]->funcs[k], 
                     reproduced[j]->funcs[k], 
                     q, 
-                    tmpi, 
-                    tmpj, 
+                    tmpI, 
+                    tmpJ, 
                     k, 
                     rank, 
                     isaligned, 
-                    tmplastind,
+                    tmpLastInd,
                     original[i],
                     reproduced[j]);
         }
-        if(lastind < tmplastind) {
-            /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
-            lastind = tmplastind;
-        }
-        /* if(!(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \ */
-                /* (k == reproduced[j]->funcs.size() - 1))) { */
-            /* if(rank == 0) { */
-                /* printsurface(original[i]->funcs[k]); */
-                /* DEBUG("////////////////////////////////////////////////////////////\n"); */
-                /* printsurface(reproduced[j]->funcs[k]); */
-            /* } */
-        /* } */
-
+        lastind = max(lastind, tmpLastInd);
         MPI_ASSERT(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \
                 (k == reproduced[j]->funcs.size() - 1));
     }
@@ -1327,24 +1321,33 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
      * one has to return back because the last point of misalignment is already found
      */
     if(!rq.empty() && !(rq.back()->isSuccess())) {
-        /* DEBUG0("at %s, we did not proceed this time 2\n", \ */
-        /*         original[i]->bb().c_str()); */
         MPI_ASSERT(islastaligned(original, reproduced, i, j));
         // this logic is not correct, like funcs.size() would overflow
         rq.push_back(make_shared<lastaligned>(reproduced[j]->funcs.size() - 1, i, j));
         return rq;
     }
 
-    // let's do the greedy alignment from where we left off in this function, below is CASE 3.
+    /*
+     * let's do the greedy alignment from where we left off in this function, below is CASE 3.
+     */
     vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned = 
         vector<pair<shared_ptr<element>, shared_ptr<element>>>();
 
-    // in case we are doing this for the first time, we should start at i and j 
-    // however, if not, then you should start at the i + 1 and j + 1
+    /* 
+     * in case we are doing this for the first time, we should start at i and j 
+     * however, if not, then you should start at the i + 1 and j + 1
+     */
     pair<size_t, size_t> p;
     size_t tmplastind = 0;
-    if(firsttime) {
+    bool isLoop = (originalParent != nullptr
+            && reproducedParent != nullptr
+            && originalParent->isLoop
+            && reproducedParent->isLoop);
+    if(firsttime == true) {
         MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
+        MPI_ASSERT((originalParent == nullptr 
+                    && reproducedParent == nullptr)
+                || (originalParent->isLoop == reproducedParent->isLoop));
         p = __greedyalignmentOnline(
                 original, 
                 reproduced, 
@@ -1353,7 +1356,8 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 j, 
                 rank, 
                 isaligned, 
-                tmplastind);
+                tmplastind,
+                isLoop);
     } else {
         size_t tmpI = i + 1, tmpJ = j + 1;
         /* DEBUG0("tmpi: %lu, tmpj: %lu, original.size(): %lu, reproduced.size(): %lu\n", tmpi, tmpj, original.size(), reproduced.size()); */
@@ -1385,6 +1389,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 p = make_pair(i, j);
             } else {
                 MPI_ASSERT(original[tmpI]->funcname == reproduced[tmpJ]->funcname);
+                MPI_ASSERT((originalParent == nullptr 
+                            && reproducedParent == nullptr)
+                        || originalParent->isLoop == reproducedParent->isLoop);
                 p = __greedyalignmentOnline(
                         original, 
                         reproduced, 
@@ -1393,14 +1400,12 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         tmpJ, 
                         rank, 
                         isaligned, 
-                        tmplastind);
+                        tmplastind,
+                        isLoop);
             }
         }
     }
-    if(lastind < tmplastind) {
-        /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
-        lastind = tmplastind;
-    }
+    lastind = max(lastind, tmplastind);
 
     deque<shared_ptr<lastaligned>> qs;
     // if we found some points that are aligned, let's do the alignment level below

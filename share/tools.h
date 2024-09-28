@@ -22,7 +22,7 @@
         if(!(CONDITION)) { \
             int rank; \
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
-            fprintf(stderr, "line: %d, rank: %d, assertion failed: %s\n", __LINE__, rank, #CONDITION); \
+            fprintf(stderr, "line: %d, rank: %d, func: %s assertion failed: %s\n", __LINE__, rank, __func__, #CONDITION); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
@@ -154,6 +154,9 @@ std::string replaceall(std::string& str, const std::string& from, const std::str
 
 void splitNinsert(const std::string& str, const std::string& delimit, std::unordered_set<std::string>& container);
 
+/*
+ * this function requires C++20 features (std::equality_comparable_with)
+ */
 template <typename T>
 void mpi_equal(T a, T b) {
     if(a != b) {
@@ -163,6 +166,10 @@ void mpi_equal(T a, T b) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
+
+void mpi_equal(std::string a, char* b);
+void mpi_equal(char* a, std::string b);
+void mpi_equal(std::string a, std::string b);
 
 #endif // TOOLS_H
        

@@ -43,8 +43,8 @@ MessagePool messagePool;
         if(!(CONDITION)) { \
             int rank; \
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
-            DEBUG("line: %d, rank: %d, assertion failed: %s\n\
-                    going to abort\n", __LINE__, rank, #CONDITION); \
+            DEBUG("line: %d, rank: %d, func: %s, assertion failed: %s\n\
+                    going to abort\n", __LINE__, rank, __func__, #CONDITION); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
@@ -848,7 +848,7 @@ int MPI_Testsome(
             lastind, 
             __order_index);
     /* fprintf(stderr, "msgs[0]: %s\n", msgs[0].c_str()); */
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Testsome");
+    MPI_EQUAL(msgs[0], "MPI_Testsome");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == myrank);
     int oc = stoi(msgs[2]);
     MPI_ASSERTNALIGN(msgs.size() == oc * 2 + 4);
@@ -878,7 +878,10 @@ int MPI_Testsome(
             req = (MPI_Request *)__requests[msgs[3 + 2 * i]];
             src = stoi(msgs[3 + 2 * i + 1]);
             ind = req - array_of_requests;
-            MPI_ASSERTNALIGN(0 <= ind 
+            if(ind < 0 || incount <= ind) {
+                DEBUG("ind: %d, incount: %d\n", ind, incount);
+            }
+            MPI_ASSERT(0 <= ind 
                     && ind < incount);
             ret = __MPI_Wait(
                     req, 

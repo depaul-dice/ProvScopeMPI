@@ -195,3 +195,29 @@ void splitNinsert(const string& str, const string& delimit, unordered_set<string
     }
 }
 
+void mpi_equal(string a, char *b) {
+    if(a != b) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        cerr << "rank: " << rank << ", " << a << " != " << b << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+}
+
+void mpi_equal(char *a, string b) {
+    if(a != b) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        cerr << "rank: " << rank << ", " << a << " != " << b << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+}
+
+void mpi_equal(string a, string b) {
+    if(a != b) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        cerr << "rank: " << rank << ", " << a << " != " << b << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+}
