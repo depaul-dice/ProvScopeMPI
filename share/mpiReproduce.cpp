@@ -835,12 +835,13 @@ int MPI_Testsome(
                             dlsym(RTLD_NEXT, "MPI_Testsome"));
         }
         // don't control anything
-        return original_MPI_Testsome(
+        return __MPI_Testsome(
                 incount, 
                 array_of_requests, 
                 outcount, 
                 array_of_indices, 
-                array_of_statuses);
+                array_of_statuses,
+                messagePool);
     }
 
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */

@@ -169,4 +169,13 @@ int __MPI_Testall(
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
 
+int __MPI_Testsome(
+        int incount, 
+        MPI_Request array_of_requests[], 
+        int *outcount, 
+        int array_of_indices[], 
+        MPI_Status array_of_statuses[],
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
 #endif // MESSAGETOOLS_H
