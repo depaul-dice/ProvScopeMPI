@@ -403,15 +403,11 @@ int MPI_Cancel(
                     MPI_Request *)>(
                         dlsym(RTLD_NEXT, "MPI_Cancel"));
     }
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_ASSERT(__requests.find(request) != __requests.end());
-    messagePool.deleteMessage(request);
-    int ret = original_MPI_Cancel(request);
-    // I just need to keep track that it is cancelled
-    fprintf(recordFile, "MPI_Cancel:%d:%p:%lu\n", 
-            rank, 
+    int ret = __MPI_Cancel(
             request, 
+            messagePool, 
+            recordFile, 
             nodecnt);
     __requests.erase(request);
     return ret;
