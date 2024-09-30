@@ -159,8 +159,18 @@ int __MPI_Recv(
             tag,
             comm,
             &localStatus);
+    /*
+     * if it is successful, then load the message and return
+     * don't call MPI_Recv
+     */
     int ret;
     if(ind != -1) {
+        if(status != MPI_STATUS_IGNORE) {
+            memcpy(
+                    status, 
+                    &localStatus, 
+                    sizeof(MPI_Status));
+        }
         ret = messagePool.loadPeekedMessage(
                 buf,
                 datatype,
@@ -168,21 +178,19 @@ int __MPI_Recv(
                 tag,
                 comm,
                 source);
-        MPI_ASSERT(ret == -1);
-        if(status != MPI_STATUS_IGNORE) {
-            memcpy(
-                    status, 
-                    &localStatus, 
-                    sizeof(MPI_Status));
-        }
+        MPI_ASSERT(ret != -1);
         if(recordFile != nullptr) {
             fprintf(recordFile, "MPI_Recv:%d:%d:%lu\n",
                     rank,
                     status->MPI_SOURCE,
                     nodeCnt);
         }
-        return ret;
+        return MPI_SUCCESS;
     }
+    /*
+     * if it is NOT successful, then call the actual MPI_Recv
+     * update status and buf accordingly
+     */
     char tmpBuffer[msgSize];
     ret = original_MPI_Recv(
             (void *)tmpBuffer, 
@@ -205,7 +213,7 @@ int __MPI_Recv(
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    fprintf(stderr, "received message from send at %s\n", msgs[msgs.size() - 2].c_str());
+    //fprintf(stderr, "received message from send at %s\n", msgs[msgs.size() - 2].c_str());
     convertMsgs2Buf(
             buf,
             datatype,
@@ -216,10 +224,13 @@ int __MPI_Recv(
     int size;
     MPI_Type_size(datatype, &size);
     int sizeFromMsgs = stoi(msgs.back());
-    // checking if the counts are the same
+    /*
+     * checking if the counts are the same
+     */
     MPI_ASSERT(size == sizeFromMsgs);
-    // manipulating count manually
-
+    /*
+     * manipulating count manually
+     */
     if(status != MPI_STATUS_IGNORE) {
         memcpy(
                 status, 

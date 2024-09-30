@@ -146,6 +146,7 @@ string MessagePool::loadMessage(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     MessageBuffer *msgBuf = pool_[request];
+    MPI_ASSERT(request == msgBuf->request_);
 
     if(msgBuf->isSend_) {
         delete pool_[request];
@@ -159,6 +160,9 @@ string MessagePool::loadMessage(
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
         string typeName = convertDatatype(msgBuf->dataType_); 
+        if(rank == 3 && msgBuf->src_ == 1) {
+            
+        }
         fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\nmessage: %s\n", 
                 tokens.size(), 
                 msgBuf->count_, 
@@ -168,8 +172,7 @@ string MessagePool::loadMessage(
                 request,
                 msgBuf->src_,
                 msg.c_str());
-
-        MPI_Abort(MPI_COMM_WORLD, 1);
+        throw runtime_error("tokens.size() != msgBuf->count_ + 2");
     }
     int size;
     MPI_Type_size(msgBuf->dataType_, &size);
