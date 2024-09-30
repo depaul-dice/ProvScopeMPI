@@ -521,6 +521,7 @@ int __MPI_Waitall(
      */
     for(int i = 0; i < count; i++) {
         MessageBuffer *msgBuf = messagePool.peekMessage(&array_of_requests[i]);
+        MPI_ASSERT(msgBuf != nullptr);
         int src;
         ret = messagePool.loadPeekedMessage(
                 msgBuf->buf_, 
@@ -565,28 +566,36 @@ int __MPI_Waitall(
      * if the peeked message is not found, then call the actual MPI_Waitall
      * and update the status and record the information
      */
-    MPI_Status stats[count];
+    MPI_Status localStats[count];
     ret = original_MPI_Waitall(
             count, 
             array_of_requests, 
-            stats);
+            localStats);
+    MPI_ASSERT(ret == MPI_SUCCESS);
+    string lastNodes [count];
     if(array_of_statuses != MPI_STATUSES_IGNORE) {
         memcpy(
                 array_of_statuses, 
-                stats, 
+                localStats, 
                 sizeof(MPI_Status) * count);
     }
-    MPI_ASSERT(ret == MPI_SUCCESS);
     for(int i = 0; i < count; i++) {
-        string lastNodes = messagePool.loadMessage(
+        lastNodes[i] = messagePool.loadMessage(
                 &array_of_requests[i], 
                 &array_of_statuses[i]);
     }
+
     if(recordFile != nullptr) {
-        fprintf(recordFile, ":%d:%d\n", 
+        fprintf(recordFile, "MPI_Waitall:%d:%d\n", 
                 rank, count);
+        for(int i = 0; i < count; i++) {
+            fprintf(recordFile, ":%p:%d", 
+                    &array_of_requests[i], 
+                    localStats[i].MPI_SOURCE);
+        }
+        fprintf(recordFile, ":%lu\n", nodeCnt);
     }
-    return MPI_SUCCESS;
+    return ret;
 }
 
 int __MPI_Testall(

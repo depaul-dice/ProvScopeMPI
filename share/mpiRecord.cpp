@@ -695,95 +695,29 @@ int MPI_Waitall(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Waitall"));
     }
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    string lastNode = updateAndGetLastNodes(
-            loopTrees, TraceType::RECORD);
-    stringstream ss;
-    for(int i = 0; i < count; i++) {
-        ss << &array_of_requests[i] << '|';
-    }
-    /*
-    DEBUG("MPI_Waitall, rank:%d, at %s for requests: %s\n", 
-            rank, 
-            lastNode.c_str(), 
-            ss.str().c_str());
-    */
-
-    /*
-     * you first look for the peeked messages
-     * if there's an appropriate message, we abort
-     * because we currently do not support this case
-     */
-    int ret;
-    MessageBuffer **msgBufs = new MessageBuffer*[count];
-    for(int i = 0; i < count; i++) {
-        msgBufs[i] = messagePool.peekMessage(&array_of_requests[i]);
-        ret = messagePool.loadPeekedMessage(
-                msgBufs[i]->buf_, 
-                msgBufs[i]->dataType_,
-                msgBufs[i]->count_,
-                msgBufs[i]->tag_, 
-                msgBufs[i]->comm_, 
-                msgBufs[i]->src_);
-        if(ret != -1) {
-            delete [] msgBufs;
-            fprintf(stderr, "we currently do not support the case\
-                    where there's a peeked message for MPI_Waitall.\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-        MPI_ASSERT(ret == -1);
-    }
-
-    MPI_Status stats [count];
-    //fprintf(stderr, "MPI_Waitall:%d:%d\n", rank, count);
-    ret = original_MPI_Waitall(
-            count, 
-            array_of_requests, 
-            stats);
-    //fprintf(stderr, "MPI_Waitall:%d:%d returned\n", rank, count);
-    if(array_of_statuses != MPI_STATUSES_IGNORE) {
-        memcpy(
+    int ret = 0;
+    try {
+        ret = __MPI_Waitall(
+                count, 
+                array_of_requests, 
                 array_of_statuses, 
-                stats, 
-                sizeof(MPI_Status) * count);
+                messagePool, 
+                recordFile, 
+                nodecnt);
+    } catch(const exception &e) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        string localLastNodes = updateAndGetLastNodes(
+                loopTrees, TraceType::RECORD);
+        fprintf(stderr, "exception caught at %s\nrank: %d\nlastNodes:%s", 
+                __func__,
+                rank, 
+                localLastNodes.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    MPI_ASSERT(ret == MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Waitall:%d:%d", 
-            rank, count);
     for(int i = 0; i < count; i++) {
-        //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank); 
-        try {
-            string receivedLastNodes = messagePool.loadMessage(
-                    &array_of_requests[i], &array_of_statuses[i]);
-            //if(lastNodes.length() > 0) {
-                //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-            //}
-        } catch (const std::exception &e) {
-            string localLastNodes = updateAndGetLastNodes(
-                    loopTrees, TraceType::RECORD);
-            fprintf(stderr, "exception caught at rank: %d\nlastNodes: %s", 
-                    rank, localLastNodes.c_str());
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-        msgBufs[i] = messagePool.peekMessage(&array_of_requests[i]);
-        if(msgBufs[i] != nullptr 
-                && msgBufs[i]->isSend_ == false 
-                && msgBufs[i]->dataType_ == MPI_DOUBLE
-                && stats[i].MPI_SOURCE == 1 
-                && rank == 3) {
-            fprintf(stderr, "received a message at rank: %d, src %d, request %p\n%s\n", 
-                    rank, 
-                    stats[i].MPI_SOURCE,
-                    &array_of_requests[i],
-                    (char *)(msgBufs[i]->realBuf_));
-        }
-        fprintf(recordFile, ":%p:%d", 
-                &array_of_requests[i], stats[i].MPI_SOURCE);
         MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
     }
-    fprintf(recordFile, ":%lu\n", nodecnt);
-    delete [] msgBufs;
     return ret;
 }
 
