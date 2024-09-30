@@ -463,69 +463,20 @@ int MPI_Testall(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Testall"));
     }
-    //DEBUG("MPI_Testall:%d, %p\n", rank, array_of_requests);
-
-    /*
-     * first check if we have any matching peeked message
-     * if there are some, abort for now
-     */
-    int ret;
-    MessageBuffer *msgBuf;
-    for(int i = 0; i < count; i++) {
-        msgBuf = messagePool.peekMessage(&array_of_requests[i]);
-        if(msgBuf == nullptr) break;
-        ret = messagePool.loadPeekedMessage(
-                msgBuf->buf_, 
-                msgBuf->dataType_,
-                msgBuf->count_,
-                msgBuf->tag_, 
-                msgBuf->comm_, 
-                msgBuf->src_);
-        if(ret != -1) {
-            fprintf(stderr, "we currently do not support the case\
-                    where there's a peeked message for MPI_Testall.\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-    }
-
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int outcount; 
-    int indices [count];
-    MPI_Status stats [count];
-
-    ret = original_MPI_Testall(
+    int ret = __MPI_Testall(
             count, 
             array_of_requests, 
             flag, 
-            stats);
-    MPI_ASSERT(ret == MPI_SUCCESS);
+            array_of_statuses, 
+            messagePool, 
+            recordFile, 
+            nodecnt);
 
-    fprintf(recordFile, "MPI_Testall:%d:%d", rank, count);
     if(*flag) {
         for(int i = 0; i < count; i++) {
-            //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
-            string lastNodes = messagePool.loadMessage(
-                    &array_of_requests[i], &stats[i]);
-                
-            if(lastNodes.length() > 0) {
-                //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-            }
-        }
-        fprintf(recordFile, ":SUCCESS");
-        for(int i = 0; i < count; i++) {
             MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
-            fprintf(recordFile, ":%p:%d", 
-                    &array_of_requests[i], stats[i].MPI_SOURCE);
-            if(array_of_statuses != MPI_STATUSES_IGNORE) 
-                memcpy(
-                        &array_of_statuses[i], 
-                        &stats[i], 
-                        sizeof(MPI_Status));
         }
-    } else {
-        fprintf(recordFile, ":FAIL");
     }
-    fprintf(recordFile, ":%lu\n", nodecnt);
 
     return ret;
 }

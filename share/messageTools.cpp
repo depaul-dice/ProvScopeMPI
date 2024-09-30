@@ -677,27 +677,26 @@ int __MPI_Testall(
         for(int i = 0; i < count; i++) {
             string lastNodes = messagePool.loadMessage(
                     &array_of_requests[i], 
-                    &localStats[i]);
+                    &array_of_statuses[i]);
+            MPI_ASSERT(lastNodes.length() > 0);
         }
         if(recordFile != nullptr) {
-            fprintf(recordFile, "MPI_Testall:%d:%d:SUCCESS:%lu\n", 
+            fprintf(recordFile, "MPI_Testall:%d:%d:SUCCESS", 
                     rank, 
-                    count, 
-                    nodeCnt);
-        }
-        for(int i = 0; i < count; i++) {
-            if(recordFile != nullptr) {
+                    count);
+            for(int i = 0; i < count; i++) {
                 fprintf(recordFile, ":%p:%d", 
                         &array_of_requests[i], 
                         localStats[i].MPI_SOURCE);
             }
+            fprintf(recordFile, ":%lu\n", nodeCnt);
         }
     } else if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Testall:%d:%d:FAIL", 
+        fprintf(recordFile, "MPI_Testall:%d:%d:FAIL:%lu\n", 
                 rank, 
-                count);
+                count,
+                nodeCnt);
     }
-    fprintf(recordFile, ":%lu\n", nodeCnt);
     return ret;
 }
 
