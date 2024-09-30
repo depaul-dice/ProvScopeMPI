@@ -790,16 +790,11 @@ int __MPI_Testsome(
             lastNodes = messagePool.loadMessage(
                     &array_of_requests[array_of_indices[ind]], 
                     &array_of_statuses[array_of_indices[ind]]);
-        }
-        /*
-        if(lastNodes.length() > 0) {
-            fprintf(stderr, "received at %s\n", lastNodes.c_str());
-        }
-        */
-        if(recordFile != nullptr) {
-            fprintf(recordFile, "%p:%d", 
-                    &array_of_requests[array_of_indices[ind]], 
-                    array_of_statuses[array_of_indices[ind]].MPI_SOURCE);
+            if(recordFile != nullptr) {
+                fprintf(recordFile, ":%p:%d", 
+                        &array_of_requests[array_of_indices[ind]], 
+                        array_of_statuses[array_of_indices[ind]].MPI_SOURCE);
+            }
         }
     }
     if(recordFile != nullptr) {

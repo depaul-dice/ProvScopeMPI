@@ -484,8 +484,6 @@ int MPI_Testsome(
     int array_of_indices[], 
     MPI_Status array_of_statuses[]
 ) {
-    // record which of the requests were filled in this
-    int rank;
     if(!original_MPI_Testsome) {
         original_MPI_Testsome = reinterpret_cast<
             int (*)(
@@ -496,67 +494,27 @@ int MPI_Testsome(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Testsome"));
     }
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    //DEBUG("MPI_Testsome:%d:%d:%p\n", rank, incount, array_of_requests);
     /*
      * first check if we have any matching peeked message
      * if there are some, abort for now
      */
-    int ret;
-    MessageBuffer *msgBuf;
-    for(int i = 0; i < incount; i++) {
-        msgBuf = messagePool.peekMessage(&array_of_requests[i]);
-        if(msgBuf != nullptr) {
-            ret = messagePool.loadPeekedMessage(
-                    msgBuf->buf_, 
-                    msgBuf->dataType_,
-                    msgBuf->count_,
-                    msgBuf->tag_, 
-                    msgBuf->comm_, 
-                    msgBuf->src_);
-            if(ret != -1) {
-                fprintf(stderr, "we currently do not support the case\
-                        where there's a peeked message for MPI_Testsome.\n");
-                MPI_Abort(MPI_COMM_WORLD, 1);
-            }
-        }
-    }
-
-    MPI_Status stats [incount];
-    ret = original_MPI_Testsome(
+    int ret = __MPI_Testsome(
             incount, 
             array_of_requests, 
             outcount, 
             array_of_indices, 
-            stats);
-    if(array_of_statuses != MPI_STATUSES_IGNORE) {
-        for(int i = 0; i < incount; i++) {
-            memcpy(
-                    &array_of_statuses[i], 
-                    &stats[i], 
-                    sizeof(MPI_Status));
-        }
-    }
+            array_of_statuses, 
+            messagePool, 
+            recordFile, 
+            nodecnt);
 
-    fprintf(recordFile, "MPI_Testsome:%d:%d", rank, *outcount);
     if(*outcount > 0) {
-        string lastNodes;
         for(int i = 0; i < *outcount; i++) {
             int ind = array_of_indices[i];
-            //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
-            lastNodes = messagePool.loadMessage(
-                    &array_of_requests[ind], &array_of_statuses[ind]);
-            if(lastNodes.length() > 0) {
-                //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-            }
             MPI_ASSERT(
                     __requests.find(&array_of_requests[ind]) != __requests.end());
-            fprintf(recordFile, ":%p:%d", 
-                    &(array_of_requests[ind]), array_of_statuses[ind].MPI_SOURCE); 
-            /* __requests.erase(&array_of_requests[ind]); */
         }
     }
-    fprintf(recordFile, ":%lu\n", nodecnt);
     return ret;
 }
 
