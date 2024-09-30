@@ -422,8 +422,6 @@ int MPI_Test(
     int *flag, 
     MPI_Status *status
 ) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(!original_MPI_Test) {
         original_MPI_Test = reinterpret_cast<
             int (*)(
@@ -432,87 +430,17 @@ int MPI_Test(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Test"));
     }
-    //DEBUG("MPI_Test:%p\n", request);
     MPI_ASSERT(
             __requests.find(request) != __requests.end());
-    /*
-     * first check if we have any matching peeked message
-     */
-    MessageBuffer *msgBuf = messagePool.peekMessage(request);
-    int src;
-    int ret = messagePool.loadPeekedMessage(
-            msgBuf->buf_, 
-            msgBuf->dataType_,
-            msgBuf->count_,
-            msgBuf->tag_, 
-            msgBuf->comm_, 
-            msgBuf->src_,
-            &src);
-    /*
-     * if loading of the peeked message is successful
-     * record it, update the status, and return
-     */
-    if(ret != -1) {
-        fprintf(stderr, "we currently do not support the case\
-                where there's a peeked message for MPI_Test.\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-
-        //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
-        string lastNodes = messagePool.loadMessage(
-                request, 
-                status);
-        /*
-         * this must be a receive request because ret == -1
-         * so we should assert that lastNodes should not be an
-         * empty string
-         */
-        MPI_ASSERT(lastNodes.length() > 0);
-
-        //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-        fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS:%d:%lu\n", 
-                rank, 
-                request, 
-                src, 
-                nodecnt);
-        return MPI_SUCCESS;
-    }
-
-    /*
-     * if the peeked message is not found, then call the actual MPI_Test
-     * and update the status and record the information
-     */
-    MPI_Status stat;
-    ret = original_MPI_Test(
+    int ret = __MPI_Test(
             request, 
             flag, 
-            &stat);
-    if(status != MPI_STATUS_IGNORE) {
-        memcpy(
-                status, 
-                &stat, 
-                sizeof(MPI_Status));
-    }
-
-    /* 
-     * use the loadMessage method only if MPI_Test was successful
-     */
+            status, 
+            messagePool, 
+            recordFile, 
+            nodecnt);
     if(*flag) {
-        //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
-        string lastNodes = messagePool.loadMessage(request, status);
-        if(lastNodes.length() > 0) {
-            //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-        }
-        fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS:%d:%lu\n", \
-                rank, 
-                request, 
-                stat.MPI_SOURCE, 
-                nodecnt);
-         __requests.erase(request);
-    } else {
-        fprintf(recordFile, "MPI_Test:%d:%p:FAIL:%lu\n", \
-                rank, 
-                request, 
-                nodecnt);
+        __requests.erase(request);
     }
     return ret;
 }
