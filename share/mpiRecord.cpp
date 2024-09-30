@@ -689,8 +689,6 @@ int MPI_Wait(
     MPI_Request *request, 
     MPI_Status *status
 ) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(!original_MPI_Wait) {
         original_MPI_Wait = reinterpret_cast<
             int (*)(
@@ -698,80 +696,13 @@ int MPI_Wait(
                     MPI_Status *)>(
                         dlsym(RTLD_NEXT, "MPI_Wait"));
     }
-    //DEBUG("MPI_Wait:%p\n", request);
-
-    /*
-     * Look for the message buffer information in MPI_Request
-     */
-    MessageBuffer *msgBuf = messagePool.peekMessage(request);
-    int src;
-    int ret = messagePool.loadPeekedMessage(
-            msgBuf->buf_, 
-            msgBuf->dataType_,
-            msgBuf->count_,
-            msgBuf->tag_, 
-            msgBuf->comm_, 
-            msgBuf->src_,
-            &src);
-    /*
-     * if the correct information is found,
-     * record the information, update the status,
-     * and return
-     */
-    if(ret != -1) {
-        fprintf(stderr, "we currently do not support the case\
-                where there's a peeked message for MPI_Wait.\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-
-        //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
-        string lastNodes = messagePool.loadMessage(
-                request, status);
-        //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu|%s\n", 
-                rank, 
-                request, 
-                src, 
-                nodecnt,
-                lastNodes.c_str());
-        MPI_ASSERT(status->MPI_ERROR == MPI_SUCCESS);
-        return MPI_SUCCESS;
-    }
-
-    /*
-     * if the correct information is not found,
-     * call the actual MPI_Wait and update the status
-     * and record the information
-     */
-    MPI_Status stat;
-    ret = original_MPI_Wait(request, &stat);
-    if(status != MPI_STATUS_IGNORE) {
-        memcpy(
-                status, 
-                &stat, 
-                sizeof(MPI_Status));
-    }
     MPI_ASSERT(__requests.find(request) != __requests.end());
-    /* string req = __requests[request]; */
-    /* __requests.erase(request); */
-
-    if(ret == MPI_SUCCESS) {
-        //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
-        string lastNodes = messagePool.loadMessage(request, status);
-        if(lastNodes.length() > 0) {
-            //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-        }
-        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu|%s\n",
-                rank, 
-                request, 
-                stat.MPI_SOURCE, 
-                nodecnt,
-                lastNodes.c_str());
-    } else {
-        fprintf(recordFile, "MPI_Wait:%d:%p:FAIL:%lu\n",
-                rank, 
-                request, 
-                nodecnt);
-    }
+    int ret = __MPI_Wait(
+            request, 
+            status, 
+            messagePool, 
+            recordFile, 
+            nodecnt);
     return ret;
 }
 
