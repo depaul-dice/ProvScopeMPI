@@ -11,6 +11,10 @@ static map<MPI_Request *, string> __requests;
 
 FILE *recordFile = nullptr;
 FILE *traceFile = nullptr;
+
+/*
+ * nodecnt is incremented at printBBname
+ */
 static unsigned long nodecnt = 0;
 static unordered_map<string, loopNode *> loopTrees;
 
@@ -230,67 +234,16 @@ int MPI_Irecv(
                         dlsym(RTLD_NEXT, "MPI_Irecv"));
     }
 
-    int ret;
-    /*
-     * let's not support the case where there exists a peeked message
-     * for now
-     */
-    MPI_Status stat;
-    ret = messagePool.peekPeekedMessage(
-            source, 
-            tag, 
-            comm, 
-            &stat);
-    if(ret != -1) {
-        fprintf(stderr, "we don't support the case where there's \
-                a peeked message for MPI_Irecv.\n\
-                Aborting...\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-    
-    /*
-     * in case the datatype is something we don't support,
-     * we should abort
-     */
-    if(datatype != MPI_INT 
-            && datatype != MPI_CHAR 
-            && datatype != MPI_BYTE
-            && datatype != MPI_DOUBLE
-            && datatype != MPI_LONG_LONG_INT) {
-        unsupportedDatatype(rank, __LINE__, datatype);
-    }
-
-    /*
-     * 1. Create a new buffer for the request
-     * 2. Call irecv with the new buffer
-     * 3. Return irecv
-     * 4. When the message is received (at either test or wait), 
-     *  alternate the message in the original buffer
-     * 5. Record the node timing
-     */
-    void *tmpBuf = messagePool.addMessage(
-            request, 
+    int ret = __MPI_Irecv(
             buf, 
-            datatype,
             count, 
-            tag,
-            comm,
-            source, /* this could be MPI_ANY_SOURCE */
-            false /* isSend */);
-    ret = original_MPI_Irecv(
-            tmpBuf, 
-            msgSize, 
-            MPI_CHAR /* datatype */,
+            datatype, 
             source, 
             tag, 
             comm, 
-            request);
- 
-    // I just need to keep track of the request
-    fprintf(recordFile, "MPI_Irecv:%d:%d:%p:%lu\n",
-            rank, 
-            source, 
-            request, 
+            request,
+            messagePool,
+            recordFile,
             nodecnt);
     __requests[request] = "MPI_Irecv";
     return ret;
