@@ -576,14 +576,6 @@ int MPI_Test(
             lastInd, 
             __looptrees);
     if(!isAligned) {
-        if(!original_MPI_Test) {
-            original_MPI_Test = reinterpret_cast<
-                int (*)(
-                        MPI_Request *, 
-                        int *, 
-                        MPI_Status *)>(
-                            dlsym(RTLD_NEXT, "MPI_Test"));
-        }
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Test\n", rank); */
         // don't control anything
         return __MPI_Test(
@@ -891,7 +883,7 @@ int MPI_Waitany(
         MPI_ASSERTNALIGN(0 <= *index && *index < count);
         MPI_ASSERTNALIGN(__requests[msgs[3]] == &array_of_requests[*index]);
         __requests.erase(msgs[3]);
-        ret = original_MPI_Wait(&array_of_requests[*index], status);
+        ret = PMPI_Wait(&array_of_requests[*index], status);
         MPI_ASSERTNALIGN(ret == MPI_SUCCESS);
     } else {
         /* DEBUG(":FAIL\n"); */
