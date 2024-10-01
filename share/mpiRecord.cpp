@@ -121,19 +121,6 @@ int MPI_Recv(
     int tag, 
     MPI_Comm comm, 
     MPI_Status *status) {
-    if(!original_MPI_Recv) {
-        original_MPI_Recv = reinterpret_cast<
-            int (*)(
-                    void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Recv"));
-    }
-
     return __MPI_Recv(
             buf, 
             count, 
@@ -218,22 +205,6 @@ int MPI_Irecv(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    //DEBUG("MPI_Irecv:%p:%d\n", request, rank);
-    if(!original_MPI_Irecv) {
-        original_MPI_Irecv = reinterpret_cast<
-            int (*)(
-                    void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Irecv"));
-    }
-
     int ret = __MPI_Irecv(
             buf, 
             count, 
@@ -285,8 +256,8 @@ int MPI_Isend(
             __LINE__);
     ss << lastNodes << '|' << size;
     string str = ss.str();
-    if(rank == 1 && dest == 3 && datatype == MPI_DOUBLE) {
-        fprintf(stderr, "sending message at MPI_Isend %s, length: %lu, at rank:%d to dest: %d, request: %p\n", 
+    if(rank == 6 && dest == 4 && datatype == MPI_DOUBLE && tag == 0) {
+        fprintf(stderr, "CAUGHT! sending message at MPI_Isend %s, length: %lu, at rank:%d to dest: %d, request: %p\n", 
                 str.c_str(), 
                 str.size(),
                 rank,
@@ -354,25 +325,11 @@ int MPI_Irsend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    fprintf(stderr, "MPI_Irsend is not supported yet\n");
-    MPI_Abort(MPI_COMM_WORLD, 1);
-
-    DEBUG0("MPI_Irsend:%p\n", request);
-    if(!original_MPI_Irsend) {
-        original_MPI_Irsend = reinterpret_cast<
-            int (*)(
-                const void *, 
-                int, MPI_Datatype, 
-                int, 
-                int, 
-                MPI_Comm, 
-                MPI_Request *)>(
-                    dlsym(RTLD_NEXT, "MPI_Irsend"));
-    }
+    FUNCGUARD();
     int rank;
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Irsend(
+    int ret = PMPI_Irsend(
             buf, 
             count, 
             datatype, 
@@ -397,12 +354,6 @@ int MPI_Irsend(
 int MPI_Cancel(
     MPI_Request *request
 ) {
-    if(!original_MPI_Cancel) {
-        original_MPI_Cancel = reinterpret_cast<
-            int (*)(
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Cancel"));
-    }
     MPI_ASSERT(__requests.find(request) != __requests.end());
     int ret = __MPI_Cancel(
             request, 
@@ -418,14 +369,6 @@ int MPI_Test(
     int *flag, 
     MPI_Status *status
 ) {
-    if(!original_MPI_Test) {
-        original_MPI_Test = reinterpret_cast<
-            int (*)(
-                    MPI_Request *, 
-                    int *, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Test"));
-    }
     MPI_ASSERT(
             __requests.find(request) != __requests.end());
     int ret = __MPI_Test(
@@ -450,15 +393,6 @@ int MPI_Testall(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if(!original_MPI_Testall) {
-        original_MPI_Testall = reinterpret_cast<
-            int (*)(
-                    int, 
-                    MPI_Request *, 
-                    int *, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Testall"));
-    }
     int ret = __MPI_Testall(
             count, 
             array_of_requests, 
@@ -484,20 +418,6 @@ int MPI_Testsome(
     int array_of_indices[], 
     MPI_Status array_of_statuses[]
 ) {
-    if(!original_MPI_Testsome) {
-        original_MPI_Testsome = reinterpret_cast<
-            int (*)(
-                    int, 
-                    MPI_Request *, 
-                    int *, 
-                    int *, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Testsome"));
-    }
-    /*
-     * first check if we have any matching peeked message
-     * if there are some, abort for now
-     */
     int ret = __MPI_Testsome(
             incount, 
             array_of_requests, 
@@ -522,13 +442,6 @@ int MPI_Wait(
     MPI_Request *request, 
     MPI_Status *status
 ) {
-    if(!original_MPI_Wait) {
-        original_MPI_Wait = reinterpret_cast<
-            int (*)(
-                    MPI_Request *, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Wait"));
-    }
     MPI_ASSERT(__requests.find(request) != __requests.end());
     int ret = __MPI_Wait(
             request, 
@@ -545,22 +458,11 @@ int MPI_Waitany(
     int *index, 
     MPI_Status *status
 ) {
-    fprintf(stderr, "MPI_Waitany not supported yet\n");
-    MPI_Abort(MPI_COMM_WORLD, 1);
-
+    FUNCGUARD();
     int rank;
-    if(!original_MPI_Waitany) {
-        original_MPI_Waitany = reinterpret_cast<
-            int (*)(
-                    int, 
-                    MPI_Request *, 
-                    int *, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Waitany"));
-    }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Status stat;
-    int ret = original_MPI_Waitany(
+    int ret = PMPI_Waitany(
             count, 
             array_of_requests, 
             index, 
@@ -592,14 +494,9 @@ int MPI_Waitall(
     MPI_Request array_of_requests[], 
     MPI_Status array_of_statuses[]
 ) {
-    if(!original_MPI_Waitall) {
-        original_MPI_Waitall = reinterpret_cast<
-            int (*)(
-                    int, 
-                    MPI_Request *, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Waitall"));
-    }
+    for(int i = 0; i < count; i++) {
+        MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
+    } 
     int ret = 0;
     try {
         ret = __MPI_Waitall(
@@ -614,14 +511,11 @@ int MPI_Waitall(
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         string localLastNodes = updateAndGetLastNodes(
                 loopTrees, TraceType::RECORD);
-        fprintf(stderr, "exception caught at %s\nrank: %d\nlastNodes:%s", 
+        fprintf(stderr, "exception caught at %s\nrank: %d\nlastNodes:%s\n", 
                 __func__,
                 rank, 
                 localLastNodes.c_str());
         MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-    for(int i = 0; i < count; i++) {
-        MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
     }
     return ret;
 }
@@ -637,29 +531,6 @@ int MPI_Probe (
     FUNCGUARD();
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /*
-    if(!original_MPI_Probe) {
-        original_MPI_Probe = reinterpret_cast<
-            int (*)(
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Probe"));
-    }
-    */
-    if(!original_MPI_Recv) {
-        original_MPI_Recv = reinterpret_cast<
-            int (*)(
-                    void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Recv"));
-    }
     /*
      * first, let's check if we have any appropriate message at peeked
      * if so, set the status to be appropriate values
@@ -688,7 +559,7 @@ int MPI_Probe (
      */
     char tmpBuf[msgSize]; 
     MPI_Status stat;
-    ret = original_MPI_Recv(
+    ret = PMPI_Recv(
             tmpBuf, 
             msgSize, 
             MPI_CHAR, 
@@ -739,32 +610,6 @@ int MPI_Iprobe (
     MPI_Status *status
 ) {
     int rank;
-    /*
-     * if the actual function call is still not set
-     * set them
-     */
-    if(!original_MPI_Iprobe) {
-        original_MPI_Iprobe = reinterpret_cast<
-            int (*)(
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    int *, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Iprobe"));
-    }
-    if(!original_MPI_Recv) {
-        original_MPI_Recv = reinterpret_cast<
-            int (*)(
-                    void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Recv"));
-    }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     //DEBUG("MPI_Iprobe:%d, at rank:%d\n", source, rank);
 
@@ -803,7 +648,7 @@ int MPI_Iprobe (
         return MPI_SUCCESS;
     }
 
-    ret = original_MPI_Iprobe(
+    ret = PMPI_Iprobe(
             source, 
             tag, 
             comm, 
@@ -823,7 +668,7 @@ int MPI_Iprobe (
          */
         MPI_Status statRecv;
         char tmpBuf[msgSize];
-        ret = original_MPI_Recv(
+        ret = PMPI_Recv(
                 tmpBuf, 
                 msgSize, 
                 MPI_CHAR, 
@@ -831,10 +676,10 @@ int MPI_Iprobe (
                 tag, 
                 comm, 
                 &statRecv);
-        /*
-        fprintf(stderr, "we received a message at rank: %d, src: %d, tag: %d\n%s\n", 
-                rank, statRecv.MPI_SOURCE, tag, tmpBuf);
-        */
+        if(rank == 6 && statIprobe.MPI_SOURCE == 4) {
+            fprintf(stderr, "Iprobe: we received a message at rank: %d, src: %d, tag: %d\n%s\n", 
+                    rank, statRecv.MPI_SOURCE, tag, tmpBuf);
+        }
         MPI_ASSERT(statIprobe.MPI_SOURCE == statRecv.MPI_SOURCE);
         MPI_ASSERT(ret == MPI_SUCCESS);
         messagePool.addPeekedMessage(

@@ -5,7 +5,7 @@ using namespace std;
 
 MessageBuffer::MessageBuffer(
         MPI_Request *request, 
-        void *buf, 
+        void * const buf, 
         MPI_Datatype dataType,
         int count,
         int tag,
@@ -25,6 +25,8 @@ MessageBuffer::MessageBuffer(
     timestamp_(timestamp){
     if(isSend_ == false) {
         realBuf_ = malloc(sizeof(char) * msgSize);
+    } else {
+        realBuf_ = nullptr;
     }
     if(timestamp_ == ULONG_MAX) {
         fprintf(stderr, "timestamp overflow\n");
@@ -35,6 +37,10 @@ MessageBuffer::MessageBuffer(
 MessageBuffer::~MessageBuffer() {
     if(realBuf_ != nullptr) {
         free(realBuf_);
+        /*
+         * set it to nullptr to avoid double free
+         */
+        realBuf_ = nullptr;
     }
 }
 
@@ -49,7 +55,7 @@ MessagePool::~MessagePool() {
 
 void *MessagePool::addMessage(
         MPI_Request *request, 
-        void *buf, 
+        void * const buf, 
         MPI_Datatype dataType, 
         int count,
         int tag,
@@ -77,32 +83,20 @@ void *MessagePool::addMessage(
                 (char *)buf);
     }
     */
-
-    if(pool_.find(request) == pool_.end()) {
-        pool_[request] = new MessageBuffer(
-                request, 
-                buf, 
-                dataType, 
-                count, 
-                tag, 
-                comm,
-                src,
-                isSend,
-                timestamp_++);
-    } else {
-        /*
-         * clearing out the realBuf_, so that it doesn't print the garbage
-         */
-        memset(pool_[request]->realBuf_, 0, msgSize);
-        pool_[request]->buf_ = buf;
-        pool_[request]->dataType_ = dataType;
-        pool_[request]->count_ = count;
-        pool_[request]->tag_ = tag;
-        pool_[request]->comm_ = comm;
-        pool_[request]->src_ = src;
-        pool_[request]->isSend_ = isSend;
-        pool_[request]->timestamp_ = timestamp_++;
+    if(pool_.find(request) != pool_.end()) {
+        MPI_ASSERT(pool_[request]->request_ == request);
+        delete pool_[request];
     }
+    pool_[request] = new MessageBuffer(
+            request, 
+            buf, 
+            dataType, 
+            count, 
+            tag, 
+            comm,
+            src,
+            isSend,
+            timestamp_++);
     /*
     if(isSend == false && src == 1 && rank == 3) {
         fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, isSend:%d, timestamp:%lu\n", 
@@ -154,15 +148,31 @@ string MessagePool::loadMessage(
         return "";
     }
 
+    /*
+     * YUTA: this is for debugging, delete afterwards
+     */
+    string substr("25.2401");
     string msg((char *)(msgBuf->realBuf_));
+    size_t pos = msg.find(substr);
+
+    if(pos != std::string::npos) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if(rank == 4 && (msgBuf->src_ == 6 || msgBuf->src_ == MPI_ANY_SOURCE)) {
+            fprintf(stderr, "substring found, rank: %d, for request: %p, src:%d\n%s\n", 
+                    rank, 
+                    request, 
+                    msgBuf->src_,
+                    msg.c_str());
+            throw runtime_error("pos != std::string::npos");
+        }
+    }
+
     vector<string> tokens = parse(msg, '|');
     if(tokens.size() != msgBuf->count_ + 2) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
         string typeName = convertDatatype(msgBuf->dataType_); 
-        if(rank == 3 && msgBuf->src_ == 1) {
-            
-        }
         fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\nmessage: %s\n", 
                 tokens.size(), 
                 msgBuf->count_, 

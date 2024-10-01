@@ -63,57 +63,6 @@ void unsupportedDatatype(
         MPI_Datatype datatype);
 
 /*
- * this should be defined at mpirecordreplay.h
- */
-extern int (*original_MPI_Recv)(
-        void *buf, 
-        int count, 
-        MPI_Datatype datatype, 
-        int source, 
-        int tag, 
-        MPI_Comm comm, 
-        MPI_Status *status);
-
-extern int (*original_MPI_Irecv)(
-        void *buf, 
-        int count, 
-        MPI_Datatype datatype, 
-        int source, 
-        int tag, 
-        MPI_Comm comm, 
-        MPI_Request *request);
-
-extern int (*original_MPI_Wait)(
-        MPI_Request *request, 
-        MPI_Status *status);
-
-extern int (*original_MPI_Test)(
-        MPI_Request *request, 
-        int *flag, 
-        MPI_Status *status);
-
-extern int (*original_MPI_Waitall)(
-        int count, 
-        MPI_Request array_of_requests[], 
-        MPI_Status array_of_statuses[]);
-
-extern int (*original_MPI_Testall)(
-        int count, 
-        MPI_Request array_of_requests[], 
-        int *flag, 
-        MPI_Status array_of_statuses[]);
-
-extern int (*original_MPI_Testsome)(
-        int incount, 
-        MPI_Request array_of_requests[], 
-        int *outcount, 
-        int array_of_indices[], 
-        MPI_Status array_of_statuses[]);
-
-extern int (*original_MPI_Cancel)(
-        MPI_Request *request);
-
-/*
  * the function below is to abstract the message conversion
  */
 int __MPI_Recv(

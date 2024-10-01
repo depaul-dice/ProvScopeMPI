@@ -19,7 +19,7 @@ class MessageBuffer {
 public:
     MessageBuffer(
             MPI_Request *request, 
-            void *buf, /* this can be nullptr when isSend == true */ 
+            void * const buf, /* this can be nullptr when isSend == true */ 
             MPI_Datatype dataType,
             int count,
             int tag,
@@ -35,7 +35,7 @@ public:
     ~MessageBuffer();
 
     MPI_Request *request_;
-    void *buf_;
+    void * const buf_;
     void *realBuf_;
     MPI_Datatype dataType_;
     int count_;
@@ -64,7 +64,7 @@ public:
      */
     void *addMessage(
             MPI_Request *request, 
-            void *buf, 
+            void * const buf, 
             MPI_Datatype dataType, 
             int count,
             int tag,

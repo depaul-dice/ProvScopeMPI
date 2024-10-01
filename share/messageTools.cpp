@@ -126,7 +126,6 @@ void convertMsgs2Buf(
 
 }
 
-
 void unsupportedDatatype(
         int rank, 
         int lineNum, 
@@ -152,7 +151,6 @@ int __MPI_Recv(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_ASSERT(original_MPI_Recv != nullptr);
     MPI_Status localStatus;
     int ind = messagePool.peekPeekedMessage(
             source,
@@ -192,7 +190,7 @@ int __MPI_Recv(
      * update status and buf accordingly
      */
     char tmpBuffer[msgSize];
-    ret = original_MPI_Recv(
+    ret = PMPI_Recv(
             (void *)tmpBuffer, 
             msgSize, 
             MPI_CHAR, 
@@ -259,7 +257,6 @@ int __MPI_Irecv(
         MessagePool &messagePool,
         FILE *recordFile,
         unsigned long nodeCnt) {
-    MPI_ASSERT(original_MPI_Irecv != nullptr);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret;
@@ -309,7 +306,7 @@ int __MPI_Irecv(
             comm,
             source, /* this could be MPI_ANY_SOURCE */
             false /* isSend */);
-    ret = original_MPI_Irecv(
+    ret = PMPI_Irecv(
             tmpBuf, 
             msgSize, 
             MPI_CHAR /* datatype */,
@@ -337,7 +334,6 @@ int __MPI_Wait(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_ASSERT(original_MPI_Wait != nullptr);
     /*
      * Look for the message buffer information in MPI_Request
      */
@@ -383,7 +379,7 @@ int __MPI_Wait(
      * and record the information
      */
     MPI_Status stat;
-    ret = original_MPI_Wait(request, &stat);
+    ret = PMPI_Wait(request, &stat);
     if(status != MPI_STATUS_IGNORE) {
         memcpy(
                 status, 
@@ -416,7 +412,6 @@ int __MPI_Test(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_ASSERT(original_MPI_Test != nullptr);
     /*
      * first check if we have any matching peeked message
      */
@@ -466,7 +461,7 @@ int __MPI_Test(
      * and update the status and record the information
      */
     MPI_Status stat;
-    ret = original_MPI_Test(
+    ret = PMPI_Test(
             request, 
             flag, 
             &stat);
@@ -514,7 +509,6 @@ int __MPI_Waitall(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_ASSERT(original_MPI_Waitall != nullptr);
     int ret;
     /*
      * first check if we have any matching peeked message
@@ -567,7 +561,7 @@ int __MPI_Waitall(
      * and update the status and record the information
      */
     MPI_Status localStats[count];
-    ret = original_MPI_Waitall(
+    ret = PMPI_Waitall(
             count, 
             array_of_requests, 
             localStats);
@@ -608,7 +602,6 @@ int __MPI_Testall(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_ASSERT(original_MPI_Testall != nullptr);
     int ret;
     /*
      * first check if we have any matching peeked message
@@ -660,7 +653,7 @@ int __MPI_Testall(
      * and update the status and record the information
      */
     MPI_Status localStats[count];
-    ret = original_MPI_Testall(
+    ret = PMPI_Testall(
             count, 
             array_of_requests, 
             flag, 
@@ -711,7 +704,6 @@ int __MPI_Testsome(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_ASSERT(original_MPI_Testsome != nullptr);
     int ret;
     /*
      * first check if we have any matching peeked message
@@ -763,7 +755,7 @@ int __MPI_Testsome(
      * and update the status and record the information
      */
     MPI_Status localStats[incount];
-    ret = original_MPI_Testsome(
+    ret = PMPI_Testsome(
             incount, 
             array_of_requests,
             outcount,
@@ -811,9 +803,8 @@ int __MPI_Cancel(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_ASSERT(original_MPI_Cancel != nullptr);
     messagePool.deleteMessage(request);
-    int ret = original_MPI_Cancel(request);
+    int ret = PMPI_Cancel(request);
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Cancel:%d:%p:%lu\n", 
                 rank, 
