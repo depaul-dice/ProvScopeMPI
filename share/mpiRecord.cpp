@@ -51,14 +51,7 @@ int MPI_Init(
     int *argc, 
     char ***argv
 ) {
-    if(!original_MPI_Init) {
-        original_MPI_Init = reinterpret_cast<
-            int (*)(
-                    int *, 
-                    char ***)>(
-                        dlsym(RTLD_NEXT, "MPI_Init"));
-    }
-    int ret = original_MPI_Init(argc, argv);
+    int ret = PMPI_Init(argc, argv);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG("MPI_Init rank:%d\n", rank);
@@ -102,14 +95,9 @@ int MPI_Finalize(void) {
     MPI_ASSERT(recordFile != nullptr);
     fclose(recordFile);
     MPI_ASSERT(traceFile != nullptr);
-    if(!original_MPI_Finalize) {
-        original_MPI_Finalize = reinterpret_cast<
-            int (*)(void)>(
-                    dlsym(RTLD_NEXT, "MPI_Finalize"));
-    }
     fflush(traceFile);
     fclose(traceFile);
-    int ret = original_MPI_Finalize();
+    int ret = PMPI_Finalize();
     return ret;
 }
 
@@ -142,17 +130,6 @@ int MPI_Send(
     int tag, 
     MPI_Comm comm
 ) {
-    if(!original_MPI_Send) {
-        original_MPI_Send = reinterpret_cast<
-            int (*)(
-                    const void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm)>(
-                        dlsym(RTLD_NEXT, "MPI_Send"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     //DEBUG("MPI_Send:to %d, at %d\n", dest, rank);
@@ -181,7 +158,7 @@ int MPI_Send(
             rank,
             dest);
     */
-    ret = original_MPI_Send(
+    ret = PMPI_Send(
             str.c_str(), 
             str.size() + 1, 
             MPI_CHAR, 
@@ -229,18 +206,6 @@ int MPI_Isend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    if(!original_MPI_Isend) {
-        original_MPI_Isend = reinterpret_cast<
-            int (*)(
-                    const void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Isend"));
-    }
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
     
@@ -280,7 +245,7 @@ int MPI_Isend(
             str.c_str());
     */
 
-    ret = original_MPI_Isend(
+    ret = PMPI_Isend(
             (void *)str.c_str(), 
             str.size() + 1, 
             MPI_CHAR, 
@@ -735,20 +700,8 @@ int MPI_Send_init (
 ) {
     FUNCGUARD();
     int rank;
-    if(!original_MPI_Send_init) {
-        original_MPI_Send_init = reinterpret_cast<
-            int (*)(
-                    const void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Send_init"));
-    }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Send_init(
+    int ret = PMPI_Send_init(
             buf, 
             count, 
             datatype, 
@@ -782,20 +735,8 @@ int MPI_Recv_init (
     FUNCGUARD();
     int rank;
     //DEBUG0("MPI_Recv_init:%d:%p\n", source, request);
-    if(!original_MPI_Recv_init) {
-        original_MPI_Recv_init = reinterpret_cast<
-            int (*)(
-                    void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Recv_init"));
-    }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Recv_init(
+    int ret = PMPI_Recv_init(
             buf, 
             count, 
             datatype, 
@@ -823,14 +764,9 @@ int MPI_Startall (
 ) {
     FUNCGUARD();
     int rank;
-    if(!original_MPI_Startall) {
-        original_MPI_Startall = reinterpret_cast<
-            int (*)(int, MPI_Request *)>(
-                    dlsym(RTLD_NEXT, "MPI_Startall"));
-    }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     DEBUG0("MPI_Startall:%d\n", count);
-    int ret = original_MPI_Startall(
+    int ret = PMPI_Startall(
             count, array_of_requests);
     MPI_ASSERT(ret == MPI_SUCCESS);
     fprintf(recordFile, "MPI_Startall:%d:%d", 
@@ -854,14 +790,9 @@ int MPI_Request_free (
 ) {
     FUNCGUARD();
     int rank;
-    if(!original_MPI_Request_free) {
-        original_MPI_Request_free = reinterpret_cast<
-            int (*)(MPI_Request *)>(
-                    dlsym(RTLD_NEXT, "MPI_Request_free"));
-    }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_ASSERT(__requests.find(request) != __requests.end());
-    int ret = original_MPI_Request_free(request);
+    int ret = PMPI_Request_free(request);
     MPI_ASSERT(ret == MPI_SUCCESS);
     fprintf(recordFile, "MPI_Request_free:%d:%p\n", 
             rank, request);
