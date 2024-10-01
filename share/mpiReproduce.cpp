@@ -114,10 +114,7 @@ int MPI_Init(
     int *argc, 
     char ***argv
 ) {
-    if (original_MPI_Init == NULL) {
-        original_MPI_Init = (int (*)(int *, char ***)) dlsym(RTLD_NEXT, "MPI_Init");
-    }
-    int ret = original_MPI_Init(argc, argv);
+    int ret = PMPI_Init(argc, argv);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -183,10 +180,6 @@ int MPI_Init(
 
 int MPI_Finalize(
 ) {
-    if (original_MPI_Finalize == NULL) {
-        original_MPI_Finalize = (int (*)()) 
-            dlsym(RTLD_NEXT, "MPI_Finalize");
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Finalize:%d\n", rank); */
@@ -212,7 +205,7 @@ int MPI_Finalize(
     }
     // should probably delete all the elements in the recordTraces
 
-    return original_MPI_Finalize();
+    return PMPI_Finalize();
 }
 
 // in this we will just manipulate the message source when calling MPI_Recv
@@ -227,17 +220,6 @@ int MPI_Recv(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (!original_MPI_Recv) {
-        original_MPI_Recv = (int (*)(
-                    void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Status *)) dlsym(
-                        RTLD_NEXT, "MPI_Recv");
-    }
     /* DEBUG0("MPI_Recv:%s:%d\n", orders[__order_index].c_str(), __order_index); */
     bool isAligned = true;
     size_t lastInd = 0;
@@ -306,16 +288,6 @@ int MPI_Send(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (!original_MPI_Send) {
-        original_MPI_Send = (int (*)(
-                    const void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm)) dlsym(
-                        RTLD_NEXT, "MPI_Send");
-    }
     string currNodes = updateAndGetLastNodes(
             __looptrees, 
             TraceType::REPLAY);
@@ -329,7 +301,7 @@ int MPI_Send(
             __LINE__);
     ss << currNodes << '|' << size;
     string message = ss.str();
-    int ret = original_MPI_Send(
+    int ret = PMPI_Send(
             message.c_str(), 
             message.size() + 1, 
             MPI_CHAR, 
@@ -349,18 +321,6 @@ int MPI_Irecv(
     MPI_Request *request
 ) {
     /* DEBUG0("MPI_Irecv\n"); */
-    if(!original_MPI_Recv) {
-        original_MPI_Irecv = reinterpret_cast<
-            int (*)(
-                    void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Irecv"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     // I need to look into the source first
@@ -434,18 +394,6 @@ int MPI_Isend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    if(!original_MPI_Isend) {
-        original_MPI_Isend = reinterpret_cast<
-            int (*)(
-                    const void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Isend"));
-    }
     int rank;
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
@@ -466,7 +414,7 @@ int MPI_Isend(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    int ret = original_MPI_Isend(
+    int ret = PMPI_Isend(
             (void *)(message.c_str()), 
             message.size() + 1, 
             MPI_CHAR, 
@@ -528,23 +476,11 @@ int MPI_Irsend(
     DEBUG("MPI_Irsend not supported yet\n");
     MPI_Abort(MPI_COMM_WORLD, 1);
 
-    if(!original_MPI_Irsend) {
-        original_MPI_Irsend = reinterpret_cast<
-            int (*)(
-                    const void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Irsend"));
-    }
     // check if this is correct
     int rank;
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
-    int ret = original_MPI_Irsend(
+    int ret = PMPI_Irsend(
             buf, 
             count, 
             datatype, 
@@ -587,11 +523,6 @@ int MPI_Cancel(
     MPI_Request *request
 ) {
     /* DEBUG("MPI_Cancel:%p\n", request); */
-    if(!original_MPI_Cancel) {
-        original_MPI_Cancel = reinterpret_cast<
-            int (*)(MPI_Request *)>(
-                    dlsym(RTLD_NEXT, "MPI_Cancel"));
-    }
     int rank;
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
@@ -634,12 +565,6 @@ int MPI_Test(
     MPI_Status *status
 ) {
     /* DEBUG0("MPI_Test"); */
-    if(!original_MPI_Wait) {
-        original_MPI_Wait = reinterpret_cast<
-            int (*)(
-                    MPI_Request *, MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Wait"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     //DEBUG0(":%d:%p", rank, request);
@@ -718,15 +643,6 @@ int MPI_Testall (
             lastind, 
             __looptrees);
     if(!isaligned) {
-        if(original_MPI_Testall == nullptr) {
-            original_MPI_Testall = reinterpret_cast<
-                int (*)(
-                        int, 
-                        MPI_Request *, 
-                        int *, 
-                        MPI_Status *)>(
-                            dlsym(RTLD_NEXT, "MPI_Testall"));
-        }
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Testall\n", rank); */
         // don't control anything
         return __MPI_Testall(
@@ -754,14 +670,6 @@ int MPI_Testall (
     /* DEBUG0("%s\n", orders[__order_index - 1].c_str()); */
     if(msgs[3] == "SUCCESS") {
         MPI_ASSERTNALIGN(msgs.size() == 5 + 2 * count);
-        if(!original_MPI_Waitall) {
-            original_MPI_Waitall = reinterpret_cast<
-                int (*)(
-                        int, 
-                        MPI_Request *, 
-                        MPI_Status *)>(
-                            dlsym(RTLD_NEXT, "MPI_Waitall"));
-        }
         int ret;
         MPI_Status stats[count];
         /* while(!flag) { */
@@ -822,16 +730,6 @@ int MPI_Testsome(
             __looptrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Testsome\n", myrank); */
-        if(original_MPI_Testsome == nullptr) {
-            original_MPI_Testsome = reinterpret_cast<
-                int (*)(
-                        int, 
-                        MPI_Request *, 
-                        int *, 
-                        int *, 
-                        MPI_Status *)>(
-                            dlsym(RTLD_NEXT, "MPI_Testsome"));
-        }
         // don't control anything
         return __MPI_Testsome(
                 incount, 
@@ -865,12 +763,6 @@ int MPI_Testsome(
         /* } */
         /* DEBUG("\n"); */
 #endif
-        if(!original_MPI_Wait) {
-            original_MPI_Wait = reinterpret_cast<
-                int (*)(
-                        MPI_Request *, MPI_Status *)>(
-                            dlsym(RTLD_NEXT, "MPI_Wait"));
-        }
         MPI_Request *req;
         int ind, ret, src;
         MPI_Status stat;
@@ -914,12 +806,6 @@ int MPI_Wait(
 ) {
     FUNCGUARD();
     /* DEBUG0("MPI_Wait\n"); */
-    if(!original_MPI_Wait) {
-        original_MPI_Wait = reinterpret_cast<
-            int (*)(
-                    MPI_Request *, MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Wait"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     bool isaligned = true;
@@ -972,12 +858,6 @@ int MPI_Waitany(
     /* for(int i = 0; i < count; i++) { */
     /*     DEBUG(":%p", &array_of_requests[i]); */
     /* } */
-    if(!original_MPI_Wait) {
-        original_MPI_Wait = reinterpret_cast<
-            int (*)(
-                    MPI_Request *, MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Wait"));
-    }
     int rank;
     int ret = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -990,17 +870,8 @@ int MPI_Waitany(
             __looptrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitany\n", rank); */
-        if(original_MPI_Waitany == nullptr) {
-            original_MPI_Waitany = reinterpret_cast<
-                int (*)(
-                        int, 
-                        MPI_Request *, 
-                        int *, 
-                        MPI_Status *)>(
-                            dlsym(RTLD_NEXT, "MPI_Waitany"));
-        }
         // don't control anything
-        return original_MPI_Waitany(
+        return PMPI_Waitany(
                 count, 
                 array_of_requests, 
                 index, 
@@ -1035,14 +906,6 @@ int MPI_Waitall(
     MPI_Request array_of_requests[], 
     MPI_Status array_of_statuses[]
 ) {
-    if(!original_MPI_Waitall) {
-        original_MPI_Waitall = reinterpret_cast<
-            int (*)(
-                    int, 
-                    MPI_Request *, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Waitall"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG0("MPI_Waitall:%s\n", orders[__order_index].c_str()); */
@@ -1109,15 +972,6 @@ int MPI_Probe (
 ) {
     FUNCGUARD();
     /* DEBUG0("MPI_Probe\n"); */
-    if(!original_MPI_Probe) {
-        original_MPI_Probe = reinterpret_cast<
-            int (*)(
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Probe"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     bool isaligned = true;
@@ -1130,7 +984,7 @@ int MPI_Probe (
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Probe\n", rank); */
         // don't control anything
-        return original_MPI_Probe(
+        return PMPI_Probe(
                 source, 
                 tag, 
                 comm, 
@@ -1150,7 +1004,7 @@ int MPI_Probe (
     if(source == MPI_ANY_SOURCE) {
         source = stoi(msgs[4]);
     }
-    int ret = original_MPI_Probe(
+    int ret = PMPI_Probe(
             source, 
             tag, 
             comm, 
@@ -1176,15 +1030,6 @@ int MPI_Iprobe (
     MPI_Status *status
 ) {
     FUNCGUARD();
-    if(!original_MPI_Probe) {
-        original_MPI_Probe = reinterpret_cast<
-            int (*)(
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Status *)>(
-                        dlsym(RTLD_NEXT, "MPI_Probe"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     bool isaligned = true;
@@ -1196,18 +1041,8 @@ int MPI_Iprobe (
             __looptrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Iprobe\n", rank); */
-        if(!original_MPI_Iprobe) {
-            original_MPI_Iprobe = reinterpret_cast<
-                int (*)(
-                        int, 
-                        int, 
-                        MPI_Comm, 
-                        int *, 
-                        MPI_Status *)>(
-                            dlsym(RTLD_NEXT, "MPI_Iprobe"));
-        }
         // don't control anything
-        return original_MPI_Iprobe(
+        return PMPI_Iprobe(
                 source, 
                 tag, 
                 comm, 
@@ -1225,21 +1060,12 @@ int MPI_Iprobe (
     MPI_ASSERTNALIGN(stoi(msgs[3]) == tag);
     int ret;
     if(msgs[4] == "SUCCESS") {
-        if(!original_MPI_Probe) {
-                original_MPI_Probe = reinterpret_cast<
-                    int (*)(
-                            int, 
-                            int, 
-                            MPI_Comm, 
-                            MPI_Status *)>(
-                                dlsym(RTLD_NEXT, "MPI_Probe"));
-        }
         *flag = 1;
         MPI_Status stat;
         if(source == MPI_ANY_SOURCE) {
             source = stoi(msgs[5]);
         }
-        ret = original_MPI_Probe(
+        ret = PMPI_Probe(
                 source, 
                 tag, 
                 comm, 
@@ -1272,18 +1098,6 @@ int MPI_Send_init (
 ) {
     FUNCGUARD();
     DEBUG0("MPI_Send_init\n");
-    if(!original_MPI_Send_init) {
-        original_MPI_Send_init = reinterpret_cast<
-            int (*)(
-                    const void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Send_init"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
@@ -1298,7 +1112,7 @@ int MPI_Send_init (
     /* MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end()); */ 
     __requests[msgs[3]] = request;
     __isends.insert(request);
-    int ret = original_MPI_Send_init(
+    int ret = PMPI_Send_init(
             buf, 
             count, 
             datatype, 
@@ -1321,18 +1135,6 @@ int MPI_Recv_init (
 ) {
     FUNCGUARD();
     DEBUG0("MPI_Recv_init\n");
-    if(!original_MPI_Recv_init) {
-        original_MPI_Recv_init = reinterpret_cast<
-            int (*)(
-                    void *, 
-                    int, 
-                    MPI_Datatype, 
-                    int, 
-                    int, 
-                    MPI_Comm, 
-                    MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Recv_init"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
@@ -1353,7 +1155,7 @@ int MPI_Recv_init (
                 msgs[3]);
         MPI_ASSERTNALIGN(source != -1);
     }
-    int ret = original_MPI_Recv_init(
+    int ret = PMPI_Recv_init(
             buf, 
             count, 
             datatype, 
@@ -1371,12 +1173,6 @@ int MPI_Startall (
 ) {
     FUNCGUARD();
     DEBUG0("MPI_Startall\n");
-    if(!original_MPI_Startall) {
-        original_MPI_Startall = reinterpret_cast<
-            int (*)(
-                    int, MPI_Request *)>(
-                        dlsym(RTLD_NEXT, "MPI_Startall"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     vector<string> msgs = parse(orders[__order_index++], ':');
@@ -1387,7 +1183,7 @@ int MPI_Startall (
         MPI_ASSERTNALIGN(__requests.find(msgs[3 + i]) != __requests.end());
         MPI_ASSERTNALIGN(__requests[msgs[3 + i]] == &array_of_requests[i]);
     }
-    int ret = original_MPI_Startall(
+    int ret = PMPI_Startall(
             count, array_of_requests);
     MPI_ASSERT(ret == MPI_SUCCESS);
     return ret;
@@ -1398,11 +1194,6 @@ int MPI_Request_free (
 ) {
     FUNCGUARD();
     DEBUG0("MPI_Request_free:%p\n", request);
-    if(!original_MPI_Request_free) {
-        original_MPI_Request_free = reinterpret_cast<
-            int (*)(MPI_Request *)>(
-                    dlsym(RTLD_NEXT, "MPI_Request_free"));
-    }
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     vector<string> msgs = parse(
@@ -1411,7 +1202,7 @@ int MPI_Request_free (
     MPI_ASSERT(stoi(msgs[1]) == rank);
     MPI_ASSERT(__requests.find(msgs[2]) != __requests.end());
     MPI_ASSERT(__requests[msgs[2]] == request);
-    int ret = original_MPI_Request_free(request);
+    int ret = PMPI_Request_free(request);
     MPI_ASSERT(ret == MPI_SUCCESS);
     __requests.erase(msgs[2]);
     if(__isends.find(request) != __isends.end()) {
@@ -1427,12 +1218,7 @@ int MPI_Barrier(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG0("MPI_Barrier Called:%d\n", rank); */
-    if(!original_MPI_Barrier) {
-        original_MPI_Barrier = reinterpret_cast<
-            int (*)(MPI_Comm)>(
-                    dlsym(RTLD_NEXT, "MPI_Barrier"));
-    }
-    int ret = original_MPI_Barrier(comm);
+    int ret = PMPI_Barrier(comm);
     MPI_ASSERT(ret == MPI_SUCCESS);
     return ret;
 }
