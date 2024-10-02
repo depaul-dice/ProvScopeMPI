@@ -65,4 +65,27 @@ TEST(MessagePoolTests, addMessageTests) {
     EXPECT_EQ(stat.MPI_TAG, 1);
     MPI_Get_count(&stat, MPI_LONG_LONG_INT, &count);
     EXPECT_EQ(count, 4);
+
+    double bufDouble [6];
+    realBuf = (char *)messagePool.addMessage(
+            &req,
+            (void *)bufDouble, 
+            MPI_DOUBLE, 
+            6,
+            2,
+            MPI_COMM_WORLD,
+            2);
+    const char *tmp3 = "1.1|2.98|35|0.05|7.89|5|location3|8";
+    strncpy(realBuf, tmp3, strlen(tmp3) + 1);
+    location = messagePool.loadMessage(
+            &req, &stat);
+    double bufDoubleExpected [6] = {1.1, 2.98, 35, 0.05, 7.89, 5};
+    for (int i = 0; i < 6; i++) {
+        EXPECT_EQ(bufDouble[i], bufDoubleExpected[i]);
+    }
+    EXPECT_EQ(location, "location3");
+    EXPECT_EQ(stat.MPI_SOURCE, 2);
+    EXPECT_EQ(stat.MPI_TAG, 2);
+    MPI_Get_count(&stat, MPI_DOUBLE, &count);
+    EXPECT_EQ(count, 6);
 }
