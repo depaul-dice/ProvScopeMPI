@@ -38,13 +38,16 @@ TEST(MessageToolTests, convertData2StringStreamTest) {
     EXPECT_EQ(ss.str(), "1|2|3|4|5|");
     auto msgs = parse(ss.str(), '|');
     EXPECT_EQ(msgs.size(), 6);
-    int bufInt2 [6];
+    int bufInt2 [4];
     convertMsgs2Buf(
             bufInt2, 
             MPI_INT, 
             5, 
             msgs);
-    for (int i = 0; i < 5; i++) {
+    /*
+     * this is only till 4 because it only converts till msgs.size() - 1
+     */
+    for (int i = 0; i < 4; i++) {
         EXPECT_EQ(bufInt1[i], bufInt2[i]);
     }
 
@@ -62,7 +65,10 @@ TEST(MessageToolTests, convertData2StringStreamTest) {
             MPI_LONG_LONG_INT, 
             5, 
             msgs);
-    for (int i = 0; i < 5; i++) {
+    /*
+     * this is only till 4 because it only converts till msgs.size() - 1
+     */
+    for (int i = 0; i < 4; i++) {
         EXPECT_EQ(bufLongLong1[i], bufLongLong2[i]);
     }
 
@@ -79,16 +85,32 @@ TEST(MessageToolTests, convertData2StringStreamTest) {
             MPI_CHAR, 
             5, 
             msgs);
-    for (int i = 0; i < 5; i++) {
+    /*
+     * this is only till 4 because it only converts till msgs.size() - 1
+     */
+    for (int i = 0; i < 4; i++) {
         EXPECT_EQ(bufChar1[i], bufChar2[i]);
     }
 
     char bufByte1 [5] = {'a', 'b', 'c', 'd', 'e'};
     ss = convertData2StringStream(
-            (void *)bufChar2, 
+            (void *)bufByte1, 
             MPI_BYTE, 
             5);
     EXPECT_EQ(ss.str(), "97|98|99|100|101|");
+    msgs = parse(ss.str(), '|');
+    char bufByte2 [5];
+    convertMsgs2Buf(
+            bufByte2, 
+            MPI_BYTE, 
+            5, 
+            msgs);
+    /*
+     * this is only till 4 because it only converts till msgs.size() - 1
+     */
+    for (int i = 0; i < 4; i++) {
+        EXPECT_EQ(bufByte1[i], bufByte2[i]);
+    }
 
     double buf5 [5] = {1.1, 2.2, 3.3, 4.4, 5.5};
     ss = convertData2StringStream(
@@ -104,7 +126,10 @@ TEST(MessageToolTests, convertData2StringStreamTest) {
             MPI_DOUBLE, 
             5, 
             msgs);
-    for (int i = 0; i < 5; i++) {
+    /*
+     * this is only till 4 because it only converts till msgs.size() - 1
+     */
+    for (int i = 0; i < 4; i++) {
         EXPECT_EQ(buf5[i], buf6[i]);
     }
 }
