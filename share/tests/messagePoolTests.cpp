@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
     return ret;
 }
 
-TEST(MessagePoolTests, addMessageTests) {
+TEST(MessagePoolTests, addAndLoadMessageTests) {
     MessagePool messagePool;
     int bufInt [5];
     MPI_Request req;
@@ -27,7 +27,7 @@ TEST(MessagePoolTests, addMessageTests) {
             5 /* count */,
             0 /* tag */,
             MPI_COMM_WORLD,
-            -1);
+            -1 /* src */);
     const char *tmp = "1|2|3|4|5|location1|4";
     strncpy(realBuf, tmp, strlen(tmp) + 1);
     string location = messagePool.loadMessage(
@@ -48,10 +48,10 @@ TEST(MessagePoolTests, addMessageTests) {
             &req,
             (void *)bufLongLong, 
             MPI_LONG_LONG_INT, 
-            4,
-            1,
+            4 /* count */,
+            1 /* tag */,
             MPI_COMM_WORLD,
-            3);
+            3 /* src */);
     const char *tmp2 = "6|7|8|9|location2|8";
     strncpy(realBuf, tmp2, strlen(tmp2) + 1);
     location = messagePool.loadMessage(
@@ -71,10 +71,10 @@ TEST(MessagePoolTests, addMessageTests) {
             &req,
             (void *)bufDouble, 
             MPI_DOUBLE, 
-            6,
-            2,
+            6 /* count */,
+            2 /* tag */,
             MPI_COMM_WORLD,
-            2);
+            2 /* src */);
     const char *tmp3 = "1.1|2.98|35|0.05|7.89|5|location3|8";
     strncpy(realBuf, tmp3, strlen(tmp3) + 1);
     location = messagePool.loadMessage(
