@@ -30,15 +30,21 @@ TEST(MessagePoolTests, addMessageTests) {
             -1);
     const char *tmp = "1|2|3|4|5|location1|4";
     strncpy(realBuf, tmp, strlen(tmp) + 1);
-    mp.loadMessage(
+    string location = mp.loadMessage(
             &req, &stat);
     int bufIntExpected [5] = {1, 2, 3, 4, 5};
     for (int i = 0; i < 5; i++) {
         EXPECT_EQ(bufInt[i], bufIntExpected[i]);
     }
+    EXPECT_EQ(location, "location1");
+    EXPECT_EQ(stat.MPI_SOURCE, -1);
+    EXPECT_EQ(stat.MPI_TAG, 0);
+    int count;
+    MPI_Get_count(&stat, MPI_INT, &count);
+    EXPECT_EQ(count, 5);
 
     /*
-    long long int bufLongLong1 [5] = {6, 7, 8, 9, 10};
+    long long int bufLongLong [5];
     mp.addMessage(
             (void *)bufLongLong1, 
             MPI_LONG_LONG_INT, 
