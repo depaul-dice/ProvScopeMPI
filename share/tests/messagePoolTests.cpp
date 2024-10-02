@@ -15,12 +15,12 @@ int main(int argc, char **argv) {
 }
 
 TEST(MessagePoolTests, addMessageTests) {
-    MessagePool mp;
+    MessagePool messagePool;
     int bufInt [5];
     MPI_Request req;
     MPI_Status stat;
     char *realBuf;
-    realBuf = (char *)mp.addMessage(
+    realBuf = (char *)messagePool.addMessage(
             &req,
             (void *)bufInt, 
             MPI_INT, 
@@ -30,7 +30,7 @@ TEST(MessagePoolTests, addMessageTests) {
             -1);
     const char *tmp = "1|2|3|4|5|location1|4";
     strncpy(realBuf, tmp, strlen(tmp) + 1);
-    string location = mp.loadMessage(
+    string location = messagePool.loadMessage(
             &req, &stat);
     int bufIntExpected [5] = {1, 2, 3, 4, 5};
     for (int i = 0; i < 5; i++) {
@@ -43,20 +43,26 @@ TEST(MessagePoolTests, addMessageTests) {
     MPI_Get_count(&stat, MPI_INT, &count);
     EXPECT_EQ(count, 5);
 
-    /*
-    long long int bufLongLong [5];
-    mp.addMessage(
-            (void *)bufLongLong1, 
+    long long int bufLongLong [4];
+    realBuf = (char *)messagePool.addMessage(
+            &req,
+            (void *)bufLongLong, 
             MPI_LONG_LONG_INT, 
-            5);
-    EXPECT_EQ(mp.size(), 2);
-    long long int bufLongLong2 [4];
-    mp.getMessage(
-            (void *)bufLongLong2, 
-            MPI_LONG_LONG_INT, 
-            5);
+            4,
+            1,
+            MPI_COMM_WORLD,
+            3);
+    const char *tmp2 = "6|7|8|9|location2|8";
+    strncpy(realBuf, tmp2, strlen(tmp2) + 1);
+    location = messagePool.loadMessage(
+            &req, &stat);
+    long long int bufLongLongExpected [4] = {6, 7, 8, 9};
     for (int i = 0; i < 4; i++) {
-        EXPECT_EQ(bufLongLong1[i], bufLongLong2[i]);
+        EXPECT_EQ(bufLongLong[i], bufLongLongExpected[i]);
     }
-    */
+    EXPECT_EQ(location, "location2");
+    EXPECT_EQ(stat.MPI_SOURCE, 3);
+    EXPECT_EQ(stat.MPI_TAG, 1);
+    MPI_Get_count(&stat, MPI_LONG_LONG_INT, &count);
+    EXPECT_EQ(count, 4);
 }
