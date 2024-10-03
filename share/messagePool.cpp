@@ -131,9 +131,9 @@ MessageBuffer *MessagePool::peekMessage(
 
 string MessagePool::loadMessage(
         MPI_Request *request, MPI_Status *status) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(pool_.find(request) == pool_.end()) {
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         fprintf(stderr, "message not found for request at loadMessage: %p \
                 at rank: %d\n", 
                 request, rank);
@@ -148,67 +148,34 @@ string MessagePool::loadMessage(
         return "";
     }
 
-    /*
-     * YUTA: this is for debugging, delete afterwards
-     */
-    string substr("25.2401");
     string msg((char *)(msgBuf->realBuf_));
-    size_t pos = msg.find(substr);
-
-    if(pos != std::string::npos) {
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        if(rank == 4 && (msgBuf->src_ == 6 || msgBuf->src_ == MPI_ANY_SOURCE)) {
-            fprintf(stderr, "substring found, rank: %d, for request: %p, src:%d\n%s\n", 
-                    rank, 
-                    request, 
-                    msgBuf->src_,
-                    msg.c_str());
-            throw runtime_error("pos != std::string::npos");
-        }
-    }
-
     vector<string> tokens = parse(msg, '|');
     if(tokens.size() != msgBuf->count_ + 2) {
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
         string typeName = convertDatatype(msgBuf->dataType_); 
-        fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\nmessage: %s\n", 
+        fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\n", 
                 tokens.size(), 
                 msgBuf->count_, 
                 msgBuf->isSend_,
                 typeName.c_str(),
                 rank, 
                 request,
-                msgBuf->src_,
-                msg.c_str());
+                msgBuf->src_);
+        if(rank == 4 and msgBuf->src_ == 6) {
+            fprintf(stderr, "message: %s\n", msg.c_str());
+        }
         throw runtime_error("tokens.size() != msgBuf->count_ + 2");
     }
     int size;
     MPI_Type_size(msgBuf->dataType_, &size);
     MPI_ASSERT(stoi(tokens.back()) == size);
-    if(msgBuf->dataType_ == MPI_INT) {
-        for(int i = 0; i < msgBuf->count_; i++) {
-            ((int *)(msgBuf->buf_))[i] = stoi(tokens[i]);
-        }
-    } else if(msgBuf->dataType_ == MPI_CHAR
-            || msgBuf->dataType_ == MPI_BYTE) {
-        for(int i = 0; i < msgBuf->count_; i++) {
-            ((char *)(msgBuf->buf_))[i] = (char)stoi(tokens[i]);
-        }
-    } else if(msgBuf->dataType_ == MPI_DOUBLE) {
-        for(int i = 0; i < msgBuf->count_; i++) {
-            ((double *)(msgBuf->buf_))[i] = stod(tokens[i]);
-        }
-    } else if(msgBuf->dataType_ == MPI_LONG_LONG_INT) {
-        for(int i = 0; i < msgBuf->count_; i++) {
-            ((long long int *)(msgBuf->buf_))[i] = stoll(tokens[i]);
-        }
-    } else {
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        unsupportedDatatype(rank, __LINE__, msgBuf->dataType_);
-    }
+
+    convertMsgs2Buf(
+            msgBuf->buf_, 
+            msgBuf->dataType_, 
+            msgBuf->count_, 
+            tokens,
+            __LINE__,
+            rank);
     if(status != MPI_STATUS_IGNORE) {
         status->MPI_SOURCE = msgBuf->src_;
         status->MPI_TAG = msgBuf->tag_;

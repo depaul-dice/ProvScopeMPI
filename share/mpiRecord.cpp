@@ -221,6 +221,7 @@ int MPI_Isend(
             __LINE__);
     ss << lastNodes << '|' << size;
     string str = ss.str();
+    /*
     if(rank == 6 && dest == 4 && datatype == MPI_DOUBLE && tag == 0) {
         fprintf(stderr, "CAUGHT! sending message at MPI_Isend %s, length: %lu, at rank:%d to dest: %d, request: %p\n", 
                 str.c_str(), 
@@ -229,6 +230,7 @@ int MPI_Isend(
                 dest,
                 request);
     }
+    */
 
     if(str.size() + 1 >= msgSize) {
         fprintf(stderr, "message size is too large, length: %lu\n%s\n", 
@@ -476,10 +478,9 @@ int MPI_Waitall(
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         string localLastNodes = updateAndGetLastNodes(
                 loopTrees, TraceType::RECORD);
-        fprintf(stderr, "exception caught at %s\nrank: %d\nlastNodes:%s\n", 
+        fprintf(stderr, "exception caught at %s\nrank: %d\n", 
                 __func__,
-                rank, 
-                localLastNodes.c_str());
+                rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     return ret;
@@ -641,10 +642,12 @@ int MPI_Iprobe (
                 tag, 
                 comm, 
                 &statRecv);
+        /*
         if(rank == 6 && statIprobe.MPI_SOURCE == 4) {
             fprintf(stderr, "Iprobe: we received a message at rank: %d, src: %d, tag: %d\n%s\n", 
                     rank, statRecv.MPI_SOURCE, tag, tmpBuf);
         }
+        */
         MPI_ASSERT(statIprobe.MPI_SOURCE == statRecv.MPI_SOURCE);
         MPI_ASSERT(ret == MPI_SUCCESS);
         messagePool.addPeekedMessage(
