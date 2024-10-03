@@ -151,6 +151,7 @@ TEST(MessageToolTests, __MPI_RecvTest) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MessagePool messagePool;
+    MPI_Status status;
     if (rank == 0) {
         int bufInt [5] = {1, 2, 3, 4, 5};
         __MPI_Send(
@@ -169,11 +170,80 @@ TEST(MessageToolTests, __MPI_RecvTest) {
                 0, 
                 0, 
                 MPI_COMM_WORLD,
-                MPI_STATUS_IGNORE,
+                &status,
                 messagePool);
         for (int i = 0; i < 5; i++) {
             EXPECT_EQ(bufInt[i], i + 1);
         }
+        EXPECT_EQ(status.MPI_SOURCE, 0);
+        EXPECT_EQ(status.MPI_TAG, 0);
+        EXPECT_EQ(status.MPI_ERROR, MPI_SUCCESS);
+        int count;
+        MPI_Get_count(&status, MPI_INT, &count);
+        EXPECT_EQ(count, 5);
+    }
+
+    if(rank == 0) {
+        char bufChar [5] = {0, 1, 2, 3, 4};
+        __MPI_Send(
+                bufChar, 
+                5,
+                MPI_CHAR, 
+                1, 
+                0, 
+                MPI_COMM_WORLD);
+    } else if (rank == 1) {
+        char bufChar [5];
+        __MPI_Recv(
+                bufChar, 
+                5, 
+                MPI_CHAR, 
+                0, 
+                0, 
+                MPI_COMM_WORLD,
+                &status,
+                messagePool);
+        for (int i = 0; i < 5; i++) {
+            EXPECT_EQ(bufChar[i], i);
+        }
+        EXPECT_EQ(status.MPI_SOURCE, 0);
+        EXPECT_EQ(status.MPI_TAG, 0);
+        EXPECT_EQ(status.MPI_ERROR, MPI_SUCCESS);
+        int count;
+        MPI_Get_count(&status, MPI_CHAR, &count);
+        EXPECT_EQ(count, 5);
+    }
+
+    if(rank == 0) {
+        double bufDouble [6] = {1.1, 2.2, 3.3, 4.4, 5.5, 6.6};
+        __MPI_Send(
+                bufDouble, 
+                6,
+                MPI_DOUBLE, 
+                1, 
+                0, 
+                MPI_COMM_WORLD);
+    } else if (rank == 1) {
+        double bufDouble [6];
+        __MPI_Recv(
+                bufDouble, 
+                6, 
+                MPI_DOUBLE, 
+                0, 
+                0, 
+                MPI_COMM_WORLD,
+                &status,
+                messagePool);
+        const double epsilon = 1e-9;
+        for (int i = 0; i < 6; i++) {
+            EXPECT_NEAR(bufDouble[i], (i + 1) * 1.1, epsilon);
+        }
+        EXPECT_EQ(status.MPI_SOURCE, 0);
+        EXPECT_EQ(status.MPI_TAG, 0);
+        EXPECT_EQ(status.MPI_ERROR, MPI_SUCCESS);
+        int count;
+        MPI_Get_count(&status, MPI_DOUBLE, &count);
+        EXPECT_EQ(count, 6);
     }
 }
 
