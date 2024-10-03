@@ -1,5 +1,6 @@
 
 #include "../messageTools.h"
+#include "testTools.h"
 
 #include <mpi.h>
 #include <gtest/gtest.h>
@@ -15,6 +16,12 @@ int main(int argc, char **argv) {
 }
 
 TEST(MessageToolTests, convertDatatypeTest) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(rank != 0) {
+        return;
+    }
+
     EXPECT_EQ(convertDatatype(MPI_INT), "MPI_INT");
     EXPECT_EQ(convertDatatype(MPI_CHAR), "MPI_CHAR");
     EXPECT_EQ(convertDatatype(MPI_DOUBLE), "MPI_DOUBLE");
@@ -30,6 +37,12 @@ TEST(MessageToolTests, convertDatatypeTest) {
 }
 
 TEST(MessageToolTests, convertData2StringStreamTest) {
+    int rank; 
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(rank != 0) {
+        return;
+    }
+
     int bufInt1 [5] = {1, 2, 3, 4, 5};
     stringstream ss = convertData2StringStream(
             (void *)bufInt1, 
@@ -133,3 +146,35 @@ TEST(MessageToolTests, convertData2StringStreamTest) {
         EXPECT_EQ(buf5[i], buf6[i]);
     }
 }
+
+TEST(MessageToolTests, __MPI_RecvTest) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MessagePool messagePool;
+    if (rank == 0) {
+        int bufInt [5] = {1, 2, 3, 4, 5};
+        __MPI_Send(
+                bufInt, 
+                5,
+                MPI_INT, 
+                1, 
+                0, 
+                MPI_COMM_WORLD);
+    } else if (rank == 1) {
+        int bufInt [5];
+        __MPI_Recv(
+                bufInt, 
+                5, 
+                MPI_INT, 
+                0, 
+                0, 
+                MPI_COMM_WORLD,
+                MPI_STATUS_IGNORE,
+                messagePool);
+        for (int i = 0; i < 5; i++) {
+            EXPECT_EQ(bufInt[i], i + 1);
+        }
+    }
+}
+
+
