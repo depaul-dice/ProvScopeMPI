@@ -2,6 +2,8 @@
 #include <mpi.h>
 #include <gtest/gtest.h>
 
+#include <iostream>
+
 #include "../messagePool.h"
 
 using namespace std;
@@ -16,6 +18,10 @@ int main(int argc, char **argv) {
 
 TEST(MessagePoolTests, addAndLoadMessageTests) {
     MessagePool messagePool;
+
+    /*
+     * let's work with message of int first
+     */
     int bufInt [5];
     MPI_Request req;
     MPI_Status stat;
@@ -28,6 +34,20 @@ TEST(MessagePoolTests, addAndLoadMessageTests) {
             0 /* tag */,
             MPI_COMM_WORLD,
             -1 /* src */);
+
+    /* let's peek the message */
+    MessageBuffer *msgBuf = messagePool.peekMessage(&req);
+    EXPECT_EQ(msgBuf->request_, &req);
+    EXPECT_EQ(msgBuf->buf_, (void *)bufInt);
+    EXPECT_EQ(msgBuf->realBuf_, realBuf);
+    EXPECT_EQ(msgBuf->dataType_, MPI_INT);
+    EXPECT_EQ(msgBuf->count_, 5);
+    EXPECT_EQ(msgBuf->tag_, 0);
+    EXPECT_EQ(msgBuf->comm_, MPI_COMM_WORLD);
+    EXPECT_EQ(msgBuf->src_, -1);
+    EXPECT_EQ(msgBuf->isSend_, false);
+    EXPECT_EQ(msgBuf->timestamp_, 0);
+
     const char *tmp = "1|2|3|4|5|location1|4";
     strncpy(realBuf, tmp, strlen(tmp) + 1);
     string location = messagePool.loadMessage(
@@ -43,6 +63,9 @@ TEST(MessagePoolTests, addAndLoadMessageTests) {
     MPI_Get_count(&stat, MPI_INT, &count);
     EXPECT_EQ(count, 5);
 
+    /*
+     * now let's try long long int message
+     */
     long long int bufLongLong [4];
     realBuf = (char *)messagePool.addMessage(
             &req,
@@ -52,6 +75,17 @@ TEST(MessagePoolTests, addAndLoadMessageTests) {
             1 /* tag */,
             MPI_COMM_WORLD,
             3 /* src */);
+    msgBuf = messagePool.peekMessage(&req);
+    EXPECT_EQ(msgBuf->request_, &req);
+    EXPECT_EQ(msgBuf->realBuf_, realBuf);
+    EXPECT_EQ(msgBuf->dataType_, MPI_LONG_LONG_INT);
+    EXPECT_EQ(msgBuf->count_, 4);
+    EXPECT_EQ(msgBuf->tag_, 1);
+    EXPECT_EQ(msgBuf->comm_, MPI_COMM_WORLD);
+    EXPECT_EQ(msgBuf->src_, 3);
+    EXPECT_EQ(msgBuf->isSend_, false);
+    EXPECT_EQ(msgBuf->timestamp_, 1);
+
     const char *tmp2 = "6|7|8|9|location2|8";
     strncpy(realBuf, tmp2, strlen(tmp2) + 1);
     location = messagePool.loadMessage(
@@ -66,6 +100,9 @@ TEST(MessagePoolTests, addAndLoadMessageTests) {
     MPI_Get_count(&stat, MPI_LONG_LONG_INT, &count);
     EXPECT_EQ(count, 4);
 
+    /*
+     * finally let's try double message
+     */
     double bufDouble [6];
     realBuf = (char *)messagePool.addMessage(
             &req,
@@ -75,6 +112,17 @@ TEST(MessagePoolTests, addAndLoadMessageTests) {
             2 /* tag */,
             MPI_COMM_WORLD,
             2 /* src */);
+    msgBuf = messagePool.peekMessage(&req);
+    EXPECT_EQ(msgBuf->request_, &req);
+    EXPECT_EQ(msgBuf->realBuf_, realBuf);
+    EXPECT_EQ(msgBuf->dataType_, MPI_DOUBLE);
+    EXPECT_EQ(msgBuf->count_, 6);
+    EXPECT_EQ(msgBuf->tag_, 2);
+    EXPECT_EQ(msgBuf->comm_, MPI_COMM_WORLD);
+    EXPECT_EQ(msgBuf->src_, 2);
+    EXPECT_EQ(msgBuf->isSend_, false);
+    EXPECT_EQ(msgBuf->timestamp_, 2);
+
     const char *tmp3 = "1.1|2.98|35|0.05|7.89|5|location3|8";
     strncpy(realBuf, tmp3, strlen(tmp3) + 1);
     location = messagePool.loadMessage(
@@ -89,3 +137,4 @@ TEST(MessagePoolTests, addAndLoadMessageTests) {
     MPI_Get_count(&stat, MPI_DOUBLE, &count);
     EXPECT_EQ(count, 6);
 }
+
