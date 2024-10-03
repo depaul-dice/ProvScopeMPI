@@ -1,6 +1,6 @@
 
 #include "../messageTools.h"
-#include "testTools.h"
+#include "testUtils.h"
 
 #include <mpi.h>
 #include <gtest/gtest.h>
