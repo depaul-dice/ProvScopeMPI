@@ -42,7 +42,7 @@ std::stringstream convertData2StringStream(
         const void *data, 
         MPI_Datatype datatype, 
         int count,
-        int lineNum);
+        int lineNum = -1);
 
 /*
  * lineNum and rank is for unsupportedDatatype function
@@ -54,8 +54,8 @@ void convertMsgs2Buf(
         MPI_Datatype datatype, 
         int count,
         std::vector<std::string>& msgs, 
-        int lineNum,
-        int rank);
+        int lineNum = -1,
+        int rank = -1);
 
 void unsupportedDatatype(
         int rank, 

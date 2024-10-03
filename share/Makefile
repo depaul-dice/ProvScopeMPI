@@ -1,7 +1,7 @@
 
 .PHONY: clean all
 # SHARED_LIB = libmpirecord.so libmpireplay.so libmpireproduce.so
-SHARED_LIB = libmpirecord.so libmpireproduce.so libmpireplay.so
+SHARED_LIB = libmpirecord.so libmpireproduce.so 
 STD = -std=c++20
 LD_FLAGS = -ldl
 LD_FLAGS_LT = -ldl -lcgraph -lgvc

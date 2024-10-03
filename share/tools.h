@@ -57,7 +57,7 @@ void close_debugfile();
 /* void DEBUG(const char* format, ...); */
 
 #else
-#define DEBUG(...)
+//#define DEBUG(...)
 #define DEBUG0(...)
 #define open_debugfile()
 #define close_debugfile()
