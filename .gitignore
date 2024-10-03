@@ -42,6 +42,9 @@
 *.idb
 *.pdb
 
+# bitcodes
+*.bc
+
 # Kernel Module Compile Results
 *.mod*
 *.cmd
