@@ -379,6 +379,7 @@ int __MPI_Wait(
      * and record the information
      */
     MPI_Status stat;
+    memset(&stat, 0, sizeof(MPI_Status));
     ret = PMPI_Wait(request, &stat);
     if(status != MPI_STATUS_IGNORE) {
         memcpy(
@@ -461,6 +462,7 @@ int __MPI_Test(
      * and update the status and record the information
      */
     MPI_Status stat;
+    memset(&stat, 0, sizeof(MPI_Status));
     ret = PMPI_Test(
             request, 
             flag, 
@@ -757,6 +759,7 @@ int __MPI_Testsome(
      * and update the status and record the information
      */
     MPI_Status localStats[incount];
+    memset(localStats, 0, sizeof(MPI_Status) * incount);
     ret = PMPI_Testsome(
             incount, 
             array_of_requests,
