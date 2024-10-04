@@ -445,4 +445,45 @@ TEST(MessageToolTests, MPI_TestTest) {
         MPI_Get_count(&status, MPI_CHAR, &count);
         EXPECT_EQ(count, 5);
     }
+
+    if(rank == 0) {
+        double bufDouble [6] = {1.1, 2.2, 3.3, 4.4, 5.5, 6.6};
+        __MPI_Send(
+                bufDouble, 
+                6 /* count */,
+                MPI_DOUBLE, 
+                1 /* dest */, 
+                3000 /* tag */, 
+                MPI_COMM_WORLD);
+    } else if (rank == 1) {
+        double bufDouble [6];
+        __MPI_Irecv(
+                bufDouble, 
+                6 /* count */, 
+                MPI_DOUBLE, 
+                0 /* source */, 
+                3000 /* tag */, 
+                MPI_COMM_WORLD,
+                &request,
+                messagePool);
+        int flag = 0;
+        while (flag == 0) {
+            __MPI_Test(
+                    &request, 
+                    &flag, 
+                    &status,
+                    messagePool);
+            EXPECT_EQ(status.MPI_ERROR, MPI_SUCCESS);
+        }
+        EXPECT_EQ(flag, 1);
+        const double epsilon = 1e-9;
+        for (int i = 0; i < 6; i++) {
+            EXPECT_NEAR(bufDouble[i], (i + 1) * 1.1, epsilon);
+        }
+        EXPECT_EQ(status.MPI_SOURCE, 0);
+        EXPECT_EQ(status.MPI_TAG, 3000);
+        int count;
+        MPI_Get_count(&status, MPI_DOUBLE, &count);
+        EXPECT_EQ(count, 6);
+    }
 }
