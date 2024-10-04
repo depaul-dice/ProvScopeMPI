@@ -561,6 +561,7 @@ int __MPI_Waitall(
      * and update the status and record the information
      */
     MPI_Status localStats[count];
+    memset(localStats, 0, sizeof(MPI_Status) * count);
     ret = PMPI_Waitall(
             count, 
             array_of_requests, 
@@ -653,6 +654,7 @@ int __MPI_Testall(
      * and update the status and record the information
      */
     MPI_Status localStats[count];
+    memset(localStats, 0, sizeof(MPI_Status) * count);
     ret = PMPI_Testall(
             count, 
             array_of_requests, 
