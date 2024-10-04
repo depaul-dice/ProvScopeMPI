@@ -147,7 +147,7 @@ TEST(MessageToolTests, convertData2StringStreamTest) {
     }
 }
 
-TEST(MessageToolTests, __MPI_RecvTest) {
+TEST(MessageToolTests, MPI_RecvTest) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MessagePool messagePool;
@@ -247,4 +247,80 @@ TEST(MessageToolTests, __MPI_RecvTest) {
     }
 }
 
+TEST(MessageToolTests, MPI_IrecvTest) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MessagePool messagePool;
+    MPI_Status status;
+    MPI_Request request;
+    if (rank == 0) {
+        int bufInt [5] = {1, 2, 3, 4, 5};
+        __MPI_Send(
+                bufInt, 
+                5 /* count */,
+                MPI_INT, 
+                1 /* dest */, 
+                1000 /* tag */, 
+                MPI_COMM_WORLD);
+    } else if (rank == 1) {
+        int bufInt [5];
+        __MPI_Irecv(
+                bufInt, 
+                5 /* count */, 
+                MPI_INT, 
+                0 /* source */, 
+                1000 /* tag */, 
+                MPI_COMM_WORLD,
+                &request,
+                messagePool);
+        __MPI_Wait(
+                &request, 
+                &status,
+                messagePool);
+        for (int i = 0; i < 5; i++) {
+            EXPECT_EQ(bufInt[i], i + 1);
+        }
+        EXPECT_EQ(status.MPI_SOURCE, 0);
+        EXPECT_EQ(status.MPI_TAG, 1000);
+        EXPECT_EQ(status.MPI_ERROR, MPI_SUCCESS);
+        int count;
+        MPI_Get_count(&status, MPI_INT, &count);
+        EXPECT_EQ(count, 5);
+    }
+
+    if(rank == 0) {
+        char bufChar [5] = {0, 1, 2, 3, 4};
+        __MPI_Send(
+                bufChar, 
+                5 /* count */,
+                MPI_CHAR, 
+                1 /* dest */, 
+                2000 /* tag */, 
+                MPI_COMM_WORLD);
+    } else if (rank == 1) {
+        char bufChar [5];
+        __MPI_Irecv(
+                bufChar, 
+                5 /* count */, 
+                MPI_CHAR, 
+                0 /* source */, 
+                2000 /* tag */, 
+                MPI_COMM_WORLD,
+                &request,
+                messagePool);
+        __MPI_Wait(
+                &request, 
+                &status,
+                messagePool);
+        for (int i = 0; i < 5; i++) {
+            EXPECT_EQ(bufChar[i], i);
+        }
+        EXPECT_EQ(status.MPI_SOURCE, 0);
+        EXPECT_EQ(status.MPI_TAG, 2000);
+        EXPECT_EQ(status.MPI_ERROR, MPI_SUCCESS);
+        int count;
+        MPI_Get_count(&status, MPI_CHAR, &count);
+        EXPECT_EQ(count, 5);
+    }
+}
 
