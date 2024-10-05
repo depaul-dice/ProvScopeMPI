@@ -152,6 +152,12 @@ TEST(MessageToolTests, convertData2StringStreamTest) {
 TEST(MessageToolTests, MPI_RecvTest) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int size; 
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    EXPECT_GT(size, 1);
+    if (size < 2) {
+        return;
+    }
     MessagePool messagePool;
     MPI_Status status;
     if (rank == 0) {
@@ -251,6 +257,12 @@ TEST(MessageToolTests, MPI_RecvTest) {
 TEST(MessageToolTests, MPI_IrecvTest) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    EXPECT_GT(size, 1);
+    if(size < 2) {
+        return;
+    }
     MessagePool messagePool;
     MPI_Status status;
     MPI_Request request;
@@ -363,6 +375,12 @@ TEST(MessageToolTests, MPI_IrecvTest) {
 TEST(MessageToolTests, MPI_TestTest) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    EXPECT_GT(size, 1);
+    if(size < 2) {
+        return;
+    }
     MessagePool messagePool;
     MPI_Status status;
     MPI_Request request;
@@ -490,6 +508,9 @@ TEST(MessageToolTests, MPI_TestTest) {
 TEST(MessageToolTests, MPI_WaitallTest) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    EXPECT_GT(size, 1);
     MessagePool messagePool;
     if(rank == 0) {
         int bufInt [5] = {1, 2, 3, 4, 5};
@@ -581,6 +602,9 @@ TEST(MessageToolTests, MPI_WaitallTest) {
 TEST(MessageToolTests, MPI_TestallTest) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    EXPECT_GT(size, 1);
     MessagePool messagePool;
     if(rank == 0) {
         int bufInt [5] = {1, 2, 3, 4, 5};

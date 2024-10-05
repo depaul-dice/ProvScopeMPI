@@ -2,6 +2,8 @@
 
 #include <mpi.h>
 #include <string>
+#include <sstream>
+#include <iostream>
 
 #include "../messagePool.h"
 #include "../messageTools.h"

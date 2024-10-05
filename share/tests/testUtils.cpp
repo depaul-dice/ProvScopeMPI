@@ -41,7 +41,7 @@ int __MPI_Send(
     return ret;
 }
 
-int MPI_Isend(
+int __MPI_Isend(
     const void *buf, 
     int count, 
     MPI_Datatype datatype, 
