@@ -54,7 +54,7 @@ int MPI_Init(
     int ret = PMPI_Init(argc, argv);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    DEBUG("MPI_Init rank:%d\n", rank);
+    //DEBUG("MPI_Init rank:%d\n", rank);
 
     /*
      * open the message exchange record file

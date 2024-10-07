@@ -557,7 +557,7 @@ int __MPI_Waitall(
             }
         }
     }
-
+    cerr << "waitall called and no peeked message found" << endl;
     /*
      * if the peeked message is not found, then call the actual MPI_Waitall
      * and update the status and record the information

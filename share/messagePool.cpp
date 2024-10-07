@@ -143,6 +143,18 @@ string MessagePool::loadMessage(
     MPI_ASSERT(request == msgBuf->request_);
 
     if(msgBuf->isSend_) {
+        /*
+         * update the status for sends here
+         */
+        if(status != MPI_STATUS_IGNORE) {
+            status->MPI_SOURCE = msgBuf->src_;
+            status->MPI_TAG = msgBuf->tag_;
+            status->MPI_ERROR = MPI_SUCCESS;
+            int size;
+            MPI_Type_size(msgBuf->dataType_, &size);
+            status->_ucount = msgBuf->count_ * size;
+        }
+
         delete pool_[request];
         pool_.erase(request);
         return "";
@@ -152,17 +164,15 @@ string MessagePool::loadMessage(
     vector<string> tokens = parse(msg, '|');
     if(tokens.size() != msgBuf->count_ + 2) {
         string typeName = convertDatatype(msgBuf->dataType_); 
-        fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\n", 
+        fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\nmessage: %s\n", 
                 tokens.size(), 
                 msgBuf->count_, 
                 msgBuf->isSend_,
                 typeName.c_str(),
                 rank, 
                 request,
-                msgBuf->src_);
-        if(rank == 4 and msgBuf->src_ == 6) {
-            fprintf(stderr, "message: %s\n", msg.c_str());
-        }
+                msgBuf->src_,
+                msg.c_str());
         throw runtime_error("tokens.size() != msgBuf->count_ + 2");
     }
     int size;
