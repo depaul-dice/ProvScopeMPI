@@ -26,30 +26,35 @@ TEST(AMGimitateTest, IsendIrecvWaitallTests) {
     MPI_Comm_size(MPI_COMM_WORLD, &numProcs);
     EXPECT_GE(numProcs, 2);
 
-    double **sendbufs = new double*[numProcs];
-    double **recvbufs = new double*[numProcs];
+    double **sendBufs = new double*[numProcs];
+    double **recvBufs = new double*[numProcs];
+    int sendCounts [numProcs];
+    int recvCounts [numProcs];
+    vector<vector<double>> recvExpected(numProcs);
+
     /*
-     * read the files from data directory
+     * read the files from data directory to send
      */
+    vector<double> sendData;
     for (int i = 0; i < numProcs; i++) {
         if(rank == i) {
             continue;
         }
-        vector<double> data;
-        string filename = "data/data_" + to_string(rank) + "_" + to_string(i) + ".txt";
-        ifstream infile(filename);
+        sendData.clear();
+        string fileName = "data/data_" + to_string(rank) + "_" + to_string(i) + ".txt";
+        ifstream infile(fileName);
         EXPECT_FALSE(!infile);
         double value;
         while (infile >> value) {
-            data.push_back(value);
+            sendData.push_back(value);
         }
         infile.close();
-        sendbufs[i] = new double[data.size() + 1];
-        recvbufs[i] = new double[data.size()];
-        sendbufs[i][0] = data.size();
-        for (int j = 1; j < data.size() + 1; j++) {
-            sendbufs[i][j] = data[j];
+        sendBufs[i] = new double[sendData.size()];
+
+        for (int j = 0; j < sendData.size(); j++) {
+            sendBufs[i][j] = sendData[j];
         }
+        sendCounts[i] = sendData.size();
     }
     /*
     cerr << "rank " << rank << " read data done" << endl;
@@ -64,60 +69,124 @@ TEST(AMGimitateTest, IsendIrecvWaitallTests) {
         cerr << endl;
     }
     */
+
+    /*
+     * read the files from data directory to check the correctness
+     */
+    vector<double> recvData;
+    for(int i = 0; i < numProcs; i++) {
+        if(rank == i) {
+            recvCounts[i] = -1;
+            recvBufs[i] = nullptr;
+            continue;
+        }
+        recvData.clear();
+        string fileName = "data/data_" + to_string(i) + "_" + to_string(rank) + ".txt";
+        ifstream infile(fileName);
+        EXPECT_FALSE(!infile);
+        double value;
+        while (infile >> value) {
+            recvData.push_back(value);
+        }
+        infile.close();
+        recvExpected[i] = recvData;
+        recvCounts[i] = recvData.size();
+        recvBufs[i] = new double[recvData.size()];
+        memset(recvBufs[i], 0, recvData.size() * sizeof(double));
+    } 
+
     MessagePool messagePool;
     MPI_Request sendReqs[numProcs - 1];
     MPI_Request recvReqs[numProcs - 1];
-    for (int i = 0; i < numProcs; i++) {
+    int recvIerr, sendIerr;
+    for (int src = 0; src < numProcs; src++) {
         int reqIndex;
-        if(rank == i) {
+        if(rank == src) {
             continue;
         }
-        if(i < rank) {
-           reqIndex = i; 
+        if(src < rank) {
+           reqIndex = src; 
         } else {
-            reqIndex = i - 1;
+            reqIndex = src - 1;
         }
-        __MPI_Irecv(
-                recvbufs[i], 
-                sendbufs[i][0], 
+        //cerr << "at rank " << rank << " reqIndex:" << reqIndex << " for recv " << endl;
+        recvIerr = __MPI_Irecv(
+                recvBufs[src], 
+                recvCounts[src],
                 MPI_DOUBLE, 
-                i, 
+                src, 
                 0, 
                 MPI_COMM_WORLD, 
                 &recvReqs[reqIndex],
                 messagePool);
+        EXPECT_EQ(recvIerr, MPI_SUCCESS);
     }
-    for(int i = 0; i < numProcs; i++) {
+    //cerr << "Irecv done with rank " << rank << endl;
+    for(int dest = 0; dest < numProcs; dest++) {
         int reqIndex;
-        if(rank == i) {
+        if(rank == dest) {
             continue;
         }
-        if(i < rank) {
-            reqIndex = i;
+        if(dest < rank) {
+            reqIndex = dest;
         } else {
-            reqIndex = i - 1;
+            reqIndex = dest - 1;
         }
-        __MPI_Isend(
-                &sendbufs[i][1], 
-                sendbufs[i][0], 
+        //cerr << "at rank " << rank << " reqIndex:" << reqIndex << " for send " << endl;
+        sendIerr = __MPI_Isend(
+                sendBufs[dest], 
+                sendCounts[dest], 
                 MPI_DOUBLE, 
-                i, 
+                dest, 
                 0, 
                 MPI_COMM_WORLD, 
                 &sendReqs[reqIndex],
                 messagePool);
+        EXPECT_EQ(sendIerr, MPI_SUCCESS);
     }
+    //cerr << "Isend done with rank " << rank << endl;
     MPI_Status recvStatuses [numProcs - 1];
     MPI_Status sendStatuses [numProcs - 1];
-    __MPI_Waitall(
+    int waitallIerr;
+    waitallIerr = __MPI_Waitall(
             numProcs - 1, 
             sendReqs, 
             sendStatuses,
             messagePool);
-    __MPI_Waitall(
+    EXPECT_EQ(waitallIerr, MPI_SUCCESS);
+    //cerr << "Waitall send done with rank " << rank << endl;
+    waitallIerr = __MPI_Waitall(
             numProcs - 1, 
             recvReqs, 
             recvStatuses,
             messagePool);
-       
+    EXPECT_EQ(waitallIerr, MPI_SUCCESS);
+    //cerr << "Waitall recv done with rank " << rank << endl;
+    for(int i = 0; i < numProcs; i++) {
+        if(rank == i) {
+            continue;
+        }
+        for(int j = 0; j < recvCounts[i]; j++) {
+            EXPECT_DOUBLE_EQ(recvExpected[i][j], recvBufs[i][j]);
+        }
+    }
+
+    /*
+     * let's check the status
+     */
+    for(int i = 0; i < numProcs - 1; i++) {
+        EXPECT_EQ(sendStatuses[i].MPI_SOURCE, i < rank ? i : i + 1);
+        EXPECT_EQ(sendStatuses[i].MPI_TAG, 0);
+        EXPECT_EQ(sendStatuses[i].MPI_ERROR, MPI_SUCCESS);
+        EXPECT_EQ(recvStatuses[i].MPI_SOURCE, i < rank ? i : i + 1);
+        EXPECT_EQ(recvStatuses[i].MPI_TAG, 0);
+        EXPECT_EQ(recvStatuses[i].MPI_ERROR, MPI_SUCCESS);
+
+        int count;
+        MPI_Get_count(&sendStatuses[i < rank ? i : i + 1], MPI_DOUBLE, &count);
+        EXPECT_EQ(count, sendCounts[i < rank ? i : i + 1]);
+        MPI_Get_count(&recvStatuses[i < rank ? i : i + 1], MPI_DOUBLE, &count);
+        EXPECT_EQ(count, recvCounts[i < rank ? i : i + 1]);
+    }
+
 }

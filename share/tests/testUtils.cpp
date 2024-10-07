@@ -69,6 +69,7 @@ int __MPI_Isend(
                 str.length(), str.c_str());
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    //cerr << "send message: " << str << endl << rank << " -> " << dest << endl;
     string typeName = convertDatatype(datatype);
     ret = PMPI_Isend(
             (void *)str.c_str(), 
