@@ -89,6 +89,7 @@ int __MPI_Isend(
             comm, 
             dest, 
             true /* isSend */);
+    //cerr << "at isend, in add message, count was " << count << endl;
 
     return ret;
 }

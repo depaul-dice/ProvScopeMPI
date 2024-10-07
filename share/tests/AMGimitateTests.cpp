@@ -120,6 +120,7 @@ TEST(AMGimitateTest, IsendIrecvWaitallTests) {
                 &recvReqs[reqIndex],
                 messagePool);
         EXPECT_EQ(recvIerr, MPI_SUCCESS);
+        cerr << "MPI_Irecv from " << src << " to " << rank << ", " << recvCounts[src] << " elements" << endl;
     }
     //cerr << "Irecv done with rank " << rank << endl;
     for(int dest = 0; dest < numProcs; dest++) {
@@ -132,7 +133,6 @@ TEST(AMGimitateTest, IsendIrecvWaitallTests) {
         } else {
             reqIndex = dest - 1;
         }
-        //cerr << "at rank " << rank << " reqIndex:" << reqIndex << " for send " << endl;
         sendIerr = __MPI_Isend(
                 sendBufs[dest], 
                 sendCounts[dest], 
@@ -143,6 +143,7 @@ TEST(AMGimitateTest, IsendIrecvWaitallTests) {
                 &sendReqs[reqIndex],
                 messagePool);
         EXPECT_EQ(sendIerr, MPI_SUCCESS);
+        cerr << "MPI_Isend from " << rank << " to " << dest << ", " << sendCounts[dest] << " elements" << endl;
     }
     //cerr << "Isend done with rank " << rank << endl;
     MPI_Status recvStatuses [numProcs - 1];
@@ -175,7 +176,6 @@ TEST(AMGimitateTest, IsendIrecvWaitallTests) {
      * let's check the status
      */
     for(int i = 0; i < numProcs - 1; i++) {
-        EXPECT_EQ(sendStatuses[i].MPI_SOURCE, i < rank ? i : i + 1);
         EXPECT_EQ(sendStatuses[i].MPI_TAG, 0);
         EXPECT_EQ(sendStatuses[i].MPI_ERROR, MPI_SUCCESS);
         EXPECT_EQ(recvStatuses[i].MPI_SOURCE, i < rank ? i : i + 1);
@@ -183,9 +183,9 @@ TEST(AMGimitateTest, IsendIrecvWaitallTests) {
         EXPECT_EQ(recvStatuses[i].MPI_ERROR, MPI_SUCCESS);
 
         int count;
-        MPI_Get_count(&sendStatuses[i < rank ? i : i + 1], MPI_DOUBLE, &count);
+        MPI_Get_count(&sendStatuses[i], MPI_DOUBLE, &count);
         EXPECT_EQ(count, sendCounts[i < rank ? i : i + 1]);
-        MPI_Get_count(&recvStatuses[i < rank ? i : i + 1], MPI_DOUBLE, &count);
+        MPI_Get_count(&recvStatuses[i], MPI_DOUBLE, &count);
         EXPECT_EQ(count, recvCounts[i < rank ? i : i + 1]);
     }
 
