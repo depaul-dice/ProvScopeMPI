@@ -70,6 +70,12 @@ int __MPI_Isend(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     //cerr << "send message: " << str << endl << rank << " -> " << dest << endl;
+    /*
+    if(rank == 2 && dest == 0) {
+        cerr << "sending this message: " << str << endl
+            << "how long? " << str.size() + 1 << endl;
+    }
+    */
     string typeName = convertDatatype(datatype);
     ret = PMPI_Isend(
             (void *)str.c_str(), 
