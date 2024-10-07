@@ -7,8 +7,6 @@
 
 using namespace std;
 
-const double epsilon = 1e-9;
-
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
     testing::InitGoogleTest(&argc, argv);
@@ -243,7 +241,7 @@ TEST(MessageToolTests, MPI_RecvTest) {
                 &status,
                 messagePool);
         for (int i = 0; i < 6; i++) {
-            EXPECT_NEAR(bufDouble[i], (i + 1) * 1.1, epsilon);
+            EXPECT_DOUBLE_EQ(bufDouble[i], (i + 1) * 1.1);
         }
         EXPECT_EQ(status.MPI_SOURCE, 0);
         EXPECT_EQ(status.MPI_TAG, 0);
@@ -361,7 +359,7 @@ TEST(MessageToolTests, MPI_IrecvTest) {
                 &status,
                 messagePool);
         for (int i = 0; i < 6; i++) {
-            EXPECT_NEAR(bufDouble[i], (i + 1) * 1.1, epsilon);
+            EXPECT_DOUBLE_EQ(bufDouble[i], (i + 1) * 1.1);
         }
         EXPECT_EQ(status.MPI_SOURCE, 0);
         EXPECT_EQ(status.MPI_TAG, 3000);
@@ -495,7 +493,7 @@ TEST(MessageToolTests, MPI_TestTest) {
         }
         EXPECT_EQ(flag, 1);
         for (int i = 0; i < 6; i++) {
-            EXPECT_NEAR(bufDouble[i], (i + 1) * 1.1, epsilon);
+            EXPECT_DOUBLE_EQ(bufDouble[i], (i + 1) * 1.1);
         }
         EXPECT_EQ(status.MPI_SOURCE, 0);
         EXPECT_EQ(status.MPI_TAG, 3000);
@@ -580,7 +578,7 @@ TEST(MessageToolTests, MPI_WaitallTest) {
             EXPECT_EQ(bufChar[i], i);
         }
         for (int i = 0; i < 6; i++) {
-            EXPECT_NEAR(bufDouble[i], (i + 1) * 1.1, epsilon);
+            EXPECT_DOUBLE_EQ(bufDouble[i], (i + 1) * 1.1);
         }
         for (int i = 0; i < 3; i++) {
             EXPECT_EQ(statuses[i].MPI_SOURCE, 0);
@@ -682,7 +680,7 @@ TEST(MessageToolTests, MPI_TestallTest) {
             EXPECT_EQ(bufChar[i], i);
         }
         for (int i = 0; i < 6; i++) {
-            EXPECT_NEAR(bufDouble[i], (i + 1) * 1.1, epsilon);
+            EXPECT_DOUBLE_EQ(bufDouble[i], (i + 1) * 1.1);
         }
         for (int i = 0; i < 3; i++) {
             EXPECT_EQ(statuses[i].MPI_SOURCE, 0);
