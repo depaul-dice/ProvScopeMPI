@@ -77,16 +77,8 @@ int __MPI_Isend(
     }
     */
     string typeName = convertDatatype(datatype);
-    ret = PMPI_Isend(
-            (void *)str.c_str(), 
-            str.size() + 1, 
-            MPI_CHAR, 
-            dest, 
-            tag, 
-            comm, 
-            request);
 
-    messagePool.addMessage(
+    char *realBuf_ = messagePool.addMessage(
             request, 
             (void *)buf, 
             datatype, 
@@ -95,7 +87,17 @@ int __MPI_Isend(
             comm, 
             dest, 
             true /* isSend */);
+    memcpy(realBuf_, str.c_str(), str.size() + 1);
     //cerr << "at isend, in add message, count was " << count << endl;
+    
+    ret = PMPI_Isend(
+            realBuf_, 
+            str.size() + 1, 
+            MPI_CHAR, 
+            dest, 
+            tag, 
+            comm, 
+            request);
 
     return ret;
 }

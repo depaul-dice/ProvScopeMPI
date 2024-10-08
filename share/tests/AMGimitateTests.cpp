@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
     return ret;
 }
 
+
 TEST(AMGImitateTest, IsendIrecvWaitallTests) {
     int rank, numProcs;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -56,20 +57,6 @@ TEST(AMGImitateTest, IsendIrecvWaitallTests) {
         }
         sendCounts[i] = sendData.size();
     }
-    /*
-    cerr << "rank " << rank << " read data done" << endl;
-    for (int i = 0; i < size; i++) {
-        if(rank == i) {
-            continue;
-        }
-        cerr << "rank " << rank << " send to " << i << endl;
-        for(int j = 1; j < sendbufs[i][0]; j++) {
-            cerr << sendbufs[i][j] << " ";
-        }
-        cerr << endl;
-    }
-    */
-
     /*
      * read the files from data directory to check the correctness
      */
@@ -506,7 +493,7 @@ TEST(AMGImitateTest, IsendRecvWaitallTests) {
                 sendCounts[dest], 
                 MPI_DOUBLE, 
                 dest, 
-                0, 
+                0 /* tag */, 
                 MPI_COMM_WORLD, 
                 &sendReqs[reqIndex],
                 messagePool);
@@ -526,7 +513,7 @@ TEST(AMGImitateTest, IsendRecvWaitallTests) {
                 src, 
                 0, 
                 MPI_COMM_WORLD,
-                recvStatuses,
+                &recvStatuses[src < rank ? src : src - 1],
                 messagePool); 
     }
     //cerr << "Isend done with rank " << rank << endl;
