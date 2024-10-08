@@ -36,7 +36,7 @@ public:
 
     MPI_Request *request_;
     void * const buf_;
-    void *realBuf_;
+    char *realBuf_;
     MPI_Datatype dataType_;
     int count_;
     int tag_;
@@ -62,7 +62,7 @@ public:
      * it should be given MPI_Request *, buffer, datatype, and rank and convert them into a message
      * return the pointer to a message
      */
-    void *addMessage(
+    char *addMessage(
             MPI_Request *request, 
             void * const buf, 
             MPI_Datatype dataType, 
@@ -89,6 +89,19 @@ public:
             MPI_Request *request, 
             MPI_Status *status = nullptr);
     
+
+    /*
+     * checks if the request is a send request or not
+     */
+    bool isSend(
+            MPI_Request *request);
+
+    /*
+     * This function returns the real buffer of the message
+     */
+    char *getRealBuf(
+            MPI_Request *request);
+
     /*
      * This function looks into the peeked_ vector and manipulates status accordingly
      * returns -1 if not found

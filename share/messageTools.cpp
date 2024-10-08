@@ -3,7 +3,7 @@
 using namespace std;
 
 void recordMPIIprobeSuccess(
-        FILE *recordFile,
+       FILE *recordFile,
         int rank,
         int source,
         int tag,
@@ -297,7 +297,7 @@ int __MPI_Irecv(
      *  alternate the message in the original buffer
      * 5. Record the node timing
      */
-    void *tmpBuf = messagePool.addMessage(
+    char *tmpBuf = messagePool.addMessage(
             request, 
             buf, 
             datatype,
@@ -306,8 +306,10 @@ int __MPI_Irecv(
             comm,
             source, /* this could be MPI_ANY_SOURCE */
             false /* isSend */);
+    //cerr << "at addMessage in irecv, count is " << count << endl;
+    //cerr << "Irecv: rank: " << rank << ", source: " << source << ", Request *: " << request << ", realBuf_: " << static_cast<void *>(tmpBuf) << endl;
     ret = PMPI_Irecv(
-            tmpBuf, 
+            static_cast<void *>(tmpBuf),
             msgSize, 
             MPI_CHAR /* datatype */,
             source, 
@@ -557,7 +559,6 @@ int __MPI_Waitall(
             }
         }
     }
-    cerr << "waitall called and no peeked message found" << endl;
     /*
      * if the peeked message is not found, then call the actual MPI_Waitall
      * and update the status and record the information
@@ -568,6 +569,7 @@ int __MPI_Waitall(
             count, 
             array_of_requests, 
             localStats);
+
     MPI_ASSERT(ret == MPI_SUCCESS);
     string lastNodes [count];
     if(array_of_statuses != MPI_STATUSES_IGNORE) {
@@ -577,6 +579,14 @@ int __MPI_Waitall(
                 sizeof(MPI_Status) * count);
     }
     for(int i = 0; i < count; i++) {
+        /*
+        if(!messagePool.isSend(&array_of_requests[i])) {
+            DEBUG("at %s, Request *: %p, realBuf_: %p\n", 
+                    __func__, 
+                    &array_of_requests[i], 
+                    messagePool.getRealBuf(&array_of_requests[i]));
+        }
+        */
         lastNodes[i] = messagePool.loadMessage(
                 &array_of_requests[i], 
                 &array_of_statuses[i]);
@@ -675,7 +685,8 @@ int __MPI_Testall(
             string lastNodes = messagePool.loadMessage(
                     &array_of_requests[i], 
                     &array_of_statuses[i]);
-            MPI_ASSERT(lastNodes.length() > 0);
+            MPI_ASSERT(lastNodes.length() > 0 
+                    || messagePool.isSend(&array_of_requests[i]));
         }
         if(recordFile != nullptr) {
             fprintf(recordFile, "MPI_Testall:%d:%d:SUCCESS", 

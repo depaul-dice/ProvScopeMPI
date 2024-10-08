@@ -23,11 +23,7 @@ MessageBuffer::MessageBuffer(
     src_(src),
     isSend_(isSend),
     timestamp_(timestamp){
-    if(isSend_ == false) {
-        realBuf_ = malloc(sizeof(char) * msgSize);
-    } else {
-        realBuf_ = nullptr;
-    }
+    realBuf_ = static_cast<char *>(calloc(msgSize, sizeof(char)));
     if(timestamp_ == ULONG_MAX) {
         fprintf(stderr, "timestamp overflow\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -53,7 +49,7 @@ MessagePool::~MessagePool() {
     }
 }
 
-void *MessagePool::addMessage(
+char *MessagePool::addMessage(
         MPI_Request *request, 
         void * const buf, 
         MPI_Datatype dataType, 
@@ -142,7 +138,7 @@ string MessagePool::loadMessage(
     MessageBuffer *msgBuf = pool_[request];
     MPI_ASSERT(request == msgBuf->request_);
 
-    if(msgBuf->isSend_) {
+    if(msgBuf->isSend_ == true) {
         /*
          * update the status for sends here
          */
@@ -155,22 +151,23 @@ string MessagePool::loadMessage(
             status->_ucount = msgBuf->count_ * size;
         }
 
-        delete pool_[request];
-        pool_.erase(request);
         return "";
     }
 
-    string msg((char *)(msgBuf->realBuf_));
+    MPI_ASSERT(msgBuf->realBuf_ != nullptr);
+    //cerr << "msgBuf->realBuf_: " << (char *)(msgBuf->realBuf_) << endl;
+    string msg = msgBuf->realBuf_;
     vector<string> tokens = parse(msg, '|');
     if(tokens.size() != msgBuf->count_ + 2) {
         string typeName = convertDatatype(msgBuf->dataType_); 
-        fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, src: %d\nmessage: %s\n", 
+        fprintf(stderr, "at loadMessage tokens.size(): %lu, count: %d, isSend: %d, datatype: %s\nAborting at rank: %d for request: %p, realBuf: %p, src: %d\nmessage: %s\n", 
                 tokens.size(), 
                 msgBuf->count_, 
                 msgBuf->isSend_,
                 typeName.c_str(),
                 rank, 
                 request,
+                msgBuf->realBuf_,
                 msgBuf->src_,
                 msg.c_str());
         throw runtime_error("tokens.size() != msgBuf->count_ + 2");
@@ -195,7 +192,24 @@ string MessagePool::loadMessage(
         MPI_Type_size(msgBuf->dataType_, &size);
         status->_ucount = msgBuf->count_ * size;
     }
+    if(tokens[tokens.size() - 2].size() == 0) {
+        fprintf(stderr, "empty message returned: %s\n", msg.c_str());
+    }
     return tokens[tokens.size() - 2]; 
+}
+
+bool MessagePool::isSend(MPI_Request *request) {
+    if(pool_.find(request) == pool_.end()) {
+        throw runtime_error("request not found in pool_ at isSend");
+    }
+    return pool_[request]->isSend_;
+}
+
+char *MessagePool::getRealBuf(MPI_Request *request) {
+    if(pool_.find(request) == pool_.end()) {
+        throw runtime_error("request not found in pool_ at getBuf");
+    }
+    return pool_[request]->realBuf_;
 }
 
 int MessagePool::peekPeekedMessage(

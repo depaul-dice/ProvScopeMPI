@@ -247,16 +247,7 @@ int MPI_Isend(
             str.c_str());
     */
 
-    ret = PMPI_Isend(
-            (void *)str.c_str(), 
-            str.size() + 1, 
-            MPI_CHAR, 
-            dest, 
-            tag, 
-            comm, 
-            request);
-
-    messagePool.addMessage(
+    char *realBuf_ = messagePool.addMessage(
             request, 
             (void *)buf, 
             datatype, 
@@ -265,6 +256,20 @@ int MPI_Isend(
             comm, 
             dest, 
             true /* isSend */);
+
+    memcpy(
+            realBuf_, 
+            str.c_str(), 
+            str.size() + 1);
+
+    ret = PMPI_Isend(
+            (void *)realBuf_, 
+            str.size() + 1, 
+            MPI_CHAR, 
+            dest, 
+            tag, 
+            comm, 
+            request);
 
     // I just need to keep track of the request
     fprintf(recordFile, "MPI_Isend:%d:%d:%p:%lu\n", 
