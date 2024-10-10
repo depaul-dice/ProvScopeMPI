@@ -502,7 +502,7 @@ int MPI_Cancel(
             lastind, 
             __looptrees);
     if(!isaligned) {
-        DEBUG("at rank %d, the alignment was not successful at MPI_Cancel\n", rank);
+        /* DEBUG("at rank %d, the alignment was not successful at MPI_Cancel\n", rank); */
         // don't control anything
         return ret;
     }
@@ -708,9 +708,6 @@ int MPI_Testsome(
     MPI_EQUAL(msgs[0], "MPI_Testsome");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == myrank);
     int oc = stoi(msgs[2]);
-    if(msgs.size() != oc * 2 + 4) {
-        cerr << msgs << endl;
-    }
     MPI_ASSERT(msgs.size() == oc * 2 + 4);
     if(oc == 0) {
         // don't do anything
@@ -718,13 +715,6 @@ int MPI_Testsome(
         *outcount = 0;
         return MPI_SUCCESS;
     } else {
-#ifdef DEBUG_MODE
-        /* DEBUG(":%d", oc); */
-        /* for(int i = 0; i < oc; i++) { */
-            /* DEBUG(":%s:%s", msgs[3 + 2 * i].c_str(), msgs[3 + 2 * i + 1].c_str()); */
-        /* } */
-        /* DEBUG("\n"); */
-#endif
         MPI_Request *req;
         int ind, ret, src;
         MPI_Status stat;
