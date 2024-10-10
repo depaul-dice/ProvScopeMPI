@@ -17,7 +17,7 @@ int __MPI_Send(
     MPI_Comm comm,
     std::string lastNodes = "randomLocation");
 
-int __MPI_Isend(
+int __MPI_IsendTest(
     const void *buf, 
     int count, 
     MPI_Datatype datatype, 

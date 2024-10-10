@@ -41,7 +41,7 @@ int __MPI_Send(
     return ret;
 }
 
-int __MPI_Isend(
+int __MPI_IsendTest(
     const void *buf, 
     int count, 
     MPI_Datatype datatype, 
@@ -70,12 +70,6 @@ int __MPI_Isend(
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     //cerr << "send message: " << str << endl << rank << " -> " << dest << endl;
-    /*
-    if(rank == 2 && dest == 0) {
-        cerr << "sending this message: " << str << endl
-            << "how long? " << str.size() + 1 << endl;
-    }
-    */
     string typeName = convertDatatype(datatype);
 
     char *realBuf_ = messagePool.addMessage(

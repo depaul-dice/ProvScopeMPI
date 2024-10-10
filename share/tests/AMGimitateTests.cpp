@@ -120,7 +120,7 @@ TEST(AMGImitateTest, IsendIrecvWaitallTests) {
         } else {
             reqIndex = dest - 1;
         }
-        sendIerr = __MPI_Isend(
+        sendIerr = __MPI_IsendTest(
                 sendBufs[dest], 
                 sendCounts[dest], 
                 MPI_DOUBLE, 
@@ -204,7 +204,7 @@ TEST(AMGImitateTest, minimalErrorReproduceTest) {
     //cerr << sendData << endl; 
     MPI_Request req;
     if(rank == 0) {
-        __MPI_Isend(
+        __MPI_IsendTest(
                 sendData,
                 sendVec.size(),
                 MPI_DOUBLE,
@@ -341,7 +341,7 @@ TEST(AMGImitateTest, IsendIrecvTestallTests) {
         } else {
             reqIndex = dest - 1;
         }
-        sendIerr = __MPI_Isend(
+        sendIerr = __MPI_IsendTest(
                 sendBufs[dest], 
                 sendCounts[dest], 
                 MPI_DOUBLE, 
@@ -488,7 +488,7 @@ TEST(AMGImitateTest, IsendRecvWaitallTests) {
         } else {
             reqIndex = dest - 1;
         }
-        sendIerr = __MPI_Isend(
+        sendIerr = __MPI_IsendTest(
                 sendBufs[dest], 
                 sendCounts[dest], 
                 MPI_DOUBLE, 
