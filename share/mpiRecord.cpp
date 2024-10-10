@@ -206,76 +206,23 @@ int MPI_Isend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int size;
-    MPI_Type_size(datatype, &size);
-    int ret = 0;
-    stringstream ss = convertData2StringStream(
-            buf, 
-            datatype, 
-            count, 
-            __LINE__);
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
-    ss << lastNodes << '|' << size;
-    string str = ss.str();
-    /*
-    if(rank == 6 && dest == 4 && datatype == MPI_DOUBLE && tag == 0) {
-        fprintf(stderr, "CAUGHT! sending message at MPI_Isend %s, length: %lu, at rank:%d to dest: %d, request: %p\n", 
-                str.c_str(), 
-                str.size(),
-                rank,
-                dest,
-                request);
-    }
-    */
 
-    if(str.size() + 1 >= msgSize) {
-        fprintf(stderr, "message size is too large, length: %lu\n%s\n", 
-                str.length(), str.c_str());
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-    string typeName = convertDatatype(datatype);
-    /*
-    DEBUG("MPI_ISend:to %d, at %d, datatype: %s, count: %d, msg: %s\n", 
-            dest, 
-            rank, 
-            typeName.c_str(), 
+    int ret = __MPI_Isend(
+            buf, 
             count, 
-            str.c_str());
-    */
-
-    char *realBuf_ = messagePool.addMessage(
-            request, 
-            (void *)buf, 
             datatype, 
-            count, 
-            tag, 
-            comm, 
-            dest, 
-            true /* isSend */);
-
-    memcpy(
-            realBuf_, 
-            str.c_str(), 
-            str.size() + 1);
-
-    ret = PMPI_Isend(
-            (void *)realBuf_, 
-            str.size() + 1, 
-            MPI_CHAR, 
             dest, 
             tag, 
             comm, 
-            request);
-
-    // I just need to keep track of the request
-    fprintf(recordFile, "MPI_Isend:%d:%d:%p:%lu\n", 
-            rank, 
-            dest, 
-            request, 
+            request,
+            messagePool,
+            lastNodes,
+            recordFile,
             nodecnt);
+
+    MPI_ASSERT(ret == MPI_SUCCESS);
     __requests[request] = "MPI_Isend";
     return ret;
 }
