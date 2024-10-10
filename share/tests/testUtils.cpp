@@ -3,7 +3,7 @@
 
 using namespace std;
 
-int __MPI_Send(
+int __MPI_SendTest(
     const void *buf, 
     int count, 
     MPI_Datatype datatype, 

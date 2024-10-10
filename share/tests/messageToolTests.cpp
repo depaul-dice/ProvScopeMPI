@@ -160,7 +160,7 @@ TEST(MessageToolTests, MPI_RecvTest) {
     MPI_Status status;
     if (rank == 0) {
         int bufInt [5] = {1, 2, 3, 4, 5};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufInt, 
                 5,
                 MPI_INT, 
@@ -191,7 +191,7 @@ TEST(MessageToolTests, MPI_RecvTest) {
 
     if(rank == 0) {
         char bufChar [5] = {0, 1, 2, 3, 4};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufChar, 
                 5,
                 MPI_CHAR, 
@@ -222,7 +222,7 @@ TEST(MessageToolTests, MPI_RecvTest) {
 
     if(rank == 0) {
         double bufDouble [6] = {1.1, 2.2, 3.3, 4.4, 5.5, 6.6};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufDouble, 
                 6,
                 MPI_DOUBLE, 
@@ -266,7 +266,7 @@ TEST(MessageToolTests, MPI_IrecvTest) {
     MPI_Request request;
     if (rank == 0) {
         int bufInt [5] = {1, 2, 3, 4, 5};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufInt, 
                 5 /* count */,
                 MPI_INT, 
@@ -301,7 +301,7 @@ TEST(MessageToolTests, MPI_IrecvTest) {
 
     if(rank == 0) {
         char bufChar [5] = {0, 1, 2, 3, 4};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufChar, 
                 5 /* count */,
                 MPI_CHAR, 
@@ -336,7 +336,7 @@ TEST(MessageToolTests, MPI_IrecvTest) {
 
     if(rank == 0) {
         double bufDouble [6] = {1.1, 2.2, 3.3, 4.4, 5.5, 6.6};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufDouble, 
                 6 /* count */,
                 MPI_DOUBLE, 
@@ -384,7 +384,7 @@ TEST(MessageToolTests, MPI_TestTest) {
     MPI_Request request;
     if (rank == 0) {
         int bufInt [5] = {1, 2, 3, 4, 5};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufInt, 
                 5 /* count */,
                 MPI_INT, 
@@ -424,7 +424,7 @@ TEST(MessageToolTests, MPI_TestTest) {
 
     if(rank == 0) {
         char bufChar [5] = {0, 1, 2, 3, 4};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufChar, 
                 5 /* count */,
                 MPI_CHAR, 
@@ -464,7 +464,7 @@ TEST(MessageToolTests, MPI_TestTest) {
 
     if(rank == 0) {
         double bufDouble [6] = {1.1, 2.2, 3.3, 4.4, 5.5, 6.6};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufDouble, 
                 6 /* count */,
                 MPI_DOUBLE, 
@@ -512,7 +512,7 @@ TEST(MessageToolTests, MPI_WaitallTest) {
     MessagePool messagePool;
     if(rank == 0) {
         int bufInt [5] = {1, 2, 3, 4, 5};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufInt, 
                 5 /* count */,
                 MPI_INT, 
@@ -520,7 +520,7 @@ TEST(MessageToolTests, MPI_WaitallTest) {
                 1000 /* tag */, 
                 MPI_COMM_WORLD);
         char bufChar [5] = {0, 1, 2, 3, 4};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufChar, 
                 5 /* count */,
                 MPI_CHAR, 
@@ -528,7 +528,7 @@ TEST(MessageToolTests, MPI_WaitallTest) {
                 2000 /* tag */, 
                 MPI_COMM_WORLD);
         double bufDouble [6] = {1.1, 2.2, 3.3, 4.4, 5.5, 6.6};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufDouble, 
                 6 /* count */,
                 MPI_DOUBLE, 
@@ -606,7 +606,7 @@ TEST(MessageToolTests, MPI_TestallTest) {
     MessagePool messagePool;
     if(rank == 0) {
         int bufInt [5] = {1, 2, 3, 4, 5};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufInt, 
                 5 /* count */,
                 MPI_INT, 
@@ -614,7 +614,7 @@ TEST(MessageToolTests, MPI_TestallTest) {
                 1000 /* tag */, 
                 MPI_COMM_WORLD);
         char bufChar [5] = {0, 1, 2, 3, 4};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufChar, 
                 5 /* count */,
                 MPI_CHAR, 
@@ -622,7 +622,7 @@ TEST(MessageToolTests, MPI_TestallTest) {
                 2000 /* tag */, 
                 MPI_COMM_WORLD);
         double bufDouble [6] = {1.1, 2.2, 3.3, 4.4, 5.5, 6.6};
-        __MPI_Send(
+        __MPI_SendTest(
                 bufDouble, 
                 6 /* count */,
                 MPI_DOUBLE, 
