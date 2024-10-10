@@ -206,9 +206,6 @@ int MPI_Isend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    string lastNodes = updateAndGetLastNodes(
-            loopTrees, TraceType::RECORD);
-    
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int size;
@@ -219,6 +216,8 @@ int MPI_Isend(
             datatype, 
             count, 
             __LINE__);
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
     ss << lastNodes << '|' << size;
     string str = ss.str();
     /*

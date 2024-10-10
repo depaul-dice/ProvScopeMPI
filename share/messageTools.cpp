@@ -328,6 +328,79 @@ int __MPI_Irecv(
     return ret;
 }
 
+int __MPI_Isend(
+    const void *buf, 
+    int count, 
+    MPI_Datatype datatype, 
+    int dest, 
+    int tag, 
+    MPI_Comm comm, 
+    MPI_Request *request,
+    MessagePool &messagePool,
+    unordered_map<string, loopNode *>& loopTrees,
+    FILE *recordFile,
+    unsigned long nodeCnt) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int size;
+    MPI_Type_size(datatype, &size);
+    int ret = 0;
+    stringstream ss = convertData2StringStream(
+            buf, 
+            datatype, 
+            count, 
+            __LINE__);
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    ss << lastNodes << '|' << size;
+    string str = ss.str();
+
+    if(str.size() + 1 >= msgSize) {
+        fprintf(stderr, "message size is too large, length: %lu\n%s\n", 
+                str.length(), str.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    string typeName = convertDatatype(datatype);
+
+    char *realBuf_ = messagePool.addMessage(
+            request, 
+            (void *)buf, 
+            datatype, 
+            count, 
+            tag, 
+            comm, 
+            dest, 
+            true /* isSend */);
+
+    memcpy(
+            realBuf_, 
+            str.c_str(), 
+            str.size() + 1);
+
+    /*
+     * CAUTION: we need to send realBuf_ instead of str, 
+     * because it could get corrupt after this function goes out of context
+     */
+    ret = PMPI_Isend(
+            (void *)realBuf_, 
+            str.size() + 1, 
+            MPI_CHAR, 
+            dest, 
+            tag, 
+            comm, 
+            request);
+
+    if(recordFile != nullptr) {
+        fprintf(recordFile, "MPI_Isend:%d:%d:%p:%lu\n", 
+                rank, 
+                dest, 
+                request, 
+                nodeCnt);
+    }
+    return ret;
+}
+
+
 int __MPI_Wait(
         MPI_Request *request, 
         MPI_Status *status,

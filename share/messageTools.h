@@ -9,6 +9,9 @@
 #include <string>
 #include <sstream>
 
+#include <vector>
+#include <unordered_map>
+
 #include "tools.h"
 #include "messagePool.h"
 
@@ -86,6 +89,19 @@ int __MPI_Irecv(
         MPI_Comm comm, 
         MPI_Request *request,
         MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
+
+int __MPI_Isend(
+        const void *buf, 
+        int count, 
+        MPI_Datatype datatype, 
+        int dest, 
+        int tag, 
+        MPI_Comm comm, 
+        MPI_Request *request,
+        MessagePool &messagePool,
+        std::unordered_map<std::string, loopNode *>& loopTrees,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
  
