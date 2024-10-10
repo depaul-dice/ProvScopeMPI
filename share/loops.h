@@ -16,7 +16,7 @@
 #include <utility>
 #include <graphviz/cgraph.h>
 
-#include "tools.h"
+#include "utils.h"
 
 
 class loopNode {

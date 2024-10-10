@@ -12,7 +12,7 @@
 #include <vector>
 #include <unordered_map>
 
-#include "tools.h"
+#include "utils.h"
 #include "loops.h"
 #include "messagePool.h"
 
@@ -102,7 +102,7 @@ int __MPI_Isend(
         MPI_Comm comm, 
         MPI_Request *request,
         MessagePool &messagePool,
-        std::unordered_map<std::string, loopNode *>& loopTrees,
+        std::string& lastNodes,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
  

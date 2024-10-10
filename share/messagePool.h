@@ -8,7 +8,7 @@
 #include <climits>
 #include <stdexcept>
 
-#include "tools.h"
+#include "utils.h"
 #include "messageTools.h"
 #include "alignment.h"
 

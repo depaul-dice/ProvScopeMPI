@@ -13,13 +13,13 @@ OBJS = $(SRCS:.cpp=.o)
 
 all: $(SHARED_LIB)
 
-libmpirecord.so: mpiRecord.o tools.o alignment.o loops.o messagePool.o messageTools.o
+libmpirecord.so: mpiRecord.o utils.o alignment.o loops.o messagePool.o messageTools.o
 	$(CXX) $(STD) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS_LT)
 
-libmpireplay.so: mpiReplay.o tools.o alignment.o
+libmpireplay.so: mpiReplay.o utils.o alignment.o
 	$(CXX) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS)
 
-libmpireproduce.so: mpiReproduce.o tools.o alignment.o loops.o messagePool.o messageTools.o
+libmpireproduce.so: mpiReproduce.o utils.o alignment.o loops.o messagePool.o messageTools.o
 	$(CXX) $(STD) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS_LT)
 
 # Explicit rule for loops.o

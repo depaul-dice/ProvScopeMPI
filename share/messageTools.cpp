@@ -337,7 +337,7 @@ int __MPI_Isend(
     MPI_Comm comm, 
     MPI_Request *request,
     MessagePool &messagePool,
-    unordered_map<string, loopNode *>& loopTrees,
+    string& lastNodes,
     FILE *recordFile,
     unsigned long nodeCnt) {
     int rank;
@@ -350,8 +350,6 @@ int __MPI_Isend(
             datatype, 
             count, 
             __LINE__);
-    string lastNodes = updateAndGetLastNodes(
-            loopTrees, TraceType::RECORD);
     ss << lastNodes << '|' << size;
     string str = ss.str();
 
