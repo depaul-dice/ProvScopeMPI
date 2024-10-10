@@ -5,8 +5,9 @@
 #include <mpi.h>
 #include <unordered_map>
 #include <string>
-#include <climits>
+/* #include <climits> */
 #include <stdexcept>
+#include <limits>
 
 #include "utils.h"
 #include "messageTools.h"

@@ -91,13 +91,13 @@ int MPI_Init(
 int MPI_Finalize(void) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    DEBUG("MPI_Finalize, rank:%d\n", rank);
     MPI_ASSERT(recordFile != nullptr);
     fclose(recordFile);
     MPI_ASSERT(traceFile != nullptr);
     fflush(traceFile);
     fclose(traceFile);
     int ret = PMPI_Finalize();
+    /* DEBUG("MPI_Finalize done, rank:%d\n", rank); */
     return ret;
 }
 

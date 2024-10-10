@@ -358,8 +358,6 @@ int __MPI_Isend(
                 str.length(), str.c_str());
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    string typeName = convertDatatype(datatype);
-
     char *realBuf_ = messagePool.addMessage(
             request, 
             (void *)buf, 

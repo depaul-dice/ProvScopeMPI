@@ -24,7 +24,7 @@ MessageBuffer::MessageBuffer(
     isSend_(isSend),
     timestamp_(timestamp){
     realBuf_ = static_cast<char *>(calloc(msgSize, sizeof(char)));
-    if(timestamp_ == ULONG_MAX) {
+    if(timestamp_ == numeric_limits<unsigned long>::max()) {
         fprintf(stderr, "timestamp overflow\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
@@ -42,6 +42,7 @@ MessageBuffer::~MessageBuffer() {
 
 MessagePool::~MessagePool() {
     for(auto it = pool_.begin(); it != pool_.end(); it++) {
+        //fprintf(stderr, "deleting msgBuffer: %p\n", it->second);
         delete it->second;
     }
     for(auto it = peeked_.begin(); it != peeked_.end(); it++) {
@@ -76,6 +77,7 @@ char *MessagePool::addMessage(
     /* } */
     if(pool_.find(request) != pool_.end()) {
         MPI_ASSERT(pool_[request]->request_ == request);
+        /* DEBUG("deleting msgBuffer at %s: %p, at rank: %d\n", __func__, pool_[request], rank); */
         delete pool_[request];
     }
     pool_[request] = new MessageBuffer(
@@ -88,17 +90,7 @@ char *MessagePool::addMessage(
             src,
             isSend,
             timestamp_++);
-    /*
-    if(isSend == false && src == 1 && rank == 3) {
-        fprintf(stderr, "addMessage, request:%p, count:%d, tag:%d, src:%d, isSend:%d, timestamp:%lu\n", 
-                request, 
-                count, 
-                tag, 
-                src, 
-                isSend,
-                timestamp_);
-    }
-    */
+    /* fprintf(stderr, "created msgBuffer: %p, at rank: %d\n", pool_[request], rank); */
     return pool_[request]->realBuf_;
 }
 
@@ -315,7 +307,7 @@ int MessagePool::loadPeekedMessage(
             if(retSrc != nullptr) {
                 *retSrc = (*it)->src_;
             }
-            delete *it;
+            /* delete *it; */
             peeked_.erase(it);
             //fprintf(stderr, "loadPeekedMessage returning: %d, size: %lu\n", rv, peeked_.size());
             return ind;
