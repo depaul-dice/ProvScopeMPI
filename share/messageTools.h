@@ -81,6 +81,17 @@ int __MPI_Recv(
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
 
+int __MPI_Send(
+        const void *buf, 
+        int count, 
+        MPI_Datatype datatype, 
+        int dest, 
+        int tag, 
+        MPI_Comm comm,
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
+
 int __MPI_Irecv(
         void *buf, 
         int count, 
