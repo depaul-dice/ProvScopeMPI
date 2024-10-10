@@ -431,7 +431,7 @@ int __MPI_Wait(
                 where there's a peeked message for MPI_Wait.\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
 
-        //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
+        /* DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank); */
         string lastNodes = messagePool.loadMessage(
                 request, status);
         //fprintf(stderr, "received at %s\n", lastNodes.c_str());
@@ -462,7 +462,7 @@ int __MPI_Wait(
     }
 
     MPI_ASSERT(ret == MPI_SUCCESS);
-    //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
+    /* DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank); */
     string lastNodes = messagePool.loadMessage(request, status);
     if(lastNodes.length() > 0) {
         //fprintf(stderr, "received at %s\n", lastNodes.c_str());
@@ -552,7 +552,8 @@ int __MPI_Test(
      * use the loadMessage method only if MPI_Test was successful
      */
     if(*flag) {
-        //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
+        /* DEBUG("load message at line: %d, rank: %d, request: %p\n", */ 
+        /*         __LINE__, rank, request); */
         string lastNodes = messagePool.loadMessage(request, status);
         if(lastNodes.length() > 0) {
             //fprintf(stderr, "received at %s\n", lastNodes.c_str());
@@ -609,7 +610,7 @@ int __MPI_Waitall(
                     where there's a peeked message for MPI_Waitall.\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
 
-            //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
+            /* DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank); */
             string lastNodes = messagePool.loadMessage(
                     &array_of_requests[i], 
                     &array_of_statuses[i]);
@@ -658,6 +659,7 @@ int __MPI_Waitall(
                     messagePool.getRealBuf(&array_of_requests[i]));
         }
         */
+        /* DEBUG("loadMessage at line: %d, rank: %d\n", __LINE__, rank); */
         lastNodes[i] = messagePool.loadMessage(
                 &array_of_requests[i], 
                 &array_of_statuses[i]);
@@ -710,7 +712,7 @@ int __MPI_Testall(
                     where there's a peeked message for MPI_Testall.\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
 
-            //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
+            /* DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank); */
             string lastNodes = messagePool.loadMessage(
                     &array_of_requests[i], 
                     &array_of_statuses[i]);
@@ -753,6 +755,7 @@ int __MPI_Testall(
     }
     if(*flag) {
         for(int i = 0; i < count; i++) {
+            /* DEBUG("loadMessage at line: %d, rank: %d\n", __LINE__, rank); */
             string lastNodes = messagePool.loadMessage(
                     &array_of_requests[i], 
                     &array_of_statuses[i]);
@@ -814,7 +817,7 @@ int __MPI_Testsome(
                     where there's a peeked message for MPI_Testsome.\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
 
-            //DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank);
+            /* DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank); */
             string lastNodes = messagePool.loadMessage(
                     &array_of_requests[i], 
                     &array_of_statuses[i]);
@@ -866,13 +869,15 @@ int __MPI_Testsome(
         int ind;
         for(int i = 0; i < *outcount; i++) {
             ind = array_of_indices[i];
+            /* DEBUG("loadMessage at line: %d, rank: %d, request: %p\n", */ 
+            /*         __LINE__, rank, &array_of_requests[ind]); */
             lastNodes = messagePool.loadMessage(
-                    &array_of_requests[array_of_indices[ind]], 
-                    &array_of_statuses[array_of_indices[ind]]);
+                    &array_of_requests[ind], 
+                    &array_of_statuses[ind]);
             if(recordFile != nullptr) {
                 fprintf(recordFile, ":%p:%d", 
-                        &array_of_requests[array_of_indices[ind]], 
-                        array_of_statuses[array_of_indices[ind]].MPI_SOURCE);
+                        &array_of_requests[ind], 
+                        array_of_statuses[ind].MPI_SOURCE);
             }
         }
     }

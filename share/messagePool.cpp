@@ -69,16 +69,11 @@ char *MessagePool::addMessage(
             && dataType != MPI_LONG_LONG_INT) {
         unsupportedDatatype(rank, __LINE__, dataType);
     }
-    /*
-    if(isSend == false) {
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        fprintf(stderr, "addMessage at rank: %d, request: %p, message: %s\n", 
-                rank, 
-                request, 
-                (char *)buf);
-    }
-    */
+    /* if(isSend == false) { */
+    /*     fprintf(stderr, "addMessage at rank: %d, request: %p\n", */ 
+    /*             rank, */ 
+    /*             request); */
+    /* } */
     if(pool_.find(request) != pool_.end()) {
         MPI_ASSERT(pool_[request]->request_ == request);
         delete pool_[request];
