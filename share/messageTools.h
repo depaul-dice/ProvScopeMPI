@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "tools.h"
+#include "loops.h"
 #include "messagePool.h"
 
 class MessagePool;
