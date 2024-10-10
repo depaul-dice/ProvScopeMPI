@@ -7,7 +7,8 @@ extern Logger logger;
     /* : entry(entry), parent(nullptr), nodes(nodes), children() { */
 /* } */
 // below is for the root node
-loopNode::loopNode(string &entry, unordered_set<string> &nodes) 
+loopNode::loopNode(
+        string &entry, unordered_set<string> &nodes) 
     : entry(entry), parent(nullptr), nodes(nodes), exclusives(), children() {
 }
 
@@ -31,11 +32,8 @@ void loopNode::addRoot(loopNode *r) {
     /* r->nodes.insert(nodes.begin(), nodes.end()); */
 }
 
-void loopNode::print(ofstream& file, const string& funcname) {
-    /* if(this->entry != nullptr) { */
-        /* cerr << "only root node can call print method!\n"; */
-        /* return; */
-    /* } */
+void loopNode::print(
+        ofstream& file, const string& funcname) {
     file << "subgraph " << funcname << "{\n"\
         << "label=\"" << funcname << "\";\n"\
         << "root_" << funcname << "[label=\"root\"];\n";
@@ -47,7 +45,8 @@ void loopNode::print(ofstream& file, const string& funcname) {
     file << edges << "}\n\n";
 }
 
-void loopNode::print(ostream& os, const string& funcname) {
+void loopNode::print(
+        ostream& os, const string& funcname) {
     // this should be the root node
     os << "subgraph " << funcname << "{\n";
     string edgeinfo = __print(os);
@@ -88,7 +87,8 @@ string loopNode::__print(ostream& os) {
     return edges;
 }
 
-void printEdgeInfo(Agnode_t* node, Agraph_t* subgraph) {
+void printEdgeInfo(
+        Agnode_t* node, Agraph_t* subgraph) {
     char *label;
     for (Agedge_t* edge = agfstout(subgraph, node); edge; edge = agnxtout(subgraph, edge)) {
         label = agget(edge, (char *)"label");
@@ -99,7 +99,8 @@ void printEdgeInfo(Agnode_t* node, Agraph_t* subgraph) {
     }
 }
 
-void printNodeInfo(Agnode_t* node, Agraph_t* subgraph) {
+void printNodeInfo(
+        Agnode_t* node, Agraph_t* subgraph) {
     char* label = agget(node, (char *)"label");
     // we should create a node here
     logger << "Node: " << agnameof(node) << endl;
@@ -222,7 +223,8 @@ unordered_set<string> loopNode::fixExclusives(void) {
     return nodes;
 }
 
-ostream& operator << (ostream& os, loopNode& ln) {
+ostream& operator << (
+        ostream& os, loopNode& ln) {
     os << ln.entry << '{' << endl;
     for(auto &n: ln.nodes) {
         os << '\t' << n << endl;

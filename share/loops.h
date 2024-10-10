@@ -27,15 +27,18 @@ public:
     ~loopNode();
 
     /* loopNode(node *entry, std::set<node *> &nodes); */
-    loopNode(std::string &entry, std::unordered_set<std::string> &nodes);
+    loopNode(
+            std::string &entry, std::unordered_set<std::string> &nodes);
     void addChild(loopNode *c);
     void addParent(loopNode *p);
     void addRoot(loopNode *r);
     std::unordered_set<std::string> fixExclusives(void); // you only call this once, after the tree is built
 
     /* void print(std::string& file); */
-    void print(std::ofstream& file, const std::string& funcname);
-    void print(std::ostream& os, const std::string& funcname = "main");
+    void print(
+            std::ofstream& file, const std::string& funcname);
+    void print(
+            std::ostream& os, const std::string& funcname = "main");
     friend std::ostream& operator << (std::ostream& os, loopNode& ln);
 
     std::string entry; // entry node of the loop
@@ -50,11 +53,14 @@ private:
     std::string __print(std::ostream& os);
 };
 
-void printEdgeInfo(Agnode_t* node, Agraph_t* subgraph);
-void printNodeInfo(Agnode_t* node, Agraph_t* subgraph);
+void printEdgeInfo(
+        Agnode_t* node, Agraph_t* subgraph);
+void printNodeInfo(
+        Agnode_t* node, Agraph_t* subgraph);
 
 // this should create one loop tree
-std::pair<std::string, loopNode *> parseCluster(Agraph_t* subgraph, const std::string& prefix);
+std::pair<std::string, loopNode *> parseCluster(
+        Agraph_t* subgraph, const std::string& prefix);
 // this should create multiple loop trees
 std::unordered_map<std::string, loopNode *> parseDotFile(const std::string& filename);
 
