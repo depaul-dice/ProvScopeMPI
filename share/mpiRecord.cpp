@@ -130,46 +130,21 @@ int MPI_Send(
     int tag, 
     MPI_Comm comm
 ) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     //DEBUG("MPI_Send:to %d, at %d\n", dest, rank);
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
-    int ret = 0;
-    int size;
-    MPI_Type_size(datatype, &size);
-    //MPI_ASSERT(count > 0);
-    stringstream ss = convertData2StringStream(
+    int ret = __MPI_Send(
             buf, 
-            datatype, 
             count, 
-            __LINE__);
-    ss << lastNodes << '|' << size;
-    string str = ss.str();
-    if(str.size() + 1 >= msgSize) {
-        fprintf(stderr, "message size is too large, length: %lu\n%s\n", 
-                str.length(), str.c_str());
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-    /*
-    fprintf(stderr, "sending message at MPI_Send %s, length: %lu, at rank:%d to dest: %d\n", 
-            str.c_str(), 
-            str.size(),
-            rank,
-            dest);
-    */
-    ret = PMPI_Send(
-            str.c_str(), 
-            str.size() + 1, 
-            MPI_CHAR, 
+            datatype, 
             dest, 
             tag, 
-            comm);
-    fprintf(recordFile, "MPI_Send:%d:%d:%lu\n", 
-            rank, 
-            dest, 
+            comm,
+            messagePool,
+            lastNodes,
+            recordFile,
             nodecnt);
-    //DEBUG("MPI_send return rank: %d\n", rank);
+    MPI_ASSERT(ret == MPI_SUCCESS);
     return ret;
 }
 

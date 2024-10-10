@@ -89,6 +89,7 @@ int __MPI_Send(
         int tag, 
         MPI_Comm comm,
         MessagePool &messagePool,
+        std::string& lastNodes,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
 
