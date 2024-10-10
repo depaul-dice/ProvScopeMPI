@@ -570,8 +570,9 @@ int MPI_Test(
                 messagePool);
         if(__isends.find(request) != __isends.end()) {
             __isends.erase(request);
+        } else {
+            MPI_ASSERT(status->MPI_SOURCE == src);
         }
-        MPI_ASSERTNALIGN(status->MPI_SOURCE == src);
         /* __requests.erase(msgs[2]); */
         *flag = 1;
     } else {
@@ -707,7 +708,10 @@ int MPI_Testsome(
     MPI_EQUAL(msgs[0], "MPI_Testsome");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == myrank);
     int oc = stoi(msgs[2]);
-    MPI_ASSERTNALIGN(msgs.size() == oc * 2 + 4);
+    if(msgs.size() != oc * 2 + 4) {
+        cerr << msgs << endl;
+    }
+    MPI_ASSERT(msgs.size() == oc * 2 + 4);
     if(oc == 0) {
         // don't do anything
         /* DEBUG(":0\n"); */

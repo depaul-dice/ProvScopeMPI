@@ -923,7 +923,7 @@ int __MPI_Testsome(
         }
     }
     if(recordFile != nullptr) {
-        fprintf(recordFile, "%lu\n", 
+        fprintf(recordFile, ":%lu\n", 
                 nodeCnt);
     }
     return ret;
