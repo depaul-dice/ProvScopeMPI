@@ -286,28 +286,18 @@ int MPI_Send(
     int tag, 
     MPI_Comm comm
 ) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     string currNodes = updateAndGetLastNodes(
             __looptrees, 
             TraceType::REPLAY);
-    int size;
-    MPI_Type_size(datatype, &size);
-    //fprintf(stderr, "currNodes: %s\n", currNodes.c_str());
-    stringstream ss = convertData2StringStream(
+    int ret = __MPI_Send(
             buf, 
+            count, 
             datatype, 
-            count,
-            __LINE__);
-    ss << currNodes << '|' << size;
-    string message = ss.str();
-    int ret = PMPI_Send(
-            message.c_str(), 
-            message.size() + 1, 
-            MPI_CHAR, 
             dest, 
             tag, 
-            comm);
+            comm,
+            messagePool,
+            currNodes);
     return ret;
 }
 
@@ -395,43 +385,19 @@ int MPI_Isend(
     MPI_Request *request
 ) {
     int rank;
-    MPI_Comm_rank(
-            MPI_COMM_WORLD, &rank);
-    stringstream ss = convertData2StringStream(
-            buf, 
-            datatype, 
-            count,
-            __LINE__);
-    int size;
-    MPI_Type_size(datatype, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     string currNodes = updateAndGetLastNodes(
             __looptrees, TraceType::REPLAY);
-    ss << currNodes << '|' << size;
-    string message = ss.str();
-    if(message.size() + 1 >= msgSize) {
-        fprintf(stderr, "Error: message size is too large, length: %lu\n%s\n", 
-                message.size(), message.c_str());
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-    int ret = PMPI_Isend(
-            (void *)(message.c_str()), 
-            message.size() + 1, 
-            MPI_CHAR, 
+    int ret = __MPI_Isend(
+            buf, 
+            count, 
+            datatype, 
             dest, 
             tag, 
             comm, 
-            request);
-
-    messagePool.addMessage(
             request,
-            (void *)buf,
-            datatype,
-            count,
-            tag,
-            comm,
-            dest,
-            true /* isSend */);
+            messagePool,
+            currNodes);
         
     bool isAligned = true;
     size_t lastInd = 0;
