@@ -993,22 +993,23 @@ int MPI_Iprobe (
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Iprobe\n", rank); */
         // don't control anything
-        return PMPI_Iprobe(
+        return __MPI_Iprobe(
                 source, 
                 tag, 
                 comm, 
                 flag, 
-                status);
+                status,
+                messagePool);
     } 
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
             __order_index);
     /* DEBUG0("MPI_Iprobe:%s\n", orders[__order_index].c_str()); */
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Iprobe");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
-    MPI_ASSERTNALIGN(stoi(msgs[2]) == source);
-    MPI_ASSERTNALIGN(stoi(msgs[3]) == tag);
+    MPI_ASSERT(msgs[0] == "MPI_Iprobe");
+    MPI_ASSERT(stoi(msgs[1]) == rank);
+    MPI_ASSERT(stoi(msgs[2]) == source);
+    MPI_ASSERT(stoi(msgs[3]) == tag);
     int ret;
     if(msgs[4] == "SUCCESS") {
         *flag = 1;
@@ -1022,16 +1023,16 @@ int MPI_Iprobe (
                 comm, 
                 &stat);
         MPI_ASSERT(ret == MPI_SUCCESS);
-        MPI_ASSERTNALIGN(stat.MPI_SOURCE == source);
+        MPI_ASSERT(stat.MPI_SOURCE == source);
 
         if(tag != MPI_ANY_TAG) {
-            MPI_ASSERTNALIGN(stat.MPI_TAG == tag);
+            MPI_ASSERT(stat.MPI_TAG == tag);
         }
         if(status != MPI_STATUS_IGNORE) {
             memcpy(status, &stat, sizeof(MPI_Status));
         }
     } else {
-        MPI_ASSERTNALIGN(msgs[4] == "FAIL");
+        MPI_ASSERT(msgs[4] == "FAIL");
         *flag = 0;
     }
 
