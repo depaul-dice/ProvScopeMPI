@@ -166,4 +166,13 @@ int __MPI_Cancel(
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
 
+int __MPI_Iprobe(
+        int source, 
+        int tag, 
+        MPI_Comm comm, 
+        int *flag, 
+        MPI_Status *status,
+        MessagePool &messagePool,
+        FILE *recordFile = nullptr,
+        unsigned long nodeCnt = 0);
 #endif // MESSAGETOOLS_H

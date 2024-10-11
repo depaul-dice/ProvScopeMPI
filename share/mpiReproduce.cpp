@@ -981,7 +981,6 @@ int MPI_Iprobe (
     int *flag, 
     MPI_Status *status
 ) {
-    FUNCGUARD();
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     bool isaligned = true;
