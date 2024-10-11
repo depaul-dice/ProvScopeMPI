@@ -420,77 +420,26 @@ int MPI_Probe (
     MPI_Comm comm, 
     MPI_Status *status
 ) {
-    FUNCGUARD();
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /*
-     * first, let's check if we have any appropriate message at peeked
-     * if so, set the status to be appropriate values
-     * CAUTION: status cannot be nullptr or STATUS_IGNORE 
-     * (otherwise why would you call probe?)
-     */
-    int ret = messagePool.peekPeekedMessage(source, tag, comm, status);
-
-    /*
-     * if successful, record it and return without actually calling the function
-     */
-    if(ret != -1) {
-        recordMPIProbe(
-                recordFile,
-                rank, 
-                source, 
-                tag, 
-                status,
-                nodecnt);
-        return MPI_SUCCESS;
-    }
-
-    /*
-     * if it's NOT successful, you need to call MPI_Recv instead
-     * then add it to the peeked message pool
-     */
-    char tmpBuf[msgSize]; 
-    MPI_Status stat;
-    ret = PMPI_Recv(
-            tmpBuf, 
-            msgSize, 
-            MPI_CHAR, 
+    int ret;
+    try {
+        ret = __MPI_Probe(
             source, 
             tag, 
             comm, 
-            &stat);
-    if(status != MPI_STATUS_IGNORE) {
-        memcpy(
-                status, 
-                &stat, 
-                sizeof(MPI_Status));
-    }
-    MPI_ASSERT(ret == MPI_SUCCESS);
-    messagePool.addPeekedMessage(
-            tmpBuf, 
-            msgSize, 
-            tag, 
-            comm, 
-            stat.MPI_SOURCE);
-
-    /*
-     * update status' ucount manually
-     * other member values should be correct
-     * when called MPI_Recv
-     */
-    string tmpStr(tmpBuf);
-    auto tokens = parse(tmpStr, '|');
-    MPI_ASSERT(tokens.size() >= 2);
-    int size = stoi(tokens.back());
-    status->_ucount = (tokens.size() - 2) * size;
-
-    recordMPIProbe(
-            recordFile,
-            rank, 
-            source, 
-            tag, 
-            status,
+            status, 
+            messagePool, 
+            recordFile, 
             nodecnt);
+    } catch (const exception &e) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        string localLastNodes = updateAndGetLastNodes(
+                loopTrees, TraceType::RECORD);
+        fprintf(stderr, "exception caught at %s\nrank: %d\n", 
+                __func__,
+                rank);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     return ret;
 }
 
