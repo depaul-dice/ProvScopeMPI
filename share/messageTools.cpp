@@ -953,6 +953,92 @@ int __MPI_Cancel(
     return ret;
 }
 
+int __MPI_Probe(
+        int source,
+        int tag,
+        MPI_Comm comm,
+        MPI_Status *status,
+        MessagePool &messagePool,
+        FILE *recordFile,
+        unsigned long nodeCnt) {
+    int rank;
+    MPI_Comm_rank(
+            MPI_COMM_WORLD, &rank);
+    /*
+     * first, let's check if we have any appropriate message at peeked
+     * if so, set the status to be appropriate values
+     * CAUTION: status cannot be nullptr or STATUS_IGNORE 
+     * (otherwise why would you call probe?)
+     */
+    int ret = messagePool.peekPeekedMessage(
+            source, 
+            tag, 
+            comm, 
+            status);
+
+    /*
+     * if successful, record it and return without actually calling the function
+     */
+    if(ret != -1) {
+        recordMPIProbe(
+                recordFile,
+                rank, 
+                source, 
+                tag, 
+                status,
+                nodeCnt);
+        return MPI_SUCCESS;
+    }
+
+    /*
+     * if it's NOT successful, you need to call MPI_Recv instead
+     * then add it to the peeked message pool
+     */
+    char tmpBuf[msgSize]; 
+    MPI_Status stat;
+    ret = PMPI_Recv(
+            tmpBuf, 
+            msgSize, 
+            MPI_CHAR, 
+            source, 
+            tag, 
+            comm, 
+            &stat);
+    if(status != MPI_STATUS_IGNORE) {
+        memcpy(
+                status, 
+                &stat, 
+                sizeof(MPI_Status));
+    }
+    MPI_ASSERT(ret == MPI_SUCCESS);
+    messagePool.addPeekedMessage(
+            tmpBuf, 
+            msgSize, 
+            tag, 
+            comm, 
+            stat.MPI_SOURCE);
+
+    /*
+     * update status' ucount manually
+     * other member values should be correct
+     * when called MPI_Recv
+     */
+    string tmpStr(tmpBuf);
+    auto tokens = parse(tmpStr, '|');
+    MPI_ASSERT(tokens.size() >= 2);
+    int size = stoi(tokens.back());
+    status->_ucount = (tokens.size() - 2) * size;
+
+    recordMPIProbe(
+            recordFile,
+            rank, 
+            source, 
+            tag, 
+            status,
+            nodeCnt);
+    return ret;
+}
+
 int __MPI_Iprobe(
         int source, 
         int tag, 
