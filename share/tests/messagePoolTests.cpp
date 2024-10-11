@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
     return ret;
 }
 
-TEST(MessagePoolTests, addAndLoadMessageTests) {
+TEST(MessagePoolTest, addAndLoadMessageTests) {
     MessagePool messagePool;
 
     /*
@@ -138,3 +138,77 @@ TEST(MessagePoolTests, addAndLoadMessageTests) {
     EXPECT_EQ(count, 6);
 }
 
+TEST(MessagePoolTest, peekedMessageTest) {
+    MessagePool messagePool;
+    /* MPI_Request req; */
+    int intBuf [5] = {1, 2, 3, 4, 5};
+    stringstream ss;
+    for (int i = 0; i < 5; i++) {
+        ss << intBuf[i] << "|";
+    }
+    ss << "location1|4";
+    string tmp = ss.str();
+    EXPECT_EQ(tmp, "1|2|3|4|5|location1|4");
+    EXPECT_THROW(
+            messagePool.addPeekedMessage(
+                (void *)(tmp.c_str()), 
+                5 /* count */,
+                0 /* tag */,
+                MPI_COMM_WORLD,
+                -1 /* src */),
+            runtime_error);
+    EXPECT_THROW(
+            messagePool.addPeekedMessage(
+                nullptr,
+                5 /* count */,
+                0 /* tag */,
+                MPI_COMM_WORLD,
+                0 /* src */),
+            runtime_error);
+    // put the count of the string length
+    EXPECT_NO_THROW(
+            messagePool.addPeekedMessage(
+                (void *)(tmp.c_str()),
+                tmp.length() + 1 /* count */,
+                0 /* tag */,
+                MPI_COMM_WORLD,
+                0 /* src */));
+
+    MPI_Status stat;
+    int rv = messagePool.peekPeekedMessage(
+            0,
+            0,
+            MPI_COMM_WORLD,
+            &stat);
+    EXPECT_EQ(rv, 0);
+    rv = messagePool.peekPeekedMessage(
+            0,
+            1,
+            MPI_COMM_WORLD,
+            &stat);
+    EXPECT_EQ(rv, -1);
+    int recvBuf [5];
+    int retSrc;
+    rv = messagePool.loadPeekedMessage(
+            (void *)recvBuf,
+            MPI_INT,
+            5 /* count */,
+            0 /* tag */,
+            MPI_COMM_WORLD,
+            0 /* src */,
+            &retSrc);
+    EXPECT_EQ(rv, 0);
+    EXPECT_EQ(retSrc, 0);
+    for (int i = 0; i < 5; i++) {
+        EXPECT_EQ(recvBuf[i], intBuf[i]);
+    }
+    rv = messagePool.loadPeekedMessage(
+            (void *)recvBuf,
+            MPI_INT,
+            5 /* count */,
+            0 /* tag */,
+            MPI_COMM_WORLD,
+            0 /* src */,
+            &retSrc);
+    EXPECT_EQ(rv, -1);
+}
