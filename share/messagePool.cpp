@@ -204,8 +204,8 @@ int MessagePool::peekPeekedMessage(
         int tag,
         MPI_Comm comm,
         MPI_Status *status) {
-    MPI_ASSERT(status != nullptr
-            && status != MPI_STATUS_IGNORE);
+    exceptionAssert(status != MPI_STATUS_IGNORE, "status is null at peekPeekedMessage");
+
     //fprintf(stderr, "peeking peeked_ size: %lu\n", peeked_.size());
     for(unsigned long i = 0; i < peeked_.size(); i++) {
         int cmpResult;
@@ -235,15 +235,17 @@ int MessagePool::peekPeekedMessage(
  
 void MessagePool::addPeekedMessage(
         void *buf, 
-        int count,
+        int strLenCount,
         int tag,
         MPI_Comm comm,
         int src) {
-    MPI_ASSERT(buf != nullptr);
-    MPI_ASSERT(src != MPI_ANY_SOURCE);
+    exceptionAssert(buf != nullptr, "buf == null at addPeekedMessage");
+    exceptionAssert(src != MPI_ANY_SOURCE, "src == MPI_ANY_SOURCE at addPeekedMessage");
+    exceptionAssert(sizeof(char) == 1, "sizeof(char) != 1 at addPeekedMessage");
 
-    char *heapBuf = (char *)malloc(count);
-    strncpy(heapBuf, (char *)buf, count);
+    //cerr << "buf " << (char *)buf << endl;
+    char *heapBuf = (char *)malloc(strLenCount);
+    strncpy(heapBuf, (char *)buf, strLenCount);
     /*
      * we are pushing it back as a raw format
      * when we load, we formalize it
@@ -252,7 +254,7 @@ void MessagePool::addPeekedMessage(
                 nullptr, 
                 (void *)heapBuf, 
                 MPI_CHAR, 
-                count, 
+                strLenCount, 
                 tag, 
                 comm,
                 src,
@@ -280,8 +282,11 @@ int MessagePool::loadPeekedMessage(
                 && cmpResult == MPI_IDENT 
                 && (src == (*it)->src_
                     || src == MPI_ANY_SOURCE)) {
-            auto tokens = parse(string((char *)(*it)->buf_), '|');
-            MPI_ASSERT(tokens.size() == count + 2);
+            auto tokens = parse(string((char *)((*it)->buf_)), '|');
+            //cerr << static_cast<char *>((*it)->buf_) << endl;
+            exceptionAssert(
+                    tokens.size() == count + 2, 
+                    "tokens.size() != count + 2 at loadPeekedMessage");
             if(dataType == MPI_INT) {
                 for(int i = 0; i < count; i++) {
                     ((int *)buf)[i] = stoi(tokens[i]);
@@ -307,7 +312,7 @@ int MessagePool::loadPeekedMessage(
             if(retSrc != nullptr) {
                 *retSrc = (*it)->src_;
             }
-            /* delete *it; */
+            delete *it;
             peeked_.erase(it);
             //fprintf(stderr, "loadPeekedMessage returning: %d, size: %lu\n", rv, peeked_.size());
             return ind;
@@ -319,7 +324,9 @@ int MessagePool::loadPeekedMessage(
 }
 
 void MessagePool::deleteMessage(MPI_Request *request) {
-    MPI_ASSERT(pool_.find(request) != pool_.end());
+    exceptionAssert(
+            pool_.find(request) != pool_.end(), 
+            "could not find the request in pool_ at deleteMessage");
     delete pool_[request];
     pool_.erase(request);
 }

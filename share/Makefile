@@ -30,4 +30,5 @@ loops.o: loops.cpp loops.h
 	$(CXX) $(STD) -c -fPIC -g -DDEBUG_MODE -o $@ $<
 
 clean:
+	$(MAKE) -C tests clean
 	rm -f *.o $(SHARED_LIB)

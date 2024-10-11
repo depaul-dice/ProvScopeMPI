@@ -221,3 +221,9 @@ void mpi_equal(string a, string b) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
+
+void exceptionAssert(bool condition, const string& message) {
+    if(!condition) {
+        throw runtime_error(message);
+    }
+}

@@ -16,6 +16,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <unistd.h>
+#include <unordered_map>
+#include <stdexcept>
 
 #define MPI_ASSERT(CONDITION) \
     do { \
@@ -154,9 +156,6 @@ std::string replaceall(std::string& str, const std::string& from, const std::str
 
 void splitNinsert(const std::string& str, const std::string& delimit, std::unordered_set<std::string>& container);
 
-/*
- * this function requires C++20 features (std::equality_comparable_with)
- */
 template <typename T>
 void mpi_equal(T a, T b) {
     if(a != b) {
@@ -170,6 +169,8 @@ void mpi_equal(T a, T b) {
 void mpi_equal(std::string a, char* b);
 void mpi_equal(char* a, std::string b);
 void mpi_equal(std::string a, std::string b);
+
+void exceptionAssert(bool condition, const std::string& message = "runtime error");
 
 #endif // TOOLS_H
        

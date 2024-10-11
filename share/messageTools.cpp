@@ -36,6 +36,9 @@ void recordMPIProbe (
         int tag,
         MPI_Status *status,
         unsigned long nodeCount) {
+    if(recordFile == nullptr) {
+        return;
+    }
     if(source == MPI_ANY_SOURCE) {
         fprintf(recordFile, "MPI_Probe:%d:%d:%d:%d:%lu\n", 
                 rank, 
@@ -982,7 +985,7 @@ int __MPI_Iprobe(
                 source, 
                 tag, 
                 &statIprobe,
-                nodecnt);
+                nodeCnt);
         if(status != MPI_STATUS_IGNORE) {
             memcpy(
                     status, 
@@ -1058,17 +1061,18 @@ int __MPI_Iprobe(
                 source, 
                 tag, 
                 status,
-                nodecnt);
+                nodeCnt);
 
     } else {
-        fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:FAIL:%lu\n", 
-                rank, 
-                source, 
-                tag, 
-                nodecnt);
+        if(recordFile != nullptr) {
+            fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:FAIL:%lu\n", 
+                    rank, 
+                    source, 
+                    tag, 
+                    nodeCnt);
+        }
     }
     return ret;
 }
 
 
-}

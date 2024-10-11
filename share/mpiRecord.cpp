@@ -501,119 +501,26 @@ int MPI_Iprobe (
     int *flag, 
     MPI_Status *status
 ) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    //DEBUG("MPI_Iprobe:%d, at rank:%d\n", source, rank);
-
-    /*
-     * we first look at the peeked messages
-     * if we have appropriate message, we don't even call the function
-     * and return
-     */
-    MPI_Status statIprobe;
-    int ret = messagePool.peekPeekedMessage(
-            source, 
-            tag, 
-            comm, 
-            &statIprobe);
-    if(ret != -1) {
-        *flag = 1;  
-        recordMPIIprobeSuccess(
-                recordFile,
-                rank, 
+    int ret;
+    try {
+        ret = __MPI_Iprobe(
                 source, 
-                tag, 
-                &statIprobe,
-                nodecnt);
-        if(status != MPI_STATUS_IGNORE) {
-            memcpy(
-                    status, 
-                    &statIprobe, 
-                    sizeof(MPI_Status));
-        }
-        fprintf(stderr, "did it work here, let's stop here, rank: %d\n", rank);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-        /*
-        DEBUG("MPI_Iprobe at rank: %d, source: %d, tag: %d, ucount:%lu\n", 
-                rank, source, tag, statIprobe._ucount);
-        */
-        return MPI_SUCCESS;
-    }
-
-    ret = PMPI_Iprobe(
-            source, 
-            tag, 
-            comm, 
-            flag, 
-            &statIprobe);
-    MPI_ASSERT(ret == MPI_SUCCESS);
-    if(status != MPI_STATUS_IGNORE) {
-        memcpy(
-                status, 
-                &statIprobe, 
-                sizeof(MPI_Status));
-    }
-    if(*flag) {
-        /*
-         * if iprobe found any message, 
-         * receive it and add it to peeked messages
-         */
-        MPI_Status statRecv;
-        char tmpBuf[msgSize];
-        ret = PMPI_Recv(
-                tmpBuf, 
-                msgSize, 
-                MPI_CHAR, 
-                statIprobe.MPI_SOURCE, 
                 tag, 
                 comm, 
-                &statRecv);
-        /*
-        if(rank == 6 && statIprobe.MPI_SOURCE == 4) {
-            fprintf(stderr, "Iprobe: we received a message at rank: %d, src: %d, tag: %d\n%s\n", 
-                    rank, statRecv.MPI_SOURCE, tag, tmpBuf);
-        }
-        */
-        MPI_ASSERT(statIprobe.MPI_SOURCE == statRecv.MPI_SOURCE);
-        MPI_ASSERT(ret == MPI_SUCCESS);
-        messagePool.addPeekedMessage(
-                tmpBuf,
-                msgSize,
-                tag,
-                comm,
-                statRecv.MPI_SOURCE);
-                
-        if(status != MPI_STATUS_IGNORE) {
-        /* update status' ucount manually */
-            /*
-             * DEBUG("result of the MPI_Recv, rank: %d, src: %d, tag: %d, ucount:%lu\n", 
-                    rank, statRecv.MPI_SOURCE, tag, statRecv._ucount);
-             */
-            auto tokens = parse(string(tmpBuf), '|');
-            MPI_ASSERT(tokens.size() >= 2);
-            int size = stoi(tokens.back());
-            status->_ucount = (tokens.size() - 2) * size;
-            /*
-             * DEBUG("MPI_Iprobe at rank: %d, source: %d, tag: %d, ucount:%lu\n", 
-                    rank, status->MPI_SOURCE, tag, status->_ucount);
-             */
-        }
-        /* record the result of Iprobe */
-        // I think this is wrong, you have to think about the count
-        recordMPIIprobeSuccess(
-                recordFile,
-                rank, 
-                source, 
-                tag, 
-                status,
+                flag, 
+                status, 
+                messagePool, 
+                recordFile, 
                 nodecnt);
-
-    } else {
-        fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:FAIL:%lu\n", 
-                rank, 
-                source, 
-                tag, 
-                nodecnt);
+    } catch (const exception &e) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        string localLastNodes = updateAndGetLastNodes(
+                loopTrees, TraceType::RECORD);
+        fprintf(stderr, "exception caught at %s\nrank: %d\n", 
+                __func__,
+                rank);
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
     return ret;
 }
