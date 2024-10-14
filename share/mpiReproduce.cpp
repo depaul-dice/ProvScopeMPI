@@ -936,11 +936,12 @@ int MPI_Probe (
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Probe\n", rank); */
         // don't control anything
-        return PMPI_Probe(
+        return __MPI_Probe(
                 source, 
                 tag, 
                 comm, 
-                status);
+                status,
+                messagePool);
     } 
  
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
@@ -956,16 +957,17 @@ int MPI_Probe (
     if(source == MPI_ANY_SOURCE) {
         source = stoi(msgs[4]);
     }
-    int ret = PMPI_Probe(
+    int ret = __MPI_Probe(
             source, 
             tag, 
             comm, 
-            &stat);
+            &stat,
+            messagePool);
     if(source != MPI_ANY_SOURCE) {
-        MPI_ASSERTNALIGN(stat.MPI_SOURCE == source);
+        MPI_ASSERT(stat.MPI_SOURCE == source);
     }
     if(tag != MPI_ANY_TAG) {
-        MPI_ASSERTNALIGN(stat.MPI_TAG == tag);
+        MPI_ASSERT(stat.MPI_TAG == tag);
     }
     if(status != MPI_STATUS_IGNORE) {
         memcpy(status, &stat, sizeof(MPI_Status));
@@ -1006,10 +1008,20 @@ int MPI_Iprobe (
             lastind, 
             __order_index);
     /* DEBUG0("MPI_Iprobe:%s\n", orders[__order_index].c_str()); */
-    MPI_ASSERT(msgs[0] == "MPI_Iprobe");
-    MPI_ASSERT(stoi(msgs[1]) == rank);
-    MPI_ASSERT(stoi(msgs[2]) == source);
-    MPI_ASSERT(stoi(msgs[3]) == tag);
+    if(msgs[0] != "MPI_Iprobe") {
+        string lastNodes = updateAndGetLastNodes(
+                __looptrees, 
+                TraceType::REPLAY);
+        DEBUG("rank: %d\nmsgs[0]: %s\n__order_index: %d\nlastNodes: %s\n", 
+                rank, 
+                msgs[0].c_str(), 
+                __order_index, 
+                lastNodes.c_str());
+    }
+    MPI_EQUAL(msgs[0], "MPI_Iprobe");
+    MPI_EQUAL(stoi(msgs[1]), rank);
+    MPI_EQUAL(stoi(msgs[2]), source);
+    MPI_EQUAL(stoi(msgs[3]), tag);
     int ret;
     if(msgs[4] == "SUCCESS") {
         *flag = 1;

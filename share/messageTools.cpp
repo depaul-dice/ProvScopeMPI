@@ -260,9 +260,7 @@ int __MPI_Send(
         int tag, 
         MPI_Comm comm,
         MessagePool &messagePool,
-        string &lastNodes,
-        FILE *recordFile,
-        unsigned long nodeCnt) {
+        string &lastNodes) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int size;
@@ -286,12 +284,6 @@ int __MPI_Send(
             dest, 
             tag, 
             comm);
-    if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Send:%d:%d:%lu\n", 
-                rank, 
-                dest, 
-                nodeCnt);
-    }
     return ret;
 }
 

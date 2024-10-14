@@ -141,9 +141,7 @@ int MPI_Send(
             tag, 
             comm,
             messagePool,
-            lastNodes,
-            recordFile,
-            nodecnt);
+            lastNodes);
     MPI_ASSERT(ret == MPI_SUCCESS);
     return ret;
 }
