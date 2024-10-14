@@ -590,8 +590,6 @@ int MPI_Testall (
     int *flag, 
     MPI_Status array_of_statuses[]
 ) {
-    FUNCGUARD();
-    /* DEBUG0("MPI_Testall\n"); */
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     bool isaligned = true;
@@ -602,7 +600,6 @@ int MPI_Testall (
             lastind, 
             __looptrees);
     if(!isaligned) {
-        /* DEBUG("at rank %d, the alignment was not successful at MPI_Testall\n", rank); */
         // don't control anything
         return __MPI_Testall(
                 count, 
@@ -616,39 +613,25 @@ int MPI_Testall (
             orders, 
             lastind, 
             __order_index);
-    /* if(msgs[0] != "MPI_Testall") { */
-        /* DEBUG0("msgs[0]: %s\n", msgs[0].c_str()); */
-    /* } */
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Testall");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
-    /* if(stoi(msgs[2]) != count) { */
-        /* DEBUG0("MPI_Testall: count = %d, stoi(msgs[2]) = %d\n__order_index: %d\n"\ */
-                /* , count, stoi(msgs[2]), __order_index - 1); */
-    /* } */
     MPI_ASSERTNALIGN(stoi(msgs[2]) == count);
-    /* DEBUG0("%s\n", orders[__order_index - 1].c_str()); */
     if(msgs[3] == "SUCCESS") {
-        MPI_ASSERTNALIGN(msgs.size() == 5 + 2 * count);
+        MPI_ASSERT(msgs.size() == 5 + 2 * count);
         int ret;
         MPI_Status stats[count];
-        /* while(!flag) { */
         ret = __MPI_Waitall(
                 count, 
                 array_of_requests, 
                 stats,
                 messagePool);
-        MPI_ASSERTNALIGN(ret == MPI_SUCCESS);
-        /* } */
+        MPI_ASSERT(ret == MPI_SUCCESS);
 
         for(int i = 0; i < count; i++) {
             if(__isends.find(&array_of_requests[i]) != __isends.end()) {
                 __isends.erase(&array_of_requests[i]);
             } else {
-                /* if(stats[i].MPI_SOURCE != stoi(msgs[4 + 2 * i + 1])) { */
-                    /* DEBUG0("stats[%d].MPI_SOURCE = %d\nstoi(msgs[%d]) = %d\n",\ */
-                            /* i, stats[i].MPI_SOURCE, 4 + 2 * i + 1, stoi(msgs[4 + 2 * i + 1])); */
-                /* } */
-                MPI_ASSERTNALIGN(stats[i].MPI_SOURCE == stoi(msgs[4 + 2 * i + 1]));
+                MPI_ASSERT(stats[i].MPI_SOURCE == stoi(msgs[4 + 2 * i + 1]));
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(
@@ -657,14 +640,13 @@ int MPI_Testall (
                         sizeof(MPI_Status));
             }
         
-            MPI_ASSERTNALIGN(__requests.find(msgs[4 + 2 * i]) != __requests.end());
-            MPI_ASSERTNALIGN(__requests[msgs[4 + 2 * i]] == &array_of_requests[i]);
-            /* __requests.erase(msgs[4 + 2 * i]); */
+            MPI_ASSERT(__requests.find(msgs[4 + 2 * i]) != __requests.end());
+            MPI_ASSERT(__requests[msgs[4 + 2 * i]] == &array_of_requests[i]);
         }
         *flag = 1;
     } else {
+        MPI_ASSERT(msgs[3] == "FAIL");
         *flag = 0;
-        MPI_ASSERTNALIGN(msgs[3] == "FAIL");
     }
     return MPI_SUCCESS;
 }
@@ -756,8 +738,6 @@ int MPI_Wait(
     MPI_Request *request, 
     MPI_Status *status
 ) {
-    FUNCGUARD();
-    /* DEBUG0("MPI_Wait\n"); */
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     bool isaligned = true;
@@ -781,19 +761,26 @@ int MPI_Wait(
             orders, 
             lastind, 
             __order_index);
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Wait");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
-    MPI_ASSERTNALIGN(__requests.find(msgs[2]) != __requests.end());
+    MPI_EQUAL(msgs[0], "MPI_Wait");
+    MPI_EQUAL(stoi(msgs[1]), rank);
+    MPI_ASSERT(__requests.find(msgs[2]) != __requests.end());
     int src = stoi(msgs[4]);
     // let's first call wait and see if the message is from the source 
+    MPI_Status localStat;
     int ret = __MPI_Wait(
             request, 
-            status,
+            &localStat,
             messagePool);
-    MPI_ASSERT(ret == MPI_SUCCESS);
+    if(status != MPI_STATUS_IGNORE) {
+        memcpy(
+                status, 
+                &localStat, 
+                sizeof(MPI_Status));
+    }
+    MPI_EQUAL(ret, MPI_SUCCESS);
     // if we have the message earlier, or if the message is not from the right source, let's alternate the source
-    MPI_ASSERTNALIGN(status->MPI_SOURCE == src);
-    MPI_ASSERTNALIGN(__requests[msgs[2]] == request);
+    MPI_EQUAL(status->MPI_SOURCE, src);
+    MPI_EQUAL(__requests[msgs[2]], request);
     __requests.erase(msgs[2]);
 
     return ret;
@@ -882,10 +869,10 @@ int MPI_Waitall(
             orders, 
             lastind, 
             __order_index);
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Waitall");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
+    MPI_EQUAL(msgs[0], "MPI_Waitall");
+    MPI_EQUAL(stoi(msgs[1]), rank);
     /* DEBUG("order: %s, __order_index: %d, %d\n", orders[__order_index - 1].c_str(), __order_index - 1, rank); */
-    MPI_ASSERTNALIGN(stoi(msgs[2]) == count);
+    MPI_EQUAL(stoi(msgs[2]), count);
     MPI_Status stats[count];
 
     int ret = __MPI_Waitall(
@@ -893,7 +880,7 @@ int MPI_Waitall(
             array_of_requests, 
             stats,
             messagePool);
-    MPI_ASSERT(ret == MPI_SUCCESS);
+    MPI_EQUAL(ret, MPI_SUCCESS);
     for(int i = 0; i < count; i++) {
         // first taking care of statuses
         if(array_of_statuses != MPI_STATUSES_IGNORE) {
