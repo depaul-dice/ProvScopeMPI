@@ -1017,11 +1017,12 @@ int MPI_Iprobe (
         if(source == MPI_ANY_SOURCE) {
             source = stoi(msgs[5]);
         }
-        ret = PMPI_Probe(
+        ret = __MPI_Probe(
                 source, 
                 tag, 
                 comm, 
-                &stat);
+                &stat,
+                messagePool);
         MPI_ASSERT(ret == MPI_SUCCESS);
         MPI_ASSERT(stat.MPI_SOURCE == source);
 
