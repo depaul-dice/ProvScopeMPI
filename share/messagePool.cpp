@@ -70,11 +70,7 @@ char *MessagePool::addMessage(
             && dataType != MPI_LONG_LONG_INT) {
         unsupportedDatatype(rank, __LINE__, dataType);
     }
-    /* if(isSend == false) { */
-    /*     fprintf(stderr, "addMessage at rank: %d, request: %p\n", */ 
-    /*             rank, */ 
-    /*             request); */
-    /* } */
+
     if(pool_.find(request) != pool_.end()) {
         MPI_ASSERT(pool_[request]->request_ == request);
         /* DEBUG("deleting msgBuffer at %s: %p, at rank: %d\n", __func__, pool_[request], rank); */
@@ -96,16 +92,6 @@ char *MessagePool::addMessage(
 
 MessageBuffer *MessagePool::peekMessage(
         MPI_Request *request) {
-    /*
-    if(pool_.find(request) == pool_.end()) {
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        fprintf(stderr, "message not found for request at peekMessage: %p \
-                at rank: %d\n", 
-                request, rank);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-    */
     if(pool_.find(request) == pool_.end()) {
         return nullptr;
     }
@@ -130,7 +116,9 @@ string MessagePool::loadMessage(
          * update the status for sends here
          */
         if(status != MPI_STATUS_IGNORE) {
-            status->MPI_SOURCE = msgBuf->src_;
+            if(!(msgBuf->isSend_)) {
+                status->MPI_SOURCE = msgBuf->src_;
+            }
             status->MPI_TAG = msgBuf->tag_;
             status->MPI_ERROR = MPI_SUCCESS;
             int size;
@@ -197,6 +185,13 @@ char *MessagePool::getRealBuf(MPI_Request *request) {
         throw runtime_error("request not found in pool_ at getBuf");
     }
     return pool_[request]->realBuf_;
+}
+
+int MessagePool::getSource(MPI_Request *request) {
+    if(pool_.find(request) == pool_.end()) {
+        throw runtime_error("request not found in pool_ at getSource");
+    }
+    return pool_[request]->src_;
 }
 
 int MessagePool::peekPeekedMessage(

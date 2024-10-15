@@ -155,6 +155,8 @@ int MPI_Irecv(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
+    /* DEBUG("MPI_Irecv: %p, source: %d\n", */ 
+    /*         request, source); */
     int ret = __MPI_Irecv(
             buf, 
             count, 

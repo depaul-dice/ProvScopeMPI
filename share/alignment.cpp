@@ -1586,7 +1586,7 @@ vector<string> getmsgs(
             msgs = parse(orders[order_index++], '|');
             MPI_ASSERT(msgs.size() == 2);
             nodes = msgs.back();
-            fprintf(stderr, "nodes: %s\n", nodes.c_str());
+            //fprintf(stderr, "nodes: %s\n", nodes.c_str());
             msgs = parse(msgs.front(), ':'); 
         } else {
             msgs = parse(orders[order_index++], ':'); 

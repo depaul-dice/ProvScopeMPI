@@ -330,6 +330,8 @@ int __MPI_Irecv(
         unsupportedDatatype(rank, __LINE__, datatype);
     }
 
+    /* DEBUG("MPI_Irecv: rank: %d, source: %d, Request *: %p\n", */ 
+    /*         rank, source, request); */
     /*
      * 1. Create a new buffer for the request
      * 2. Call irecv with the new buffer
@@ -573,17 +575,16 @@ int __MPI_Test(
      * if the peeked message is not found, then call the actual MPI_Test
      * and update the status and record the information
      */
-    MPI_Status stat;
-    memset(&stat, 0, sizeof(MPI_Status));
+    MPI_Status localStat;
     ret = PMPI_Test(
             request, 
             flag, 
-            &stat);
-    MPI_ASSERT(ret == MPI_SUCCESS);
+            &localStat);
+    MPI_EQUAL(ret, MPI_SUCCESS);
     if(status != MPI_STATUS_IGNORE) {
         memcpy(
                 status, 
-                &stat, 
+                &localStat, 
                 sizeof(MPI_Status));
     }
 
@@ -594,14 +595,24 @@ int __MPI_Test(
         /* DEBUG("load message at line: %d, rank: %d, request: %p\n", */ 
         /*         __LINE__, rank, request); */
         string lastNodes = messagePool.loadMessage(request, status);
-        if(lastNodes.length() > 0) {
-            //fprintf(stderr, "received at %s\n", lastNodes.c_str());
-        }
         if(recordFile != nullptr) {
+            /*
+             * this is a temporary solution, 
+             * we should not get localStat.MPI_SOURCE == MPI_ANY_SOURCE
+             * in the first place
+             */
+            if(localStat.MPI_SOURCE == MPI_ANY_SOURCE 
+                    && !messagePool.isSend(request)) {
+                DEBUG("MPI_ANY_SOURCE for something that's not send: %p, rank: %d\n", 
+                        request, 
+                        rank); 
+                localStat.MPI_SOURCE = messagePool.getSource(request);    
+                MPI_ASSERT(localStat.MPI_SOURCE != MPI_ANY_SOURCE);
+            }
             fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS:%d:%lu\n", \
                     rank, 
                     request, 
-                    stat.MPI_SOURCE, 
+                    localStat.MPI_SOURCE, 
                     nodeCnt);
         }
     } else {
@@ -705,7 +716,7 @@ int __MPI_Waitall(
     }
 
     if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Waitall:%d:%d\n", 
+        fprintf(recordFile, "MPI_Waitall:%d:%d", 
                 rank, count);
         for(int i = 0; i < count; i++) {
             fprintf(recordFile, ":%p:%d", 

@@ -49,7 +49,7 @@ MessagePool messagePool;
         } \
     } while(0)
 
-void segfault_handler(int sig, siginfo_t *info, void *ucontext) {
+void segfaultHandler(int sig, siginfo_t *info, void *ucontext) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     void *array[10];
@@ -76,11 +76,11 @@ void segfault_handler(int sig, siginfo_t *info, void *ucontext) {
     MPI_Abort(MPI_COMM_WORLD, 1);
 }
 
-void setup_signal_hander() {
+void setupSignalHandler() {
     struct sigaction sa;
 
     sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = segfault_handler;
+    sa.sa_sigaction = segfaultHandler;
     sigemptyset(&sa.sa_mask);
     if(sigaction(SIGSEGV, &sa, NULL) == -1) {
         fprintf(stderr, "Error: cannot set signal handler\n");
@@ -251,8 +251,8 @@ int MPI_Recv(
             lastInd, 
             __order_index);
     int src = stoi(msgs[2]);
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Recv");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
+    MPI_EQUAL(msgs[0], "MPI_Recv");
+    MPI_EQUAL(stoi(msgs[1]), rank);
     // force the source to the right source
     if(source == MPI_ANY_SOURCE) source = src;
     if(source != src) {
@@ -345,10 +345,9 @@ int MPI_Irecv(
             lastInd, 
             __order_index);
 
-    /* DEBUG0("MPI_Irecv: %s -> %p: %s\t", msgs[3].c_str(), request, orders[__order_index - 1].c_str()); */
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Irecv");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
-    /* MPI_ASSERTNALIGN(stoi(msgs[2]) == source); // commenting for the greedy alignment */
+    MPI_EQUAL(msgs[0], "MPI_Irecv");
+    MPI_EQUAL(stoi(msgs[1]), rank);
+    /* MPI_ASSERT(stoi(msgs[2]) == source); // commenting for the greedy alignment */
     // below is commented on purpose, do not uncomment
     /* MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end()); */
     __requests[msgs[3]] = request;
@@ -357,12 +356,14 @@ int MPI_Irecv(
                 orders, 
                 __order_index, 
                 msgs[3]);
-        /* DEBUG0(":ANY_SOURCE to %d\n", source); */
-        // -1 means was not able to find the right source, -2 means it was cancelled
-        MPI_ASSERTNALIGN(source != -1);
-    } else {
-        /* DEBUG0(":%d\n", source); */
-    }
+    } 
+    /*
+     * -1 means was not able to find the right source,
+     * -2 means it was cancelled
+     */
+    /* DEBUG("request: %p, source: %d\n", */ 
+    /*         request, source); */
+    MPI_ASSERT(source != -1);
     ret = __MPI_Irecv(
             buf, 
             count, 
@@ -561,8 +562,9 @@ int MPI_Test(
     MPI_ASSERT(__requests[msgs[2]] == request);
     int ret = MPI_SUCCESS;
     if(msgs[3] == "SUCCESS") {
-        // call wait and make sure it succeeds
-        /* DEBUG0(":SUCCESS\n"); */
+        /*
+         * call wait and make sure it succeeds
+         */
         int src = stoi(msgs[4]);
         ret = __MPI_Wait(
                 request,
@@ -571,13 +573,14 @@ int MPI_Test(
         if(__isends.find(request) != __isends.end()) {
             __isends.erase(request);
         } else {
-            MPI_ASSERT(status->MPI_SOURCE == src);
+            MPI_EQUAL(status->MPI_SOURCE, src);
         }
         /* __requests.erase(msgs[2]); */
         *flag = 1;
     } else {
-        // don't call anything
-        /* DEBUG0(":FAIL\n"); */
+        /* 
+         * don't call anything
+         */
         *flag = 0;
     }
     
@@ -869,6 +872,16 @@ int MPI_Waitall(
             orders, 
             lastind, 
             __order_index);
+    if(msgs[0] != "MPI_Waitall") {
+        string lastNodes = updateAndGetLastNodes(
+                __looptrees, 
+                TraceType::REPLAY);
+        DEBUG("rank: %d\nmsgs[0]: %s\n__order_index: %d\nlastNodes: %s\n", 
+                rank, 
+                msgs[0].c_str(), 
+                __order_index, 
+                lastNodes.c_str());
+    }
     MPI_EQUAL(msgs[0], "MPI_Waitall");
     MPI_EQUAL(stoi(msgs[1]), rank);
     /* DEBUG("order: %s, __order_index: %d, %d\n", orders[__order_index - 1].c_str(), __order_index - 1, rank); */

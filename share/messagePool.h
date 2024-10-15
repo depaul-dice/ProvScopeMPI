@@ -104,6 +104,13 @@ public:
             MPI_Request *request);
 
     /*
+     * This function gets the source, I am using this for the unexpected behavior, 
+     * but idk why this is happening
+     */
+    int getSource(
+            MPI_Request *request);
+
+    /*
      * This function looks into the peeked_ vector and manipulates status accordingly
      * returns -1 if not found
      */
