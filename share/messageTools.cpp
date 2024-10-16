@@ -13,14 +13,14 @@ void recordMPIIprobeSuccess(
         return;
     }
     if(source == MPI_ANY_SOURCE) {
-        fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:SUCCESS:%d:%lu\n", 
+        fprintf(recordFile, "MPI_Iprobe|%d|%d|%d|SUCCESS|%d|%lu\n", 
                 rank, 
                 source, 
                 tag, 
                 stat->MPI_SOURCE, 
                 nodeCount);
     } else {
-        fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:SUCCESS:%lu\n", 
+        fprintf(recordFile, "MPI_Iprobe|%d|%d|%d|SUCCESS|%lu\n", 
                 rank, 
                 source, 
                 tag, 
@@ -40,14 +40,14 @@ void recordMPIProbe (
         return;
     }
     if(source == MPI_ANY_SOURCE) {
-        fprintf(recordFile, "MPI_Probe:%d:%d:%d:%d:%lu\n", 
+        fprintf(recordFile, "MPI_Probe|%d|%d|%d|%d|%lu\n", 
                 rank, 
                 source, 
                 tag, 
                 status->MPI_SOURCE, 
                 nodeCount);
     } else {
-        fprintf(recordFile, "MPI_Probe:%d:%d:%d:%lu\n", 
+        fprintf(recordFile, "MPI_Probe|%d|%d|%d|%lu\n", 
                 rank, 
                 source, 
                 tag, 
@@ -184,7 +184,7 @@ int __MPI_Recv(
                 source);
         MPI_ASSERT(ret != -1);
         if(recordFile != nullptr) {
-            fprintf(recordFile, "MPI_Recv:%d:%d:%lu\n",
+            fprintf(recordFile, "MPI_Recv|%d|%d|%lu\n",
                     rank,
                     status->MPI_SOURCE,
                     nodeCnt);
@@ -243,7 +243,7 @@ int __MPI_Recv(
         status->_ucount = (msgs.size() - 2) * size;
     }
     if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Recv:%d:%d:%lu|%s\n",
+        fprintf(recordFile, "MPI_Recv|%d|%d|%lu|%s\n",
                 rank,
                 status->MPI_SOURCE,
                 nodeCnt,
@@ -362,7 +362,7 @@ int __MPI_Irecv(
  
     // I just need to keep track of the request
     if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Irecv:%d:%d:%p:%lu\n",
+        fprintf(recordFile, "MPI_Irecv|%d|%d|%p|%lu\n",
                 rank, 
                 source, 
                 request, 
@@ -430,7 +430,7 @@ int __MPI_Isend(
             request);
 
     if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Isend:%d:%d:%p:%lu\n", 
+        fprintf(recordFile, "MPI_Isend|%d|%d|%p|%lu\n", 
                 rank, 
                 dest, 
                 request, 
@@ -477,7 +477,7 @@ int __MPI_Wait(
                 request, status);
         //fprintf(stderr, "received at %s\n", lastNodes.c_str());
         if(recordFile != nullptr) {
-            fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu\n", 
+            fprintf(recordFile, "MPI_Wait|%d|%p|SUCCESS|%d|%lu\n", 
                     rank, 
                     request, 
                     src, 
@@ -509,7 +509,7 @@ int __MPI_Wait(
         //fprintf(stderr, "received at %s\n", lastNodes.c_str());
     }
     if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Wait:%d:%p:SUCCESS:%d:%lu\n", 
+        fprintf(recordFile, "MPI_Wait|%d|%p|SUCCESS|%d|%lu\n", 
                 rank, 
                 request, 
                 stat.MPI_SOURCE, 
@@ -562,7 +562,7 @@ int __MPI_Test(
 
         //fprintf(stderr, "received at %s\n", lastNodes.c_str());
         if(recordFile != nullptr) {
-            fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS:%d:%lu\n", 
+            fprintf(recordFile, "MPI_Test|%d|%p|SUCCESS|%d|%lu\n", 
                     rank, 
                     request, 
                     src, 
@@ -609,7 +609,7 @@ int __MPI_Test(
                 localStat.MPI_SOURCE = messagePool.getSource(request);    
                 MPI_ASSERT(localStat.MPI_SOURCE != MPI_ANY_SOURCE);
             }
-            fprintf(recordFile, "MPI_Test:%d:%p:SUCCESS:%d:%lu\n", \
+            fprintf(recordFile, "MPI_Test|%d|%p|SUCCESS|%d|%lu\n", \
                     rank, 
                     request, 
                     localStat.MPI_SOURCE, 
@@ -617,7 +617,7 @@ int __MPI_Test(
         }
     } else {
         if(recordFile != nullptr) {
-            fprintf(recordFile, "MPI_Test:%d:%p:FAIL:%lu\n", \
+            fprintf(recordFile, "MPI_Test|%d|%p|FAIL|%lu\n", \
                     rank, 
                     request, 
                     nodeCnt);
@@ -673,7 +673,7 @@ int __MPI_Waitall(
 
             //fprintf(stderr, "received at %s\n", lastNodes.c_str());
             if(recordFile != nullptr) {
-                fprintf(recordFile, "MPI_Waitall:%d:%p:SUCCESS:%d:%lu\n", 
+                fprintf(recordFile, "MPI_Waitall|%d|%p|SUCCESS|%d|%lu\n", 
                         rank, 
                         &array_of_requests[i], 
                         src, 
@@ -716,14 +716,14 @@ int __MPI_Waitall(
     }
 
     if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Waitall:%d:%d", 
+        fprintf(recordFile, "MPI_Waitall|%d|%d", 
                 rank, count);
         for(int i = 0; i < count; i++) {
-            fprintf(recordFile, ":%p:%d", 
+            fprintf(recordFile, "|%p|%d", 
                     &array_of_requests[i], 
                     localStats[i].MPI_SOURCE);
         }
-        fprintf(recordFile, ":%lu\n", nodeCnt);
+        fprintf(recordFile, "|%lu\n", nodeCnt);
     }
     return ret;
 }
@@ -775,7 +775,7 @@ int __MPI_Testall(
 
             //fprintf(stderr, "received at %s\n", lastNodes.c_str());
             if(recordFile != nullptr) {
-                fprintf(recordFile, "MPI_Testall:%d:%p:SUCCESS:%d:%lu\n", 
+                fprintf(recordFile, "MPI_Testall|%d|%p|SUCCESS|%d|%lu\n", 
                         rank, 
                         &array_of_requests[i], 
                         src, 
@@ -813,18 +813,18 @@ int __MPI_Testall(
                     || messagePool.isSend(&array_of_requests[i]));
         }
         if(recordFile != nullptr) {
-            fprintf(recordFile, "MPI_Testall:%d:%d:SUCCESS", 
+            fprintf(recordFile, "MPI_Testall|%d|%d|SUCCESS", 
                     rank, 
                     count);
             for(int i = 0; i < count; i++) {
-                fprintf(recordFile, ":%p:%d", 
+                fprintf(recordFile, "|%p|%d", 
                         &array_of_requests[i], 
                         localStats[i].MPI_SOURCE);
             }
-            fprintf(recordFile, ":%lu\n", nodeCnt);
+            fprintf(recordFile, "|%lu\n", nodeCnt);
         }
     } else if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Testall:%d:%d:FAIL:%lu\n", 
+        fprintf(recordFile, "MPI_Testall|%d|%d|FAIL|%lu\n", 
                 rank, 
                 count,
                 nodeCnt);
@@ -880,7 +880,7 @@ int __MPI_Testsome(
 
             //fprintf(stderr, "received at %s\n", lastNodes.c_str());
             if(recordFile != nullptr) {
-                fprintf(recordFile, "MPI_Testsome:%d:%p:SUCCESS:%d:%lu\n", 
+                fprintf(recordFile, "MPI_Testsome|%d|%p|SUCCESS|%d|%lu\n", 
                         rank, 
                         &array_of_requests[i], 
                         src, 
@@ -911,7 +911,7 @@ int __MPI_Testsome(
 
     // below this part is not done yet, IMPLEMENT!!
     if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Testsome:%d:%d", 
+        fprintf(recordFile, "MPI_Testsome|%d|%d", 
                 rank, *outcount);
     }
     if(*outcount > 0) {
@@ -925,14 +925,14 @@ int __MPI_Testsome(
                     &array_of_requests[ind], 
                     &array_of_statuses[ind]);
             if(recordFile != nullptr) {
-                fprintf(recordFile, ":%p:%d", 
+                fprintf(recordFile, "|%p|%d", 
                         &array_of_requests[ind], 
                         array_of_statuses[ind].MPI_SOURCE);
             }
         }
     }
     if(recordFile != nullptr) {
-        fprintf(recordFile, ":%lu\n", 
+        fprintf(recordFile, "|%lu\n", 
                 nodeCnt);
     }
     return ret;
@@ -948,7 +948,7 @@ int __MPI_Cancel(
     messagePool.deleteMessage(request);
     int ret = PMPI_Cancel(request);
     if(recordFile != nullptr) {
-        fprintf(recordFile, "MPI_Cancel:%d:%p:%lu\n", 
+        fprintf(recordFile, "MPI_Cancel|%d|%p|%lu\n", 
                 rank, 
                 request, 
                 nodeCnt);
@@ -1154,7 +1154,7 @@ int __MPI_Iprobe(
 
     } else {
         if(recordFile != nullptr) {
-            fprintf(recordFile, "MPI_Iprobe:%d:%d:%d:FAIL:%lu\n", 
+            fprintf(recordFile, "MPI_Iprobe|%d|%d|%d|FAIL|%lu\n", 
                     rank, 
                     source, 
                     tag, 

@@ -231,12 +231,12 @@ int MPI_Irsend(
             comm, 
             request);
     // I just need to keep track of the request
-    fprintf(recordFile, "MPI_Irsend:%d:%d:%p:%lu\n", 
+    fprintf(recordFile, "MPI_Irsend|%d|%d|%p|%lu\n", 
             rank, 
             dest, 
             request, 
             nodecnt);
-    RECORDTRACE("MPI_Irsend:%d:%d:%p\n", 
+    RECORDTRACE("MPI_Irsend|%d|%d|%p\n", 
             rank, 
             dest, 
             request);
@@ -366,12 +366,12 @@ int MPI_Waitany(
     }
 
     if(*index == MPI_UNDEFINED) {
-        fprintf(recordFile, "MPI_Waitany:%d:FAIL:%lu\n", 
+        fprintf(recordFile, "MPI_Waitany|%d|FAIL|%lu\n", 
                 rank, nodecnt);
     } else {
         MPI_ASSERT(__requests.find(&array_of_requests[*index]) != __requests.end());
         /* string req = __requests[&array_of_requests[*index]]; */
-        fprintf(recordFile, "MPI_Waitany:%d:SUCCESS:%p:%d:%lu\n", 
+        fprintf(recordFile, "MPI_Waitany|%d|SUCCESS|%p|%d|%lu\n", 
                 rank, 
                 &array_of_requests[*index], 
                 stat.MPI_SOURCE, 
@@ -496,11 +496,11 @@ int MPI_Send_init (
             request);
     MPI_ASSERT(__requests.find(request) == __requests.end());
     MPI_ASSERT(ret == MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Send_init:%d:%d:%p\n", 
+    fprintf(recordFile, "MPI_Send_init|%d|%d|%p\n", 
             rank, 
             dest, 
             request);
-    RECORDTRACE("MPI_Send_init:%d:%d:%p\n", 
+    RECORDTRACE("MPI_Send_init|%d|%d|%p\n", 
             rank, 
             dest, 
             request);
@@ -531,11 +531,11 @@ int MPI_Recv_init (
             request);
     MPI_ASSERT(__requests.find(request) == __requests.end());
     MPI_ASSERT(ret == MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Recv_init:%d:%d:%p\n", 
+    fprintf(recordFile, "MPI_Recv_init|%d|%d|%p\n", 
             rank, 
             source, 
             request);
-    RECORDTRACE("MPI_Recv_init:%d:%d:%p\n", 
+    RECORDTRACE("MPI_Recv_init|%d|%d|%p\n", 
             rank, 
             source, 
             request);
@@ -554,19 +554,13 @@ int MPI_Startall (
     int ret = PMPI_Startall(
             count, array_of_requests);
     MPI_ASSERT(ret == MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Startall:%d:%d", 
-            rank, count);
-    RECORDTRACE("MPI_Startall:%d:%d", 
+    fprintf(recordFile, "MPI_Startall|%d|%d", 
             rank, count);
     for(int i = 0; i < count; i++) {
         MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
-        fprintf(recordFile, ":%p", &array_of_requests[i]);
-        RECORDTRACE(":%p", &array_of_requests[i]);
-        DEBUG0(":%p", &array_of_requests[i]);
+        fprintf(recordFile, "|%p", &array_of_requests[i]);
     }
     fprintf(recordFile, "\n");
-    RECORDTRACE("\n");
-    DEBUG0("\n");
     return ret;
 }
 
@@ -578,10 +572,8 @@ int MPI_Request_free (
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_ASSERT(__requests.find(request) != __requests.end());
     int ret = PMPI_Request_free(request);
-    MPI_ASSERT(ret == MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Request_free:%d:%p\n", 
-            rank, request);
-    RECORDTRACE("MPI_Request_free:%d:%p\n", 
+    MPI_EQUAL(ret, MPI_SUCCESS);
+    fprintf(recordFile, "MPI_Request_free|%d|%p\n", 
             rank, request);
     __requests.erase(request);
     messagePool.deleteMessage(request);

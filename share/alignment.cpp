@@ -1582,14 +1582,11 @@ vector<string> getmsgs(
             DEBUG("order_index went beyong the size of orders, rank: %d\n", rank);
             return vector<string>();
         }
-        if(orders[order_index].find('|') != string::npos) {
-            msgs = parse(orders[order_index++], '|');
-            MPI_ASSERT(msgs.size() == 2);
+        msgs = parse(orders[order_index++], msgDelimiter);
+        if(msgs[0] == "MPI_Recv") {
             nodes = msgs.back();
-            //fprintf(stderr, "nodes: %s\n", nodes.c_str());
-            msgs = parse(msgs.front(), ':'); 
-        } else {
-            msgs = parse(orders[order_index++], ':'); 
+            msgs.pop_back();
+            fprintf(stderr, "received at %s\n", nodes.c_str());
         }
         ind = stoul(msgs.back());
     } while(lastind > ind);

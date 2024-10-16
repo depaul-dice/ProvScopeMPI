@@ -65,6 +65,8 @@ void close_debugfile();
 #define close_debugfile()
 #endif // DEBUG_MODE
 
+const char msgDelimiter = '|';
+
 std::vector<std::string> parse(std::string line, char delimit);
 // returns the rank where you got the message from
 int lookahead(std::vector<std::string>& orders, unsigned start, std::string& request);

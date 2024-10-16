@@ -62,10 +62,10 @@ vector<string> parse(string line, char delimit) {
 int lookahead(vector<string>& orders, unsigned start, string& request) {
     vector<string> tokens;
     for (unsigned i = start; i < orders.size(); i++) {
-        tokens = parse(orders[i], ':');
+        tokens = parse(orders[i], msgDelimiter);
         if(tokens[0] == "MPI_Test") {
-            // either MPI_Test:rank:request:SUCCESS:src
-            // or MPI_Test:rank:request:FAIL
+            // either MPI_Test|rank|request|SUCCESS|src
+            // or MPI_Test|rank|request|FAIL
             if(tokens[2] == request) {
                 if(tokens[3] == "SUCCESS") {
                     return stoi(tokens[4]);
@@ -78,8 +78,8 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
             // have not implemented this yet 
             MPI_ASSERT(false);
         } else if (tokens[0] == "MPI_Testsome") {
-            // either MPI_Testsome:rank:outcount:request:src:... 
-            // or MPI_Testsome:rank:outcount
+            // either MPI_Testsome|rank|outcount|request|src|... 
+            // or MPI_Testsome|rank|outcount
             int outcount = stoi(tokens[2]);
             if(outcount == 0) continue;
             else {
@@ -90,8 +90,8 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
                 }
             }
         } else if (tokens[0] == "MPI_Wait") {
-            // MPI_Wait:rank:request:SUCCESS:src
-            // or MPI_Wait:rank:request:FAIL
+            // MPI_Wait|rank|request|SUCCESS|src
+            // or MPI_Wait|rank|request|FAIL
             if(tokens[2] == request && tokens[3] == "SUCCESS") {
                 return stoi(tokens[4]);
             }
@@ -99,8 +99,8 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
             // have not implemented this yet
             MPI_ASSERT(false);
         } else if (tokens[0] == "MPI_Waitany") {
-            // MPI_Waitany:rank:SUCCESS:request:src
-            // or MPI_Waitany:rank:FAIL
+            // MPI_Waitany|rank|SUCCESS|request|src
+            // or MPI_Waitany|rank|FAIL
             if(tokens[2] == "SUCCESS" && tokens[3] == request) {
                 return stoi(tokens[4]);
             }
@@ -108,7 +108,7 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
             // have not implemented this yet
             MPI_ASSERT(false);
         } else if (tokens[0] == "MPI_Cancel") {
-            // MPI_Cancel:rank:request
+            // MPI_Cancel|rank|request
             if(tokens[2] == request) {
                 return -2;
             }
