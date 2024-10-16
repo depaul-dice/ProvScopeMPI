@@ -144,7 +144,8 @@ public:
         int tag,
         MPI_Comm comm,
         int src,
-        int *retSrc = nullptr);
+        int *retSrc = nullptr,
+        std::string *retTiming = nullptr);
 
     /*
      * This function deletes the message buffer

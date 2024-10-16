@@ -1583,6 +1583,9 @@ vector<string> getmsgs(
             return vector<string>();
         }
         msgs = parse(orders[order_index++], msgDelimiter);
+        /*
+         * this part needs to be fixed as it is causing some bugs
+         */
         if(msgs[0] == "MPI_Recv") {
             nodes = msgs.back();
             msgs.pop_back();

@@ -265,7 +265,8 @@ int MessagePool::loadPeekedMessage(
         int tag,
         MPI_Comm comm,
         int src,
-        int *retSrc) {
+        int *retSrc,
+        string *retTiming) {
     //fprintf(stderr, "loadPeekedMessage called: %lu, tag: %d, src: %d, count: %d\n", peeked_.size(), tag, src, count);
     int ind = 0;
     for(auto it = peeked_.begin(); it != peeked_.end(); it++) {
@@ -282,6 +283,9 @@ int MessagePool::loadPeekedMessage(
             exceptionAssert(
                     tokens.size() == count + 2, 
                     "tokens.size() != count + 2 at loadPeekedMessage");
+            if(retTiming != nullptr) {
+                *retTiming = tokens[tokens.size() - 2];
+            }
             if(dataType == MPI_INT) {
                 for(int i = 0; i < count; i++) {
                     ((int *)buf)[i] = stoi(tokens[i]);

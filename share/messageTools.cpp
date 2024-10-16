@@ -175,19 +175,24 @@ int __MPI_Recv(
                     &localStatus, 
                     sizeof(MPI_Status));
         }
+        int retSrc;
+        string sendNodes;
         ret = messagePool.loadPeekedMessage(
                 buf,
                 datatype,
                 count,
                 tag,
                 comm,
-                source);
+                source,
+                &retSrc,
+                &sendNodes);
         MPI_ASSERT(ret != -1);
         if(recordFile != nullptr) {
-            fprintf(recordFile, "MPI_Recv|%d|%d|%lu\n",
+            fprintf(recordFile, "MPI_Recv|%d|%d|%lu|%s\n",
                     rank,
-                    status->MPI_SOURCE,
-                    nodeCnt);
+                    retSrc,
+                    nodeCnt,
+                    sendNodes.c_str());
         }
         return MPI_SUCCESS;
     }
