@@ -149,7 +149,8 @@ vector<shared_ptr<element>> makeHierarchyMain(
     }
 
     if(index >= traces.size()) {
-        DEBUG("index: %lu, traces.size(): %lu\n", index, traces.size()); 
+        DEBUG("index: %lu, traces.size(): %lu\n", 
+                index, traces.size()); 
         return functionalTraces;
     }
 
