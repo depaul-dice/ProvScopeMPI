@@ -620,7 +620,7 @@ int MPI_Testall (
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
     MPI_ASSERTNALIGN(stoi(msgs[2]) == count);
     if(msgs[3] == "SUCCESS") {
-        MPI_ASSERT(msgs.size() == 5 + 2 * count);
+        MPI_ASSERT(msgs.size() == 5 + 3 * count);
         int ret;
         MPI_Status stats[count];
         ret = __MPI_Waitall(
@@ -634,7 +634,10 @@ int MPI_Testall (
             if(__isends.find(&array_of_requests[i]) != __isends.end()) {
                 __isends.erase(&array_of_requests[i]);
             } else {
-                MPI_ASSERT(stats[i].MPI_SOURCE == stoi(msgs[4 + 2 * i + 1]));
+                MPI_ASSERT(stats[i].MPI_SOURCE == stoi(msgs[4 + 3 * i + 1]));
+                auto sendNodes = msgs[4 + 3 * i + 2];
+                fprintf(stderr, "at %s, sendNodes: %s\n", 
+                        __func__, sendNodes.c_str());
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(
@@ -643,8 +646,8 @@ int MPI_Testall (
                         sizeof(MPI_Status));
             }
         
-            MPI_ASSERT(__requests.find(msgs[4 + 2 * i]) != __requests.end());
-            MPI_ASSERT(__requests[msgs[4 + 2 * i]] == &array_of_requests[i]);
+            MPI_ASSERT(__requests.find(msgs[4 + 3 * i]) != __requests.end());
+            MPI_ASSERT(__requests[msgs[4 + 3 * i]] == &array_of_requests[i]);
         }
         *flag = 1;
     } else {
@@ -693,7 +696,7 @@ int MPI_Testsome(
     MPI_EQUAL(msgs[0], "MPI_Testsome");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == myrank);
     int oc = stoi(msgs[2]);
-    MPI_ASSERT(msgs.size() == oc * 2 + 4);
+    MPI_ASSERT(msgs.size() == oc * 3 + 4);
     if(oc == 0) {
         // don't do anything
         /* DEBUG(":0\n"); */
@@ -704,8 +707,8 @@ int MPI_Testsome(
         int ind, ret, src;
         MPI_Status stat;
         for(int i = 0; i < oc; i++) {
-            req = (MPI_Request *)__requests[msgs[3 + 2 * i]];
-            src = stoi(msgs[3 + 2 * i + 1]);
+            req = (MPI_Request *)__requests[msgs[3 + 3 * i]];
+            src = stoi(msgs[3 + 3 * i + 1]);
             ind = req - array_of_requests;
             if(ind < 0 || incount <= ind) {
                 DEBUG("ind: %d, incount: %d\n", ind, incount);
@@ -723,6 +726,9 @@ int MPI_Testsome(
                 __isends.erase(req);
             } else {
                 MPI_ASSERTNALIGN(src == stat.MPI_SOURCE);
+                auto sendNodes = msgs[3 + 3 * i + 2];
+                fprintf(stderr, "at %s, sendNodes: %s\n", 
+                        __func__, sendNodes.c_str());
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(
@@ -768,6 +774,7 @@ int MPI_Wait(
     MPI_EQUAL(stoi(msgs[1]), rank);
     MPI_ASSERT(__requests.find(msgs[2]) != __requests.end());
     int src = stoi(msgs[4]);
+    auto sendNodes = msgs[6];
     // let's first call wait and see if the message is from the source 
     MPI_Status localStat;
     int ret = __MPI_Wait(
@@ -904,14 +911,17 @@ int MPI_Waitall(
         }
 
         // then requests
-        MPI_ASSERTNALIGN(__requests.find(msgs[3 + 2 * i]) != __requests.end());
-        MPI_ASSERTNALIGN(__requests[msgs[3 + 2 * i]] == &array_of_requests[i]);
+        MPI_ASSERTNALIGN(__requests.find(msgs[3 + 3 * i]) != __requests.end());
+        MPI_ASSERTNALIGN(__requests[msgs[3 + 3 * i]] == &array_of_requests[i]);
         if(__isends.find(&array_of_requests[i]) != __isends.end()) {
             __isends.erase(&array_of_requests[i]);
         } else {
-            MPI_ASSERTNALIGN(array_of_statuses[i].MPI_SOURCE == stoi(msgs[3 + 2 * i + 1]));
+            MPI_ASSERTNALIGN(array_of_statuses[i].MPI_SOURCE == stoi(msgs[3 + 3 * i + 1]));
+            auto sendNodes = msgs[3 + 3 * i + 2];
+            fprintf(stderr, "at %s, sendNodes: %s\n", 
+                    __func__, sendNodes.c_str());
         }
-        __requests.erase(msgs[3 + 2 * i]);
+        __requests.erase(msgs[3 + 3 * i]);
     }
     return ret;
 }

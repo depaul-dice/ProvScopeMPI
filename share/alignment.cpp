@@ -12,6 +12,11 @@ vector<vector<string>> replayTracesRaw; // this is necessary for bbprinter
 vector<shared_ptr<element>> replayTraces;
 
 static unordered_map<string, unordered_set<string>> divs;
+const unordered_set<string> mpiCallsWithSendNodesAtLast = {
+    "MPI_Recv",
+    "MPI_Test",
+    "MPI_Wait"
+};
 
 /*
  * this is simply the declaration of the function for a reference
@@ -178,7 +183,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
                     traces[index][0]);
         }
         index++;
-        
+    
         while(!isExit 
                 && index < traces.size() 
                 && traces[index][1] == "entry") {
@@ -1587,12 +1592,23 @@ vector<string> getmsgs(
         /*
          * this part needs to be fixed as it is causing some bugs
          */
-        if(msgs[0] == "MPI_Recv") {
+
+        if(mpiCallsWithSendNodesAtLast.find(msgs[0]) != mpiCallsWithSendNodesAtLast.end()
+                && 
+                (msgs[0] != "MPI_Test" 
+                 || msgs[3] == "SUCCESS")) {
             nodes = msgs.back();
             msgs.pop_back();
-            fprintf(stderr, "received at %s\n", nodes.c_str());
+        } 
+        try {
+            ind = stoul(msgs.back());
+        } catch(exception& e) {
+            cerr << "at " << msgs[0] << endl;
+            cerr << "exception caught: " << e.what() << endl;
+            cerr << "msgs.back(): " << msgs.back() << endl;
+            cerr << orders[order_index - 1] << endl;
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
-        ind = stoul(msgs.back());
     } while(lastind > ind);
     return msgs;
 }

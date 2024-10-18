@@ -84,7 +84,7 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
             if(outcount == 0) continue;
             else {
                 for(int j = 0; j < outcount; j++) {
-                    if(tokens[3 + 2 * j] == request) {
+                    if(tokens[3 + 3 * j] == request) {
                         return stoi(tokens[3 + 2 * j + 1]);
                     }
                 }
@@ -101,6 +101,7 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
         } else if (tokens[0] == "MPI_Waitany") {
             // MPI_Waitany|rank|SUCCESS|request|src
             // or MPI_Waitany|rank|FAIL
+            MPI_ASSERT(false);
             if(tokens[2] == "SUCCESS" && tokens[3] == request) {
                 return stoi(tokens[4]);
             }
