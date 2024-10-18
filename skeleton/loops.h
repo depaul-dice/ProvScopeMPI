@@ -37,7 +37,7 @@ public:
     void addRoot(loopNode *r);
 
     /* void print(std::string& file); */
-    void print(std::ofstream& file, cont std::string& funcname);
+    void print(std::ofstream& file, const std::string& funcname);
 
     node *entry;
     loopNode *parent;
