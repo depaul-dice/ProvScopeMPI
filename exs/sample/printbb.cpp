@@ -9,7 +9,7 @@ extern "C" void printBBname(char *name) {
     int rank, isInitialized, isFinalized;
     MPI_Initialized(&isInitialized);
     MPI_Finalized(&isFinalized);
-    if (!isInitialized || isFinalized) {
+    if (isInitialized && !isFinalized) {
         if(f == nullptr) {
             int rank;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
