@@ -3,9 +3,11 @@
 
 using namespace std;
 
-node::node(const string& name) : name(name) {}
+node::node(const string& name) : 
+    name(name) {}
 
-cfg::cfg(const string& funcname): funcname(funcname), entry(nullptr) {}
+cfg::cfg(const string& funcname): 
+    funcname(funcname), entry(nullptr) {}
 
 cfg::~cfg() {
     for (auto it = nodes.begin(); it != nodes.end(); it++) {
@@ -19,7 +21,8 @@ void cfg::insertNode(const string &name) {
     } 
 }
 
-void cfg::insertEdge(const string &from, const string &to) {
+void cfg::insertEdge(
+        const string &from, const string &to) {
     node *src = nodes[from], *dst = nodes[to];
     if(outEdges.find(src) == outEdges.end()) {
         outEdges[src] = set<node *>();
@@ -60,7 +63,11 @@ node *cfg::getNode(const string &name) {
         return nullptr;
     }
 }
-static void mergeEdges(map<node *, set<node *>> &tmpOutEdges, map<node *, set<node *>> &outEdges, map<node *, set<node *>> &inEdges) {
+
+static void mergeEdges(
+        map<node *, set<node *>> &tmpOutEdges, 
+        map<node *, set<node *>> &outEdges, 
+        map<node *, set<node *>> &inEdges) {
     for(auto it = tmpOutEdges.begin(); it != tmpOutEdges.end(); it++) {
         if(outEdges.find(it->first) == outEdges.end()) {
             outEdges[it->first] = set<node *>();
@@ -89,13 +96,16 @@ set<node *> cfg::findMinimalNodes() {
     bool flag = false;
     for(node *n : v) {
         flag = false;
-        if(newInEdges.find(n) == newInEdges.end() || newInEdges[n].size() == 0
-                || newOutEdges.find(n) == newOutEdges.end() || newOutEdges[n].size() == 0) {
+        if(newInEdges.find(n) == newInEdges.end() 
+                || newInEdges[n].size() == 0
+                || newOutEdges.find(n) == newOutEdges.end() 
+                || newOutEdges[n].size() == 0) {
             continue;
         }
         for(node *src : newInEdges[n]) {
             for(node *dst : newOutEdges[n]) {
-                if(newOutEdges.find(src) != newOutEdges.end() && newOutEdges[src].find(dst) != newOutEdges[src].end()) {
+                if(newOutEdges.find(src) != newOutEdges.end() 
+                        && newOutEdges[src].find(dst) != newOutEdges[src].end()) {
                     flag = true;
                     break;
                 } else {

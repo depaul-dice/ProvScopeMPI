@@ -45,7 +45,11 @@ namespace {
             return succ_begin(&bb) == succ_end(&bb);
         }
          
-        void inline insertBeginning(string str, Function *printFunc, Function::iterator& bb, IRBuilder<>& Builder) {
+        void inline insertBeginning(
+                string str, 
+                Function *printFunc, 
+                Function::iterator& bb, 
+                IRBuilder<>& Builder) {
             /* Value *strPtr = Builder.CreateGlobalStringPtr(str, "blockString"); */
             /* Builder.CreateCall(printFunc, strPtr); */
             ASSERT(!bb->empty());
@@ -55,7 +59,11 @@ namespace {
             Builder.CreateCall(printFunc, strPtr);
         }
 
-        void inline insertBeforeRet(string str, Function *printFunc, Function::iterator& bb, IRBuilder<>& Builder) {
+        void inline insertBeforeRet(
+                string str, 
+                Function *printFunc, 
+                Function::iterator& bb, 
+                IRBuilder<>& Builder) {
             ASSERT(!bb->empty());
             Instruction *terminator = bb->getTerminator();
             ASSERT(isa<ReturnInst>(terminator));
@@ -94,28 +102,53 @@ namespace {
 
             for(Function::iterator bb = F.begin(), e = F.end(); bb != e; ++bb){
                 funcBBnum++;
-                if(isEntryBlock(*bb) && isExitBlock(*bb)) {
+                if(isEntryBlock(*bb) 
+                        && isExitBlock(*bb)) {
                     graph->insertNode(F.getName().str() + ":entry:" + to_string(count));
 
                     bb->setName(F.getName() + ":entry:" + to_string(count++));
-                    insertBeginning(bb->getName().str(), printFunc, bb, Builder);
+                    insertBeginning(
+                            bb->getName().str(), 
+                            printFunc, 
+                            bb, 
+                            Builder);
                     string str = (F.getName() + ":exit:" + to_string(count++)).str();
-                    insertBeforeRet(str, printFunc, bb, Builder);
+                    insertBeforeRet(
+                            str, 
+                            printFunc, 
+                            bb, 
+                            Builder);
                 } else if (isEntryBlock(*bb)) {
                     bb->setName(F.getName() + ":entry:" + to_string(count++));
-                    insertBeginning(bb->getName().str(), printFunc, bb, Builder);
+                    insertBeginning(
+                            bb->getName().str(), 
+                            printFunc, 
+                            bb, 
+                            Builder);
 
                     graph->insertNode(bb->getName().str());
                 } else if (isExitBlock(*bb)) {
                     string str = (F.getName() + ":neither:" + to_string(count++)).str();
-                    insertBeginning(str, printFunc, bb, Builder);
+                    insertBeginning(
+                            str, 
+                            printFunc, 
+                            bb, 
+                            Builder);
 
                     graph->insertNode(F.getName().str() + ":exit:" + to_string(count));
                     bb->setName(F.getName() + ":exit:" + to_string(count++));
-                    insertBeforeRet(bb->getName().str(), printFunc, bb, Builder);
+                    insertBeforeRet(
+                            bb->getName().str(), 
+                            printFunc, 
+                            bb, 
+                            Builder);
                 } else {
                     bb->setName(F.getName() + ":neither:" + to_string(count++));
-                    insertBeginning(bb->getName().str(), printFunc, bb, Builder);
+                    insertBeginning(
+                            bb->getName().str(), 
+                            printFunc, 
+                            bb, 
+                            Builder);
 
                     graph->insertNode(bb->getName().str());
                 }
@@ -125,7 +158,8 @@ namespace {
 
             for(auto &bb : F){
                 for(auto *succ: successors(&bb)){
-                    graph->insertEdge(bb.getName().str(), succ->getName().str());
+                    graph->insertEdge(
+                            bb.getName().str(), succ->getName().str());
                 }
             }
 
@@ -133,10 +167,13 @@ namespace {
             __duration += duration_cast<microseconds>(tok - tik);
 
             map<node *, node *> iloopHeaders{};
-            fillIloopHeaders(graph, iloopHeaders);
-            loopNode *root = createLoopTree(iloopHeaders, graph);
+            fillIloopHeaders(
+                    graph, iloopHeaders);
+            loopNode *root = createLoopTree(
+                    iloopHeaders, graph);
             /* root->print(loopfile); */
-            root->print(looptreefile, F.getName().str());
+            root->print(
+                    looptreefile, F.getName().str());
 
             delete graph;
             delete root;

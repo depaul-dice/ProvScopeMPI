@@ -178,22 +178,30 @@ string replaceall(string& str, const string& from, const string& to) {
     return ret;
 }
 
-void splitNinsert(const string& str, const string& delimit, unordered_set<string>& container) {
+string splitNinsert(const string& str, const string& delimit, unordered_set<string>& container) {
     size_t start = 0;
     size_t end = str.find(delimit);
     string res;
+    string headName;
     while(end != string::npos) {
         res = str.substr(start, end - start);
         if(res.size() > 0) {
             container.insert(res);
         }
+        if(start == 0) {
+            headName = res;
+        }
         start = end + delimit.size();
         end = str.find(delimit, start);
     }
     res = str.substr(start, end);
+    if(start == 0) {
+        headName = res;
+    }
     if(res.size() > 0) {
         container.insert(res);
     }
+    return headName;
 }
 
 void mpi_equal(string a, char *b) {

@@ -59,7 +59,7 @@ void printNodeInfo(
         Agnode_t* node, Agraph_t* subgraph);
 
 // this should create one loop tree
-std::pair<std::string, loopNode *> parseCluster(
+std::pair<std::string, loopNode *> parseGraph(
         Agraph_t* subgraph, const std::string& prefix);
 // this should create multiple loop trees
 std::unordered_map<std::string, loopNode *> parseDotFile(const std::string& filename);

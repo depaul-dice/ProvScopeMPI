@@ -31,13 +31,15 @@ public:
     loopNode& operator = (const loopNode& rhs) = delete; // I will need to deep copy
     ~loopNode();
 
-    loopNode(node *entry, std::set<node *> &nodes);
+    loopNode(
+            node *entry, std::set<node *> &nodes);
     loopNode(std::set<node *> &nodes);
     void addParent(loopNode *p);
     void addRoot(loopNode *r);
 
     /* void print(std::string& file); */
-    void print(std::ofstream& file, const std::string& funcname);
+    void print(
+            std::ofstream& file, const std::string& funcname);
 
     node *entry;
     loopNode *parent;
@@ -49,5 +51,6 @@ private:
     std::string __print(std::ofstream& file);
 };
 
-loopNode *createLoopTree(std::map<node *, node *>& iloopHeaders, cfg *g);
+loopNode *createLoopTree(
+        std::map<node *, node *>& iloopHeaders, cfg *g);
 #endif // LOOPS_H

@@ -112,21 +112,17 @@ void printNodeInfo(
 }
 
 // here you need to manipulate ret to get the correct values
-pair<string, loopNode *> parseCluster(
-        Agraph_t* subgraph, const std::string& prefix = "") {
+pair<string, loopNode *> parseGraph(
+        Agraph_t* graph, const std::string& prefix = "") {
     pair<string, loopNode *> ret;
-    string subgraphName = agnameof(subgraph);
-    MPI_ASSERT(subgraphName.rfind("root", 0) != 0);
+    string graphName = agnameof(graph);
+    MPI_ASSERT(graphName.rfind("root", 0) != 0);
     
-    ret.first = subgraphName;
-    /* bool flag = false; */
-    /* if(subgraphName == "hypre_NewCommPkgCreate_core") { */
-    /*     flag = true; */
-    /* } */
+    ret.first = graphName;
 
-    unordered_set<string> dummyset;
-    string rootname = "root_" + subgraphName;;
-    loopNode *root = new loopNode(rootname, dummyset);
+    unordered_set<string> dummySet;
+    string rootName = "root_" + graphName;;
+    loopNode *root = new loopNode(rootName, dummySet);
     ret.second = root;
 
     // Iterate over nodes in the subgraph, and create a tree here
@@ -135,36 +131,59 @@ pair<string, loopNode *> parseCluster(
     nodes["root"] = root;
 
     char *label;
-    string headname;
-    for (Agnode_t* node = agfstnode(subgraph); node; node = agnxtnode(subgraph, node)) {
+    string headName;
+    unordered_map<string, string> headNameConversions;
+    for (
+            Agnode_t* node = agfstnode(graph); 
+            node != nullptr; 
+            node = agnxtnode(graph, node)) {
         /* logger << prefix << "  "; */
         /* if(flag) printNodeInfo(node, subgraph); */
         label = agget(node, (char *)"label");
         MPI_ASSERT(label && *label);
-        if(string(agnameof(node)).rfind("root", 0) == 0) {
+        headName = agnameof(node);
+        if(headName == "root") {
             // the name of the node starts with root_
             // this is the root node
-            headname = "root";
             MPI_ASSERT(!strcmp(label, "root"));
         } else {
-            headname = agnameof(node);
-            /* if(flag) logger << "\nheadname: " << headname << endl; */
+            string lastHeadName = headName;
             string labelstr = string(label);
             unordered_set<string> content;
-            splitNinsert(labelstr, "\\l", content);
-            nodes[headname] = new loopNode(headname, content); 
+            headName = splitNinsert(labelstr, "\\l", content);
+            MPI_ASSERT(headNameConversions.find(lastHeadName) == headNameConversions.end());
+            headNameConversions[lastHeadName] = headName;
+            /* DEBUG0("headName: %s\n", headName.c_str()); */
+            nodes[headName] = new loopNode(headName, content); 
             /* int rank; */
             /* MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
             /* if(flag && rank == 0) cerr << "\nnew node!\n" << *(nodes[headname]) << endl; */
         }
-
-        for(Agedge_t *edge = agfstout(subgraph, node); edge; edge = agnxtout(subgraph, edge)) {
-            string child = agnameof(aghead(edge));
-            /* if(flag) logger << "child: " << child << endl << endl; */
-            if(edges.find(headname) == edges.end()) {
-                edges[headname] = unordered_set<string>();
+    }
+    for(
+            Agnode_t *node = agfstnode(graph); 
+            node != nullptr; 
+            node = agnxtnode(graph, node)) {
+        string src;
+        if(headNameConversions.find(agnameof(node)) != headNameConversions.end()) {
+            src = headNameConversions[agnameof(node)];
+        } else {
+            src = agnameof(node);
+        }
+        for(
+                Agedge_t *edge = agfstout(graph, node); 
+                edge != nullptr; 
+                edge = agnxtout(graph, edge)) {
+            string dest;
+            if(headNameConversions.find(agnameof(aghead(edge))) != headNameConversions.end()) {
+                dest = headNameConversions[agnameof(aghead(edge))];
+            } else {
+                dest = agnameof(aghead(edge));
             }
-            edges[headname].insert(child);
+            if(edges.find(src) == edges.end()) {
+                edges[src] = unordered_set<string>();
+            }
+            edges[src].insert(dest);
         }
     }
 
@@ -194,17 +213,14 @@ unordered_map<string, loopNode *> parseDotFile(const std::string& filename) {
 
     Agraph_t* graph = agread(file, nullptr);
     MPI_ASSERT(graph != nullptr);
-    /* cerr << "Graph name: " << agnameof(graph) << endl; */
-    /* cerr << "Graph has nodes: " << (agnode(graph, NULL, 0) != nullptr) << endl; */
 
     // Iterate over all subgraphs (clusters only)
     pair<string, loopNode *> root;
     while((graph = agread(file, nullptr)) != nullptr) {
-        root = parseCluster(graph);
+        root = parseGraph(graph);
         ret[root.first] = root.second;
         agclose(graph);
     }
-    /* cerr << "Parsed " << ret.size() << " clusters" << endl; */
 
     fclose(file);
     return ret;

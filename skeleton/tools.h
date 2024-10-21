@@ -8,6 +8,8 @@
 #include <iostream>
 
 namespace Tools {
+    const std::string SAFEDELIM = "::";
+
     template<typename E> 
     void print(std::ostream& os, std::vector<E>& v) {
         for(auto e: v) {
@@ -197,6 +199,8 @@ namespace Tools {
     }
 
     double average(const std::vector<double>& vec);
+
+    std::string replaceAll(const std::string &str);
 }
 
 #endif /*TOOLS_H*/

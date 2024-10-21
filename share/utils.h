@@ -156,7 +156,7 @@ Logger& Logger::operator << (const T& message) {
 
 std::string replaceall(std::string& str, const std::string& from, const std::string& to);
 
-void splitNinsert(const std::string& str, const std::string& delimit, std::unordered_set<std::string>& container);
+std::string splitNinsert(const std::string& str, const std::string& delimit, std::unordered_set<std::string>& container);
 
 template <typename T>
 void mpi_equal(T a, T b) {
