@@ -200,6 +200,9 @@ vector<shared_ptr<element>> makeHierarchyMain(
 static loopNode *isNewLoop(
         string bbname, 
         loopNode *ln) {
+    if(ln == nullptr) {
+        cerr << bbname << endl;
+    }
     MPI_ASSERT(ln != nullptr);
     /* DEBUG0("isNewLoop with bbname: %s, at ln of %s\n", bbname.c_str(), ln->entry.c_str()); */
     for(auto &c: ln->children) {

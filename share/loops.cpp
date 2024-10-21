@@ -216,11 +216,11 @@ unordered_map<string, loopNode *> parseDotFile(const std::string& filename) {
 
     // Iterate over all subgraphs (clusters only)
     pair<string, loopNode *> root;
-    while((graph = agread(file, nullptr)) != nullptr) {
+    do {
         root = parseGraph(graph);
         ret[root.first] = root.second;
         agclose(graph);
-    }
+    } while((graph = agread(file, nullptr)) != nullptr);
 
     fclose(file);
     return ret;
