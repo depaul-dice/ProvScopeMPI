@@ -116,7 +116,8 @@ pair<string, loopNode *> parseCluster(
         Agraph_t* subgraph, const std::string& prefix = "") {
     pair<string, loopNode *> ret;
     string subgraphName = agnameof(subgraph);
-    /* logger << prefix << "Cluster: " << subgraphName << endl; */
+    MPI_ASSERT(subgraphName.rfind("root", 0) != 0);
+    
     ret.first = subgraphName;
     /* bool flag = false; */
     /* if(subgraphName == "hypre_NewCommPkgCreate_core") { */
@@ -140,7 +141,7 @@ pair<string, loopNode *> parseCluster(
         /* if(flag) printNodeInfo(node, subgraph); */
         label = agget(node, (char *)"label");
         MPI_ASSERT(label && *label);
-        if(string(agnameof(node)).rfind("root_", 0) == 0) {
+        if(string(agnameof(node)).rfind("root", 0) == 0) {
             // the name of the node starts with root_
             // this is the root node
             headname = "root";
@@ -193,16 +194,18 @@ unordered_map<string, loopNode *> parseDotFile(const std::string& filename) {
 
     Agraph_t* graph = agread(file, nullptr);
     MPI_ASSERT(graph != nullptr);
+    /* cerr << "Graph name: " << agnameof(graph) << endl; */
+    /* cerr << "Graph has nodes: " << (agnode(graph, NULL, 0) != nullptr) << endl; */
 
     // Iterate over all subgraphs (clusters only)
     pair<string, loopNode *> root;
-    for (Agraph_t* subgraph = agfstsubg(graph); subgraph; subgraph = agnxtsubg(subgraph)) {
-        root = parseCluster(subgraph);
+    while((graph = agread(file, nullptr)) != nullptr) {
+        root = parseCluster(graph);
         ret[root.first] = root.second;
+        agclose(graph);
     }
-    cerr << "Parsed " << ret.size() << " clusters" << endl;
+    /* cerr << "Parsed " << ret.size() << " clusters" << endl; */
 
-    agclose(graph);
     fclose(file);
     return ret;
 }

@@ -85,9 +85,11 @@ int MPI_Init(
         lt.second->fixExclusives();
     }
 
-    cerr << "hello from rank " << rank << endl;
-    for(auto lt: loopTrees) {
-        lt.second->print(std::cerr, lt.first);
+    if(rank == 0) {
+        cerr << "printing...\n";
+        for(auto lt: loopTrees) {
+            lt.second->print(std::cerr, lt.first);
+        }
     }
 
     return ret;

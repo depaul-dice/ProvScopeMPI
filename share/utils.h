@@ -60,7 +60,7 @@ void close_debugfile();
 
 #else
 //#define DEBUG(...)
-#define DEBUG0(...)
+//#define DEBUG0(...)
 #define open_debugfile()
 #define close_debugfile()
 #endif // DEBUG_MODE
