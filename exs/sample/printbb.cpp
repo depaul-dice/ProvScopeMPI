@@ -5,7 +5,7 @@
 
 FILE *f = nullptr;
 
-void printBBname(char *name) {
+extern "C" void printBBname(char *name) {
     int rank, isInitialized, isFinalized;
     MPI_Initialized(&isInitialized);
     MPI_Finalized(&isFinalized);
