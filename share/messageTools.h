@@ -78,6 +78,7 @@ int __MPI_Recv(
         MPI_Comm comm, 
         MPI_Status *status,
         MessagePool &messagePool,
+        std::string *repSendNodes = nullptr,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
 

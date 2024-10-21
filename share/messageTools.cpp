@@ -153,6 +153,7 @@ int __MPI_Recv(
         MPI_Comm comm, 
         MPI_Status *status,
         MessagePool& messagePool,
+        string *repSendNodes,
         FILE *recordFile,
         unsigned long nodeCnt) {
     int rank;
@@ -187,6 +188,9 @@ int __MPI_Recv(
                 &retSrc,
                 &sendNodes);
         MPI_ASSERT(ret != -1);
+        if(repSendNodes != nullptr) {
+            *repSendNodes = sendNodes;
+        }
         if(recordFile != nullptr) {
             fprintf(recordFile, "MPI_Recv|%d|%d|%lu|%s\n",
                     rank,
@@ -246,6 +250,9 @@ int __MPI_Recv(
                 &localStatus, 
                 sizeof(MPI_Status));
         status->_ucount = (msgs.size() - 2) * size;
+    }
+    if(repSendNodes != nullptr) {
+        *repSendNodes = msgs[msgs.size() - 2];
     }
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Recv|%d|%d|%lu|%s\n",
@@ -1153,7 +1160,9 @@ int __MPI_Iprobe(
                 statRecv.MPI_SOURCE);
                 
         if(status != MPI_STATUS_IGNORE) {
-        /* update status' ucount manually */
+            /* 
+             * update status' ucount manually 
+             */
             /*
              * DEBUG("result of the MPI_Recv, rank: %d, src: %d, tag: %d, ucount:%lu\n", 
                     rank, statRecv.MPI_SOURCE, tag, statRecv._ucount);
@@ -1167,7 +1176,9 @@ int __MPI_Iprobe(
                     rank, status->MPI_SOURCE, tag, status->_ucount);
              */
         }
-        /* record the result of Iprobe */
+        /* 
+         * record the result of Iprobe 
+         */
         // I think this is wrong, you have to think about the count
         recordMPIIprobeSuccess(
                 recordFile,

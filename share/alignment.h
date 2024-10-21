@@ -155,7 +155,8 @@ std::deque<std::shared_ptr<lastaligned>> greedyalignmentOnline(
 std::vector<std::string> getmsgs(
         std::vector<std::string> &orders, 
         const size_t lastind, 
-        unsigned& order_index);
+        unsigned& order_index,
+        std::string *recSendNodes = nullptr);
 
 void appendRecordTracesRaw(std::vector<std::string> rawRecordTrace);
 #endif // ALIGNMENT_H

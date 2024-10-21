@@ -200,6 +200,7 @@ unordered_map<string, loopNode *> parseDotFile(const std::string& filename) {
         root = parseCluster(subgraph);
         ret[root.first] = root.second;
     }
+    cerr << "Parsed " << ret.size() << " clusters" << endl;
 
     agclose(graph);
     fclose(file);

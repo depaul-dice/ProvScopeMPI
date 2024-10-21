@@ -394,7 +394,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
     bool isEntry = false, 
          isExit = false;
     string funcname = "main";
-    MPI_ASSERT(loopTrees.find(funcname) != loopTrees.end());
+    MPI_ASSERT(loopTrees.find("main") != loopTrees.end());
     loopNode *loopTree = loopTrees[funcname], 
              *child = nullptr;
     string bbname;
@@ -1577,7 +1577,8 @@ bool greedyalignmentWholeOffline() {
 vector<string> getmsgs(
         vector<string> &orders, 
         const size_t lastind, 
-        unsigned& order_index) {
+        unsigned& order_index,
+        string* recSendNodes) {
     size_t ind = 0;
     vector<string> msgs;
     string nodes;
@@ -1597,7 +1598,9 @@ vector<string> getmsgs(
                 && 
                 (msgs[0] != "MPI_Test" 
                  || msgs[3] == "SUCCESS")) {
-            nodes = msgs.back();
+            if(recSendNodes != nullptr) {
+                *recSendNodes = msgs.back();
+            }
             msgs.pop_back();
         } 
         try {

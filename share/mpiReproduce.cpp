@@ -246,21 +246,24 @@ int MPI_Recv(
                 messagePool);
         return ret;
     } 
+    string recSendNodes = "";
     msgs = getmsgs(
             orders, 
             lastInd, 
-            __order_index);
+            __order_index,
+            &recSendNodes);
     int src = stoi(msgs[2]);
     MPI_EQUAL(msgs[0], "MPI_Recv");
     MPI_EQUAL(stoi(msgs[1]), rank);
-    // force the source to the right source
-    if(source == MPI_ANY_SOURCE) source = src;
-    if(source != src) {
-        DEBUG0("MPI_Recv: source = %d, src = %d\n", 
-                source, src);
+    /*
+     * force the source to the right source
+     */
+    if(source == MPI_ANY_SOURCE) {
+        source = src;
     }
     MPI_ASSERTNALIGN(source == src);
     
+    string repSendNodes = "";
     ret = __MPI_Recv(
             buf, 
             count, 
@@ -269,7 +272,10 @@ int MPI_Recv(
             tag, 
             comm, 
             status,
-            messagePool);
+            messagePool,
+            &repSendNodes);
+
+    MPI_EQUAL(recSendNodes, repSendNodes);
     return ret;
 }
 

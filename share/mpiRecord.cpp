@@ -85,6 +85,11 @@ int MPI_Init(
         lt.second->fixExclusives();
     }
 
+    cerr << "hello from rank " << rank << endl;
+    for(auto lt: loopTrees) {
+        lt.second->print(std::cerr, lt.first);
+    }
+
     return ret;
 }
 
@@ -118,6 +123,7 @@ int MPI_Recv(
             comm, 
             status,
             messagePool,
+            nullptr,
             recordFile,
             nodecnt);
 }
