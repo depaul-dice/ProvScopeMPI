@@ -16,7 +16,11 @@ static unsigned __order_index = 0;
 /* static unsigned __recordtrace_index = 0; */
 extern vector<shared_ptr<element>> recordTraces;
 extern vector<vector<string>> replayTracesRaw;
-/* extern vector<element> replaytraces; */
+/*
+ * below is for the debugging purpose, delete when done
+ */
+extern vector<shared_ptr<element>> replayTraces;
+
 /* static unsigned __replaytrace_index = 0; */
 /* static unordered_map<string, vector<unsigned long>> __map; */
 
@@ -416,7 +420,7 @@ int MPI_Isend(
             lastInd, 
             __looptrees);
     if(!isAligned) {
-        /* DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank); */
+        DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank);
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
         __isends.insert(request);
@@ -428,7 +432,15 @@ int MPI_Isend(
             orders, 
             lastInd, 
             __order_index);
-    /* DEBUG0("MPI_Isend: %s -> %p: %s\n", msgs[3].c_str(), request, orders[__order_index - 1].c_str()); */
+    if(rank == 4 && dest == 5) {
+        print(replayTraces, 0);
+        DEBUG("MPI_Isend: %s -> %p: %s\nrank: %d, currNodes:%s\n", 
+                msgs[3].c_str(), 
+                request, 
+                orders[__order_index - 1].c_str(), 
+                rank,
+                currNodes.c_str());
+    }
     MPI_EQUAL(msgs[0], "MPI_Isend");
     MPI_EQUAL(stoi(msgs[1]), rank);
     /* MPI_ASSERTNALIGN(stoi(msgs[2]) == dest); */ // commenting for the greedy alignment
@@ -741,6 +753,9 @@ int MPI_Testsome(
                 auto recSendNodes = msgs[3 + 3 * i + 2];
                 /* fprintf(stderr, "at %s, sendNodes: %s\n", */ 
                 /*         __func__, recSendNodes.c_str()); */
+                if(recSendNodes != repSendNodes) {
+                    fprintf(stderr, "rank: %d, src: %d\n", myrank, src);
+                }
                 MPI_EQUAL(recSendNodes, repSendNodes);
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {

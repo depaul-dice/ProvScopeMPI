@@ -107,13 +107,17 @@ std::string updateAndGetLastNodes(
         std::unordered_map<std::string, loopNode *>& loopTrees, 
         TraceType traceType);
 
-// these functions below DO NOT consider loops at all
+/*
+ * these functions below DO NOT consider loops at all
+ */
 std::vector<std::shared_ptr<element>> makeHierarchyMain(
         std::vector<std::vector<std::string>>& traces, unsigned long& index);
 std::vector<std::shared_ptr<element>> makeHierarchy(
         std::vector<std::vector<std::string>>& traces, unsigned long& index);
 
-// these functions below consider loops
+/*
+ * these functions below consider loops
+ */
 std::vector<std::shared_ptr<element>> makeHierarchyMain(
         std::vector<std::vector<std::string>>& traces, 
         unsigned long &index, 

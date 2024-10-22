@@ -39,7 +39,7 @@
 
 #define MPI_EQUAL(A, B) \
     do { \
-        mpi_equal(A, B, __LINE__, __func__); \
+        mpi_equal(A, B, __LINE__, __func__, #A, #B); \
     } while(0)
 
 #define DEBUG(...) fprintf(stderr, __VA_ARGS__)
@@ -163,14 +163,17 @@ void mpi_equal(
         T a, 
         T b, 
         int line, 
-        const char* func) {
+        const char* func,
+        const char* A,
+        const char* B) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         std::cerr << "line: " << line 
             << ", function: " << func 
             << ", rank: " << rank 
-            << ", " << a << " != " << b << std::endl;
+            << ", " << A << ':' << a << " != " 
+            << B << ':' << b << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
@@ -179,17 +182,23 @@ void mpi_equal(
         std::string a, 
         char* b, 
         int line, 
-        const char* func);
+        const char* func,
+        const char* A,
+        const char* B);
 void mpi_equal(
         char* a, 
         std::string b, 
         int line, 
-        const char* func);
+        const char* func,
+        const char* A,
+        const char* B);
 void mpi_equal(
         std::string a, 
         std::string b, 
         int line, 
-        const char* func);
+        const char* func,
+        const char* A,
+        const char* B);
 
 void exceptionAssert(
         bool condition, const std::string& message = "runtime error");

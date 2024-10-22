@@ -208,14 +208,17 @@ void mpi_equal(
         string a, 
         char *b, 
         int line, 
-        const char* func) {
+        const char* func,
+        const char* A,
+        const char* B) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         cerr << "line: " << line 
             << ", function: " << func 
             << "rank: " << rank << 
-            ", " << a << " != " << b << endl;
+            ", " << A << ':' << a 
+            << " != " << B << ':' << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
@@ -224,14 +227,17 @@ void mpi_equal(
         char *a, 
         string b, 
         int line, 
-        const char* func) {
+        const char* func,
+        const char* A,
+        const char* B) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         cerr << "line: " << line 
             << ", function: " << func 
             << "rank: " << rank 
-            << ", " << a << " != " << b << endl;
+            << ", " << A << ':' << a 
+            << " != " << B << ':' << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
@@ -240,14 +246,17 @@ void mpi_equal(
         string a, 
         string b, 
         int line, 
-        const char* func) {
+        const char* func,
+        const char* A,
+        const char* B) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         cerr << "line: " << line 
             << ", function: " << func 
             << ",rank: " << rank 
-            << ", " << a << " != " << b << endl;
+            << ", " << A << ':' << a 
+            << " != " << B << ':' << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
