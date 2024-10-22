@@ -39,7 +39,7 @@
 
 #define MPI_EQUAL(A, B) \
     do { \
-        mpi_equal(A, B); \
+        mpi_equal(A, B, __LINE__, __func__); \
     } while(0)
 
 #define DEBUG(...) fprintf(stderr, __VA_ARGS__)
@@ -159,20 +159,40 @@ std::string replaceall(std::string& str, const std::string& from, const std::str
 std::string splitNinsert(const std::string& str, const std::string& delimit, std::unordered_set<std::string>& container);
 
 template <typename T>
-void mpi_equal(T a, T b) {
+void mpi_equal(
+        T a, 
+        T b, 
+        int line, 
+        const char* func) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        std::cerr << "rank: " << rank << ", " << a << " != " << b << std::endl;
+        std::cerr << "line: " << line 
+            << ", function: " << func 
+            << ", rank: " << rank 
+            << ", " << a << " != " << b << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
-void mpi_equal(std::string a, char* b);
-void mpi_equal(char* a, std::string b);
-void mpi_equal(std::string a, std::string b);
+void mpi_equal(
+        std::string a, 
+        char* b, 
+        int line, 
+        const char* func);
+void mpi_equal(
+        char* a, 
+        std::string b, 
+        int line, 
+        const char* func);
+void mpi_equal(
+        std::string a, 
+        std::string b, 
+        int line, 
+        const char* func);
 
-void exceptionAssert(bool condition, const std::string& message = "runtime error");
+void exceptionAssert(
+        bool condition, const std::string& message = "runtime error");
 
 #endif // TOOLS_H
        

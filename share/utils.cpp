@@ -204,34 +204,56 @@ string splitNinsert(const string& str, const string& delimit, unordered_set<stri
     return headName;
 }
 
-void mpi_equal(string a, char *b) {
+void mpi_equal(
+        string a, 
+        char *b, 
+        int line, 
+        const char* func) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        cerr << "rank: " << rank << ", " << a << " != " << b << endl;
+        cerr << "line: " << line 
+            << ", function: " << func 
+            << "rank: " << rank << 
+            ", " << a << " != " << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
-void mpi_equal(char *a, string b) {
+void mpi_equal(
+        char *a, 
+        string b, 
+        int line, 
+        const char* func) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        cerr << "rank: " << rank << ", " << a << " != " << b << endl;
+        cerr << "line: " << line 
+            << ", function: " << func 
+            << "rank: " << rank 
+            << ", " << a << " != " << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
-void mpi_equal(string a, string b) {
+void mpi_equal(
+        string a, 
+        string b, 
+        int line, 
+        const char* func) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        cerr << "rank: " << rank << ", " << a << " != " << b << endl;
+        cerr << "line: " << line 
+            << ", function: " << func 
+            << ",rank: " << rank 
+            << ", " << a << " != " << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
-void exceptionAssert(bool condition, const string& message) {
+void exceptionAssert(
+        bool condition, const string& message) {
     if(!condition) {
         throw runtime_error(message);
     }
