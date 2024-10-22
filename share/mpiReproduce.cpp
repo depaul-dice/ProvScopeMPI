@@ -267,7 +267,7 @@ int MPI_Recv(
     if(source == MPI_ANY_SOURCE) {
         source = src;
     }
-    MPI_ASSERTNALIGN(source == src);
+    MPI_EQUAL(source, src);
     
     string repSendNodes = "";
     ret = __MPI_Recv(
@@ -432,8 +432,9 @@ int MPI_Isend(
             orders, 
             lastInd, 
             __order_index);
-    if(rank == 4 && dest == 5) {
+    if(rank == 6 && dest == 2) {
         print(replayTraces, 0);
+        print(recordTraces, 0);
         DEBUG("MPI_Isend: %s -> %p: %s\nrank: %d, currNodes:%s\n", 
                 msgs[3].c_str(), 
                 request, 

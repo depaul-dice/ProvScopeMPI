@@ -147,9 +147,10 @@ ostream& operator<<(ostream& os, const lastaligned& l) {
 vector<shared_ptr<element>> makeHierarchyMain(
         vector<vector<string>>& traces, unsigned long& index) {
     vector<shared_ptr<element>> functionalTraces;
-    bool isEntry, isExit;
-    string funcname = "main";
-    string bbname;
+    bool isEntry, 
+         isExit;
+    string funcname = "main", 
+           bbname;
     while(index < traces.size() && funcname != traces[index][0]) {
         index++;
     }
@@ -161,7 +162,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
     }
 
     do {
-        MPI_ASSERT(traces[index][0] == funcname);
+        MPI_EQUAL(traces[index][0], funcname);
         MPI_ASSERT(traces[index].size() == 3 
                 || traces[index].size() == 4);
         bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
@@ -406,6 +407,9 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
     return iterations; 
 }
 
+/*
+ * this function signature takes loops into account
+ */
 vector<shared_ptr<element>> makeHierarchyMain(
         vector<vector<string>>& traces, 
         unsigned long &index, 
@@ -418,19 +422,25 @@ vector<shared_ptr<element>> makeHierarchyMain(
     loopNode *loopTree = loopTrees[funcname], 
              *child = nullptr;
     string bbname;
+    /*
+     * in case there are some nodes that is before main, 
+     * just ignore
+     */
     while(index < traces.size() 
             && funcname != traces[index][0]) {
         index++;
     }
     while(!isExit 
             && index < traces.size()) {
-        MPI_ASSERT(traces[index][0] == funcname);
+        MPI_EQUAL(traces[index][0], funcname);
         MPI_ASSERT(traces[index].size() == 3 
                 || traces[index].size() == 4);
         bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
 
-        // this returns the ptr of a child that has bbname in it
-        // if none, then it returns nullptr
+        /*
+         * this returns the ptr of a child that has bbname in it
+         * if none, then it returns nullptr
+         */
         if((child = isNewLoop(bbname, loopTree)) != nullptr) {
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
                     traces, 
