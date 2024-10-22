@@ -39,7 +39,8 @@ public:
             std::ofstream& file, const std::string& funcname);
     void print(
             std::ostream& os, const std::string& funcname = "main");
-    friend std::ostream& operator << (std::ostream& os, loopNode& ln);
+    friend std::ostream& operator << (
+            std::ostream& os, loopNode& ln);
 
     std::string entry; // entry node of the loop
     loopNode *parent;
@@ -58,10 +59,14 @@ void printEdgeInfo(
 void printNodeInfo(
         Agnode_t* node, Agraph_t* subgraph);
 
-// this should create one loop tree
+/*
+ * this should create one loop tree
+ */
 std::pair<std::string, loopNode *> parseGraph(
         Agraph_t* subgraph, const std::string& prefix);
-// this should create multiple loop trees
+/*
+ * this should create multiple loop trees
+ */
 std::unordered_map<std::string, loopNode *> parseDotFile(const std::string& filename);
 
 // at the end of the day, we want to get the map, where key is the function name and the value is the root node (loopNode)

@@ -121,6 +121,7 @@ int __MPI_Wait(
         MPI_Request *request, 
         MPI_Status *status,
         MessagePool &messagePool,
+        std::string *repSendNodes = nullptr,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
 
@@ -137,6 +138,7 @@ int __MPI_Waitall(
         MPI_Request array_of_requests[], 
         MPI_Status array_of_statuses[],
         MessagePool &messagePool,
+        std::string *repSendNodes = nullptr,
         FILE *recordFile = nullptr,
         unsigned long nodeCnt = 0);
 

@@ -140,6 +140,9 @@ pair<string, loopNode *> parseGraph(
         /* logger << prefix << "  "; */
         /* if(flag) printNodeInfo(node, subgraph); */
         label = agget(node, (char *)"label");
+        if(!label || !*label) {
+            DEBUG0("No label for node %s\n", graphName.c_str());
+        }
         MPI_ASSERT(label && *label);
         headName = agnameof(node);
         if(headName == "root") {

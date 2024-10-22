@@ -341,6 +341,7 @@ int MPI_Wait(
             request, 
             status, 
             messagePool, 
+            nullptr,
             recordFile, 
             nodecnt);
     return ret;
@@ -398,6 +399,7 @@ int MPI_Waitall(
                 array_of_requests, 
                 array_of_statuses, 
                 messagePool, 
+                nullptr,
                 recordFile, 
                 nodecnt);
     } catch(const exception &e) {

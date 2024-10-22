@@ -456,6 +456,7 @@ int __MPI_Wait(
         MPI_Request *request, 
         MPI_Status *status,
         MessagePool &messagePool,
+        string *repSendNodes,
         FILE *recordFile,
         unsigned long nodeCnt) {
     int rank;
@@ -476,6 +477,9 @@ int __MPI_Wait(
             msgBuf->src_,
             &retSrc,
             &retNodes);
+    if(repSendNodes != nullptr) {
+        *repSendNodes = retNodes;
+    }
     /*
      * if the correct information is found,
      * record the information, update the status,
@@ -524,8 +528,8 @@ int __MPI_Wait(
     MPI_ASSERT(ret == MPI_SUCCESS);
     /* DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank); */
     string sendNodes = messagePool.loadMessage(request, status);
-    if(sendNodes.length() > 0) {
-        //fprintf(stderr, "received at %s\n", lastNodes.c_str());
+    if(repSendNodes != nullptr) {
+        *repSendNodes = sendNodes;
     }
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Wait|%d|%p|SUCCESS|%d|%lu|%s\n", 
@@ -659,6 +663,7 @@ int __MPI_Waitall(
         MPI_Request array_of_requests[], 
         MPI_Status array_of_statuses[],
         MessagePool &messagePool,
+        string *repSendNodes,
         FILE *recordFile,
         unsigned long nodeCnt) {
     int rank;
@@ -741,6 +746,9 @@ int __MPI_Waitall(
         sendNodes[i] = messagePool.loadMessage(
                 &array_of_requests[i], 
                 &array_of_statuses[i]);
+        if(repSendNodes != nullptr) {
+            repSendNodes[i] = sendNodes[i];
+        }
     }
 
     if(recordFile != nullptr) {
