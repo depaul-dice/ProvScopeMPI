@@ -202,7 +202,7 @@ string loopNode::__print(ofstream& file) {
     file << "\"];\n";
     for(auto &c: children) {
         string childEntryNameReplaced = replaceAll(c->entry->name);
-        edges += entry->name + " -> " + childEntryNameReplaced + ";\n";
+        edges += entryNameReplaced + " -> " + childEntryNameReplaced + ";\n";
         edges += c->__print(file);
     }
     return edges;
