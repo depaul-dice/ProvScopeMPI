@@ -66,11 +66,6 @@ void segfaultHandler(int sig, siginfo_t *info, void *ucontext) {
         << "at line " << info->si_code << endl;
         size = backtrace(array, 10);
         strings = backtrace_symbols(array, size);
-        /* for (size_t i = 0; i < size; ++i) { */
-        /*     char command[256]; */
-        /*     snprintf(command, sizeof(command), "addr2line -f -e %s %p", __progname, array[i]); */
-        /*     system(command); */
-        /* } */
         fprintf(stderr, "Obtained %zd stack frames in rank %d\n", size, rank);
         for (size_t i = 0; i < size; i++) {
             fprintf(stderr, "%s\n", strings[i]);
@@ -432,20 +427,19 @@ int MPI_Isend(
             orders, 
             lastInd, 
             __order_index);
-    if(rank == 6 && dest == 2) {
-        print(replayTraces, 0);
-        print(recordTraces, 0);
-        DEBUG("MPI_Isend: %s -> %p: %s\nrank: %d, currNodes:%s\n", 
-                msgs[3].c_str(), 
-                request, 
-                orders[__order_index - 1].c_str(), 
-                rank,
-                currNodes.c_str());
+    if(rank == 4 && dest == 6) {
+        /* print(replayTraces, 0); */
+        /* print(recordTraces, 0); */
+        /* DEBUG("MPI_Isend: %s -> %p: %s\nrank: %d, currNodes:%s\n", */ 
+        /*         msgs[3].c_str(), */ 
+        /*         request, */ 
+        /*         orders[__order_index - 1].c_str(), */ 
+        /*         rank, */
+        /*         currNodes.c_str()); */
     }
     MPI_EQUAL(msgs[0], "MPI_Isend");
     MPI_EQUAL(stoi(msgs[1]), rank);
-    /* MPI_ASSERTNALIGN(stoi(msgs[2]) == dest); */ // commenting for the greedy alignment
-    /* MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end()); */
+    /* MPI_ASSERT(stoi(msgs[2]) == dest); */ // commenting for the greedy alignment
     __requests[msgs[3]] = request;
     __isends.insert(request);
     return ret;
@@ -688,8 +682,8 @@ int MPI_Testsome(
     MPI_Status array_of_statuses[]
 ) {
     // record which of the requests were filled in this
-    int myrank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG0("MPI_Testsome:%d", rank); */
     bool isaligned = true;
     size_t lastind = 0;
@@ -717,7 +711,7 @@ int MPI_Testsome(
             __order_index);
     /* fprintf(stderr, "msgs[0]: %s\n", msgs[0].c_str()); */
     MPI_EQUAL(msgs[0], "MPI_Testsome");
-    MPI_EQUAL(stoi(msgs[1]), myrank);
+    MPI_EQUAL(stoi(msgs[1]), rank);
     int oc = stoi(msgs[2]);
     MPI_ASSERT(msgs.size() == oc * 3 + 4);
     if(oc == 0) {
@@ -733,9 +727,6 @@ int MPI_Testsome(
             req = (MPI_Request *)__requests[msgs[3 + 3 * i]];
             src = stoi(msgs[3 + 3 * i + 1]);
             ind = req - array_of_requests;
-            if(ind < 0 || incount <= ind) {
-                DEBUG("ind: %d, incount: %d\n", ind, incount);
-            }
             MPI_ASSERT(0 <= ind 
                     && ind < incount);
             string repSendNodes = "";
@@ -755,9 +746,15 @@ int MPI_Testsome(
                 /* fprintf(stderr, "at %s, sendNodes: %s\n", */ 
                 /*         __func__, recSendNodes.c_str()); */
                 if(recSendNodes != repSendNodes) {
-                    fprintf(stderr, "rank: %d, src: %d\n", myrank, src);
+                    if(rank == 6 && src == 4) {
+                        auto recSendNodesVec = parse(recSendNodes, '/');
+                        auto repSendNodesVec = parse(repSendNodes, '/');
+                        cerr << "rank: " << rank << ", src: " << src << endl 
+                            << "recSendNodes:\n" << recSendNodesVec << endl
+                            << "repSendNodes:\n" << repSendNodesVec << endl;
+                    }
+                    MPI_Abort(MPI_COMM_WORLD, 1);
                 }
-                MPI_EQUAL(recSendNodes, repSendNodes);
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(
@@ -953,8 +950,8 @@ int MPI_Waitall(
         } else {
             MPI_EQUAL(array_of_statuses[i].MPI_SOURCE, stoi(msgs[3 + 3 * i + 1]));
             auto recSendNodes = msgs[3 + 3 * i + 2];
-            fprintf(stderr, "at %s, sendNodes: %s\n", 
-                    __func__, recSendNodes.c_str());
+            /* fprintf(stderr, "at %s, sendNodes: %s\n", */ 
+                    /* __func__, recSendNodes.c_str()); */
             MPI_EQUAL(recSendNodes, repSendNodes[i]);
         }
         __requests.erase(msgs[3 + 3 * i]);

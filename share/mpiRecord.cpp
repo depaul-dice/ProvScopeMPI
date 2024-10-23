@@ -22,10 +22,7 @@ Logger logger;
 MessagePool messagePool;
 
 #ifdef DEBUG_MODE
-/* FILE *recordtraceFile = nullptr; */
-/* #define RECORDTRACE(...) \ */
-    /* fprintf(recordtraceFile, __VA_ARGS__); \ */
-/* #else */
+extern vector<shared_ptr<element>> recordTraces;
 #define RECORDTRACE(...)
 #endif
 
@@ -184,6 +181,17 @@ int MPI_Isend(
 ) {
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    /*
+     * below is for debugging, delete afterwards
+     */
+    /* int rank; */
+    /* MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+    /* if(rank == 4 && dest == 6) { */
+    /*     auto lastNodesVec = parse(lastNodes, '/'); */
+    /*     if(lastNodesVec.back() == "get_hash:exit:1") { */
+    /*         print(recordTraces, 0); */
+    /*     } */
+    /* } */
 
     int ret = __MPI_Isend(
             buf, 

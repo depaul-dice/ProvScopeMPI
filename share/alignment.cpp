@@ -333,13 +333,13 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
                     entryindex, 
                     funcname, 
                     iterationCnt++); 
-            if(eptr->bb() == "neighbor_communication:neither:3:loop") {
-                int rank; 
-                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-                if(rank == 4) {
-                    cerr << "found!!\n" << eptr->bb() << ":" << iterationCnt - 1 << endl;
-                }
-            }
+            /* if(eptr->bb() == "neighbor_communication:neither:3:loop") { */
+            /*     int rank; */ 
+            /*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+            /*     if(rank == 4) { */
+            /*         cerr << "found!!\n" << eptr->bb() << ":" << iterationCnt - 1 << endl; */
+            /*     } */
+            /* } */
             eptr->funcs.push_back(curriter);
             curriter.clear();
             iterations.push_back(eptr);
@@ -394,13 +394,13 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
             entryindex, 
             funcname, 
             iterationCnt++);
-    if(eptr->bb() == "neighbor_communication:neither:3:loop") {
-        int rank; 
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        if(rank == 4) {
-            cerr << "found!!\n" << eptr->bb() << ":" << iterationCnt - 1 << endl;
-        }
-    }
+    /* if(eptr->bb() == "neighbor_communication:neither:3:loop") { */
+    /*     int rank; */ 
+    /*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+    /*     if(rank == 4) { */
+    /*         cerr << "found!!\n" << eptr->bb() << ":" << iterationCnt - 1 << endl; */
+    /*     } */
+    /* } */
     eptr->funcs.push_back(curriter);
     iterations.push_back(eptr);
     
