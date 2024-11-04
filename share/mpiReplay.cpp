@@ -133,8 +133,8 @@ int MPI_Recv(
     DEBUG0("MPI_Recv:%s:%d\n", orders[__order_index].c_str(), __order_index);
     vector<string> msgs = parse(orders[__order_index++], ':');
     int src = stoi(msgs[2]);
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Recv");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
+    MPI_ASSERT(msgs[0] == "MPI_Recv");
+    MPI_ASSERT(stoi(msgs[1]) == rank);
     // force the source to the right source
     if(source == MPI_ANY_SOURCE) source = src;
     if(source != src) {

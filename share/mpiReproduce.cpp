@@ -21,6 +21,13 @@ extern vector<vector<string>> replayTracesRaw;
  */
 extern vector<shared_ptr<element>> replayTraces;
 
+/*
+ * This is referring to points of divergences (also named pods,
+ * of course) in alignment.cpp.
+ * It stores points of divergences at dump it at MPI_Finalize.
+ */
+extern unordered_set<string> pods;
+
 /* static unsigned __replaytrace_index = 0; */
 /* static unordered_map<string, vector<unsigned long>> __map; */
 
@@ -206,7 +213,19 @@ int MPI_Finalize(
      * should probably delete all the elements in the recordTraces
      */
 
-    return PMPI_Finalize();
+    /*
+     * print the pods to a file 
+     * (to avoid writing everything at console at once)
+     */
+    string podfile = "pods" + to_string(rank) + ".txt";
+    FILE *fp = fopen(podfile.c_str(), "w");
+    for(auto it = pods.begin(); it != pods.end(); it++) {
+        fprintf(fp, "%s\n", it->c_str());
+    }
+    fclose(fp);
+
+    int rv = PMPI_Finalize();
+    return rv;
 }
 
 // in this we will just manipulate the message source when calling MPI_Recv
@@ -232,7 +251,6 @@ int MPI_Recv(
     vector<string> msgs;
     int ret;
     if(!isAligned) {
-        DEBUG("at rank %d, the alignment was not successful at MPI_Recv\n", rank);
         /*
          * you still need to convert the message into the way it should be
          */
@@ -415,7 +433,7 @@ int MPI_Isend(
             lastInd, 
             __looptrees);
     if(!isAligned) {
-        DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank);
+        /* DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank); */
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
         __isends.insert(request);

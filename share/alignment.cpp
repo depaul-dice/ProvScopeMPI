@@ -11,7 +11,11 @@ vector<shared_ptr<element>> recordTraces;
 vector<vector<string>> replayTracesRaw; // this is necessary for bbprinter
 vector<shared_ptr<element>> replayTraces;
 
-static unordered_map<string, unordered_set<string>> divs;
+static  unordered_map<string, unordered_set<string>> divs;
+
+// below stores points of divergences and dumps at MPI_Finalize
+unordered_set<string> pods;
+
 const unordered_set<string> mpiCallsWithSendNodesAtLast = {
     "MPI_Recv",
     "MPI_Test",
@@ -844,7 +848,6 @@ void addHierarchy(
                 currloop = tmploop;
             }
             if(currloop->entry == bb) {
-                cerr << "we are facing this situation now: " << bb << endl;
                 /* 
                  * the situation is... 
                  * 1. the last node was an exit bb of the function
@@ -852,7 +855,33 @@ void addHierarchy(
                  * if the parent is the virtual node of this loop, you need to make another virtual node for this iterations
                  * if not, you stil need to make another virtual node
                 */
-                MPI_ASSERT(false);
+                if(parent->isLoop == true
+                        && parent->bb() == currloop->entry + ":loop") {
+                    auto loopIterations = __makeHierarchyLoop(
+                            traces, 
+                            index, 
+                            loopTrees, 
+                            currloop,
+                            parent->index + 1);     
+                    curr = parent;
+                    if(!__stack.empty()) {
+                        parent = __stack.top();
+                        __stack.pop();
+                        parent->funcs.back().insert(
+                                parent->funcs.back().end(), 
+                                loopIterations.begin(), 
+                                loopIterations.end());
+                    } else {
+                        parent = nullptr;
+                        functionalTraces.insert(
+                                functionalTraces.end(), 
+                                loopIterations.begin(), 
+                                loopIterations.end());
+                    }
+                } else {
+                    cerr << "we are not dealing with this case yet\n";
+                    MPI_ASSERT(false);
+                }
             }
         } else {
             /*
@@ -1119,7 +1148,14 @@ static pair<size_t, size_t> __greedyalignmentOnline(
              * reproduced traces (in case they are not filled up already), 
              * and then we try to match the traces in the original execution
              */
-            printf("pod: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank);
+            /* printf("pod: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank); */
+            if(original[i - 1]->isLoop == true) {
+                pods.insert(original[i - 1]->bb() 
+                        + ':' 
+                        + to_string(original[i - 1]->index));
+            } else {
+                pods.insert(original[i - 1]->bb());
+            }
             size_t oldj = j, oldi = i;
 
             /*
@@ -1143,7 +1179,7 @@ static pair<size_t, size_t> __greedyalignmentOnline(
                  * we have already set the i and j to the point of convergence,
                  * so move on to the next nodes by incrementing i and j
                  */
-                printf("poc: %s, rank: %d\n", original[i]->bb().c_str(), rank);
+                /* printf("poc: %s, rank: %d\n", original[i]->bb().c_str(), rank); */
                 i++; j++;
             }
         }
@@ -1342,10 +1378,12 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
          * below incorporates the case different functions being called through function pointers
          */
         if(original[i]->funcs[k][0]->funcname != reproduced[j]->funcs[k][0]->funcname) {
-            printf("different function called from %s: %s vs. %s\n", 
-                    original[i]->bb().c_str(), 
-                    original[i]->funcs[k][0]->funcname.c_str(), 
-                    reproduced[j]->funcs[k][0]->funcname.c_str());
+            MPI_ASSERT(original[i]->isLoop == false);
+            pods.insert(original[i]->bb());
+            /* printf("different function called from %s: %s vs. %s\n", */ 
+                    /* original[i]->bb().c_str(), */ 
+                    /* original[i]->funcs[k][0]->funcname.c_str(), */ 
+                    /* reproduced[j]->funcs[k][0]->funcname.c_str()); */
         } else {
             rq = greedyalignmentOnline(
                     original[i]->funcs[k], 
@@ -1471,10 +1509,10 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         for(unsigned ind1 = 0; ind1 < aligned[ind0].second->funcs.size(); ind1++) {
             size_t tmpi = 0, tmpj = 0, tmpfuncId = 0;
             if(aligned[ind0].first->funcs[ind1][0]->funcname != aligned[ind0].second->funcs[ind1][0]->funcname) {
-                printf("different function called from %s: %s vs. %s\n", \
-                        aligned[ind0].first->bb().c_str(), \
-                        aligned[ind0].first->funcs[ind1][0]->funcname.c_str(), \
-                        aligned[ind0].second->funcs[ind1][0]->funcname.c_str());
+                /* printf("different function called from %s: %s vs. %s\n", \ */
+                        /* aligned[ind0].first->bb().c_str(), \ */
+                        /* aligned[ind0].first->funcs[ind1][0]->funcname.c_str(), \ */
+                        /* aligned[ind0].second->funcs[ind1][0]->funcname.c_str()); */
             } else {
                 /* MPI_ASSERT(aligned[ind0].first->funcs[ind1][0]->funcname == aligned[ind0].second->funcs[ind1][0]->funcname); */
                 qs = greedyalignmentOnline(

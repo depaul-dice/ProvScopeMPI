@@ -40,14 +40,16 @@ public:
             std::string& funcname, 
             unsigned long index, 
             bool isLoop = false);
-    // this is for the loop node, index is the iteration cnt of the loop
+    /*
+     * this is for the loop node, index is the iteration cnt of the loop
+     */
     element(
             int id, 
             std::string& funcname, 
             unsigned long index, 
             bool isLoop = true);
 
-    bool operator ==(const element &e) const;
+    bool operator == (const element &e) const;
 
     std::string bb() const;
     std::string content() const;
