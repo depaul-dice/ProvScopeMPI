@@ -3,8 +3,8 @@
 # SHARED_LIB = libmpirecord.so libmpireplay.so libmpireproduce.so
 SHARED_LIB = libmpirecord.so libmpireproduce.so 
 STD = -std=c++20
-LD_FLAGS = -ldl
-LD_FLAGS_LT = -ldl -lcgraph -lgvc
+LD_FLAGS = 
+LD_FLAGS_LT = -lcgraph -lgvc
 CC = mpicc
 CXX = mpicxx
 SRCS = mpiRecord.cpp mpiReplay.cpp mpiReproduce.cpp \

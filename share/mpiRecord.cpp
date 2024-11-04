@@ -93,6 +93,9 @@ int MPI_Finalize(void) {
     MPI_ASSERT(traceFile != nullptr);
     fflush(traceFile);
     fclose(traceFile);
+    for(auto lt: loopTrees) {
+        delete lt.second;
+    }
     int ret = PMPI_Finalize();
     /* DEBUG("MPI_Finalize done, rank:%d\n", rank); */
     return ret;
@@ -587,7 +590,7 @@ int MPI_Request_free (
     fprintf(recordFile, "MPI_Request_free|%d|%p\n", 
             rank, request);
     __requests.erase(request);
-    messagePool.deleteMessage(request);
+    messagePool.deleteMessage(request); 
     return ret;
 }
 

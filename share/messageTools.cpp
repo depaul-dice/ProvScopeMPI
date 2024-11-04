@@ -218,12 +218,13 @@ int __MPI_Recv(
     auto msgs = parse(tmpStr, '|');
     if(msgs.size() > count + 2) {
         DEBUG("message size is too large, length: %lu, count: %d\
-                tag: %d, source: %d, rank: %d\n", 
+                tag: %d, source: %d, rank: %d, at line: %d\n", 
                 msgs.size(), 
                 count,
                 tag,
                 source,
-                rank);
+                rank,
+                __LINE__);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     //fprintf(stderr, "received message from send at %s\n", msgs[msgs.size() - 2].c_str());

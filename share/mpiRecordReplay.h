@@ -26,7 +26,6 @@
  */
 #include <memory>
 #include <algorithm>
-#include <dlfcn.h>
 
 /*
  * libraries that I made

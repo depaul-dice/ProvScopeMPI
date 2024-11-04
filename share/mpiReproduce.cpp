@@ -142,6 +142,14 @@ int MPI_Init(
             line[read - 1] = '\0';
         }
         orders.push_back(line);
+        if(line != nullptr) {
+            free(line);
+            line = nullptr;
+        }
+    }
+    if(line != nullptr) {
+        free(line);
+        line = nullptr;
     }
     fclose(fp);    
 
@@ -161,6 +169,14 @@ int MPI_Init(
         }
         string str(line);
         rawTraces.push_back(parse(str, ':'));
+        if(line != nullptr) {
+            free(line);
+            line = nullptr;
+        }
+    }
+    if(line != nullptr) {
+        free(line);
+        line = nullptr;
     }
     fclose(fp);
 
@@ -169,8 +185,8 @@ int MPI_Init(
     /*
      * opening the file that has loop information
      */
-    string looptreefile = "loops.dot";
-    __looptrees = parseDotFile(looptreefile);
+    string loopTreeFile = "loops.dot";
+    __looptrees = parseDotFile(loopTreeFile);
     for(auto lt: __looptrees) {
         lt.second->fixExclusives();
     }
