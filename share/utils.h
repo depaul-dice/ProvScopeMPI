@@ -25,6 +25,7 @@
             int rank; \
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
             fprintf(stderr, "line: %d, rank: %d, func: %s assertion failed: %s\n", __LINE__, rank, __func__, #CONDITION); \
+            printStackTrace(); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
@@ -67,14 +68,20 @@ void close_debugfile();
 
 const char msgDelimiter = '|';
 
-std::vector<std::string> parse(std::string line, char delimit);
+std::vector<std::string> parse(
+        std::string line, char delimit);
 // returns the rank where you got the message from
-int lookahead(std::vector<std::string>& orders, unsigned start, std::string& request);
+int lookahead(
+        std::vector<std::string>& orders, 
+        unsigned start, 
+        std::string& request);
 
-void printtails(std::vector<std::vector<std::string>>& traces, unsigned tail);
+void printtails(
+        std::vector<std::vector<std::string>>& traces, unsigned tail);
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, const std::deque<T>& deq) {
+std::ostream& operator<<(
+        std::ostream& os, const std::deque<T>& deq) {
     os << "[";
     if(!deq.empty()) {
         for(unsigned i = 0; i < deq.size(); ++i)
@@ -85,7 +92,8 @@ std::ostream& operator<<(std::ostream& os, const std::deque<T>& deq) {
 }
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, const std::deque<std::shared_ptr<T>>& deq) {
+std::ostream& operator<<(
+        std::ostream& os, const std::deque<std::shared_ptr<T>>& deq) {
     os << "[";
     if(!deq.empty()) {
         for(unsigned i = 0; i < deq.size(); ++i)
@@ -96,7 +104,8 @@ std::ostream& operator<<(std::ostream& os, const std::deque<std::shared_ptr<T>>&
 }
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
+std::ostream& operator<<(
+        std::ostream& os, const std::vector<T>& vec) {
     os << "[";
     if(!vec.empty()) {
         for(unsigned i = 0; i < vec.size(); ++i)
@@ -107,7 +116,8 @@ std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
 }
 
 template <typename T> 
-std::ostream& operator<<(std::ostream& os, const std::vector<std::shared_ptr<T>>& vec) {
+std::ostream& operator<<(
+        std::ostream& os, const std::vector<std::shared_ptr<T>>& vec) {
     os << "[";
     if(!vec.empty()) {
         for(unsigned i = 0; i < vec.size(); ++i)
@@ -118,7 +128,8 @@ std::ostream& operator<<(std::ostream& os, const std::vector<std::shared_ptr<T>>
 }
 
 template <typename T>
-std::unordered_set<T> operator+=(std::unordered_set<T>& lhs, const std::unordered_set<T>& rhs) {
+std::unordered_set<T> operator+=(
+        std::unordered_set<T>& lhs, const std::unordered_set<T>& rhs) {
     lhs.insert(rhs.begin(), rhs.end());
     return lhs;
 }
@@ -152,11 +163,16 @@ Logger& Logger::operator << (const T& message) {
     }
     return *this;
 }
-/* void segfault_handler(int sig, siginfo_t *info, void *ucontext); */
 
-std::string replaceall(std::string& str, const std::string& from, const std::string& to);
+std::string replaceall(
+        std::string& str, 
+        const std::string& from, 
+        const std::string& to);
 
-std::string splitNinsert(const std::string& str, const std::string& delimit, std::unordered_set<std::string>& container);
+std::string splitNinsert(
+        const std::string& str, 
+        const std::string& delimit, 
+        std::unordered_set<std::string>& container);
 
 template <typename T>
 void mpi_equal(
@@ -202,6 +218,15 @@ void mpi_equal(
 
 void exceptionAssert(
         bool condition, const std::string& message = "runtime error");
+
+void printStackTrace();
+
+void segfaultHandler(
+        int sig, 
+        siginfo_t *info, 
+        void *ucontext);
+
+void setupSignalHandler();
 
 #endif // TOOLS_H
        
