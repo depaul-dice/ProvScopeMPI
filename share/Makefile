@@ -31,4 +31,4 @@ loops.o: loops.cpp loops.h
 
 clean:
 	$(MAKE) -C tests clean
-	rm -f *.o $(SHARED_LIB)
+	rm -f *.o .*.o .*.o.bc $(SHARED_LIB) 
