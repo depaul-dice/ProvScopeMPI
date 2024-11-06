@@ -39,7 +39,7 @@ static unordered_set<MPI_Request *> __isends;
 static unordered_set<MPI_Request *> __unalignedRequests;
 
 // key is the function name
-static unordered_map<string, loopNode *> __looptrees;
+static unordered_map<string, loopNode *> __loopTrees;
 
 // TODO: better name for this variable because it's not self descriptive
 deque<shared_ptr<lastaligned>> __q;
@@ -153,8 +153,8 @@ int MPI_Init(
      * opening the file that has loop information
      */
     string loopTreeFile = "loops.dot";
-    __looptrees = parseDotFile(loopTreeFile);
-    for(auto lt: __looptrees) {
+    __loopTrees = parseDotFile(loopTreeFile);
+    for(auto lt: __loopTrees) {
         lt.second->fixExclusives();
     }
 
@@ -162,7 +162,7 @@ int MPI_Init(
      * creating the hierarchy of traces for recorded traces
      */
     unsigned long index = 0;
-    recordTraces = makeHierarchyMain(rawTraces, index, __looptrees); 
+    recordTraces = makeHierarchyMain(rawTraces, index, __loopTrees); 
 
     return ret;
 }
@@ -184,12 +184,12 @@ int MPI_Finalize(
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
 
     /*
      * deleting the looptrees
      */
-    for(auto it = __looptrees.begin(); it != __looptrees.end(); it++) {
+    for(auto it = __loopTrees.begin(); it != __loopTrees.end(); it++) {
         delete it->second;
     }
     /*
@@ -230,7 +230,7 @@ int MPI_Recv(
             __q, 
             isAligned, 
             lastInd, 
-            __looptrees);
+            __loopTrees);
     vector<string> msgs;
     int ret;
     if(!isAligned) {
@@ -295,7 +295,7 @@ int MPI_Send(
     MPI_Comm comm
 ) {
     string currNodes = updateAndGetLastNodes(
-            __looptrees, 
+            __loopTrees, 
             TraceType::REPLAY);
     int ret = __MPI_Send(
             buf, 
@@ -330,7 +330,7 @@ int MPI_Irecv(
             __q, 
             isAligned, 
             lastInd, 
-            __looptrees);
+            __loopTrees);
     int ret;
     if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank); */
@@ -398,7 +398,7 @@ int MPI_Isend(
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Isend, rank: %d\n", rank); */
     string currNodes = updateAndGetLastNodes(
-            __looptrees, TraceType::REPLAY);
+            __loopTrees, TraceType::REPLAY);
     int ret = __MPI_Isend(
             buf, 
             count, 
@@ -416,7 +416,7 @@ int MPI_Isend(
             __q, 
             isAligned, 
             lastInd, 
-            __looptrees);
+            __loopTrees);
     if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank); */
         // don't control anything, but keep track of the request
@@ -471,7 +471,7 @@ int MPI_Irsend(
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Irsend\n", rank); */
         // don't control anything, but keep track of the request
@@ -511,7 +511,7 @@ int MPI_Cancel(
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Cancel\n", rank); */
         // don't control anything
@@ -550,7 +550,7 @@ int MPI_Test(
             __q, 
             isAligned, 
             lastInd, 
-            __looptrees);
+            __loopTrees);
     if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Test\n", rank); */
         // don't control anything
@@ -613,7 +613,7 @@ int MPI_Testall (
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         // don't control anything
         return __MPI_Testall(
@@ -687,7 +687,7 @@ int MPI_Testsome(
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Testsome\n", myrank); */
         // don't control anything
@@ -776,7 +776,7 @@ int MPI_Wait(
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Wait\n", rank); */
         // don't control anything
@@ -852,7 +852,7 @@ int MPI_Waitany(
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitany\n", rank); */
         // don't control anything
@@ -900,7 +900,7 @@ int MPI_Waitall(
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitall\n", rank); */
         /*
@@ -918,7 +918,7 @@ int MPI_Waitall(
             __orderIndex);
     if(msgs[0] != "MPI_Waitall") {
         string lastNodes = updateAndGetLastNodes(
-                __looptrees, 
+                __loopTrees, 
                 TraceType::REPLAY);
         DEBUG("rank: %d\nmsgs[0]: %s\norderIndex: %d\nlastNodes: %s\nlastind: %lu\n", 
                 rank, 
@@ -984,7 +984,7 @@ int MPI_Probe (
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Probe\n", rank); */
         // don't control anything
@@ -1043,7 +1043,7 @@ int MPI_Iprobe (
             __q, 
             isaligned, 
             lastind, 
-            __looptrees);
+            __loopTrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Iprobe\n", rank); */
         // don't control anything
@@ -1062,7 +1062,7 @@ int MPI_Iprobe (
     /* DEBUG0("MPI_Iprobe:%s\n", orders[__order_index].c_str()); */
     if(msgs[0] != "MPI_Iprobe") {
         string lastNodes = updateAndGetLastNodes(
-                __looptrees, 
+                __loopTrees, 
                 TraceType::REPLAY);
         DEBUG("rank: %d\nmsgs[0]: %s\n__order_index: %d\nlastNodes: %s\n", 
                 rank, 
