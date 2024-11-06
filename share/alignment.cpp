@@ -933,7 +933,7 @@ static size_t findSize(FILE *fp) {
 deque<shared_ptr<lastaligned>> onlineAlignment(
         deque<shared_ptr<lastaligned>>& q, 
         bool& isaligned, 
-        size_t &lastind, 
+        size_t &lastInd, 
         unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -963,9 +963,9 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
             funcId, 
             rank, 
             isaligned, 
-            lastind); 
-    MPI_ASSERT(lastind != numeric_limits<size_t>::max()); 
-    MPI_ASSERT(lastind > 0);
+            lastInd); 
+    MPI_ASSERT(lastInd != numeric_limits<size_t>::max()); 
+    MPI_ASSERT(lastInd > 0);
     return rq;
 }
 
@@ -1283,7 +1283,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         const size_t& funcId, 
         const int &rank, 
         bool& isaligned, 
-        size_t& lastind,
+        size_t& lastInd,
         shared_ptr<element> originalParent,
         shared_ptr<element> reproducedParent) {
     MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
@@ -1329,7 +1329,8 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     tmpLastInd,
                     original[i],
                     reproduced[j]);
-            lastind = max(lastind, tmpLastInd);
+            lastInd = max(lastInd, tmpLastInd);
+            MPI_ASSERT(lastInd > 0);
         }
     } else {
         firstTime = true;
@@ -1408,7 +1409,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     original[i],
                     reproduced[j]);
         }
-        lastind = max(lastind, tmpLastInd);
+        lastInd = max(lastInd, tmpLastInd);
         MPI_ASSERT(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \
                 (k == reproduced[j]->funcs.size() - 1));
     }
@@ -1435,7 +1436,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
      * however, if not, then you should start at the i + 1 and j + 1
      */
     pair<size_t, size_t> p;
-    size_t tmplastind = 0;
+    size_t tmpLastInd = 0;
     bool isLoop = (originalParent != nullptr
             && reproducedParent != nullptr
             && originalParent->isLoop
@@ -1453,7 +1454,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 j, 
                 rank, 
                 isaligned, 
-                tmplastind,
+                tmpLastInd,
                 isLoop);
     } else {
         size_t tmpI = i + 1, tmpJ = j + 1;
@@ -1497,12 +1498,12 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         tmpJ, 
                         rank, 
                         isaligned, 
-                        tmplastind,
+                        tmpLastInd,
                         isLoop);
             }
         }
     }
-    lastind = max(lastind, tmplastind);
+    lastInd = max(lastInd, tmpLastInd);
 
     deque<shared_ptr<lastaligned>> qs;
     // if we found some points that are aligned, let's do the alignment level below
@@ -1515,7 +1516,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 || ind0 == aligned.size() - 1);
         MPI_ASSERT(aligned[ind0].first->funcs.size() >= aligned[ind0].second->funcs.size());
         newfuncId = aligned[ind0].second->funcs.size() - 1;
-        tmplastind = 0;
+        tmpLastInd = 0;
         for(unsigned ind1 = 0; ind1 < aligned[ind0].second->funcs.size(); ind1++) {
             size_t tmpi = 0, 
                    tmpj = 0, 
@@ -1536,7 +1537,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         tmpfuncId, 
                         rank, 
                         tmpisaligned, 
-                        tmplastind,
+                        tmpLastInd,
                         aligned[ind0].first,
                         aligned[ind0].second);
                 // we only expect the last of the last thing to be not successful
@@ -1562,9 +1563,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         (ind0 == aligned.size() - 1 && \
                         ind1 == aligned[ind0].second->funcs.size() - 1));
                 if(!tmpisaligned) isaligned = false;
-                if(lastind < tmplastind) {
-                    /* DEBUG0("updating lastind: %lu at %d\n", tmplastind, __LINE__); */
-                    lastind = tmplastind;
+                if(lastInd < tmpLastInd) {
+                    /* DEBUG0("updating lastInd: %lu at %d\n", tmpLastInd, __LINE__); */
+                    lastInd = tmpLastInd;
                 }
             }
         }
