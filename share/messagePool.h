@@ -13,7 +13,7 @@
 #include "messageTools.h"
 #include "alignment.h"
 
-const int msgSize = 1 << 13;
+const int msgSize = (1 << 13) + (1 << 10);
 
 // this class does not have to be visible to users
 class MessageBuffer {

@@ -10,7 +10,8 @@
 using namespace std;
 
 static vector<string> orders;
-static unsigned __order_index = 0;
+/* static unsigned __order_index = 0; */
+static unsigned __orderIndex = 0;
 
 /* static vector<vector<string>> recordtraces; */
 /* static unsigned __recordtrace_index = 0; */
@@ -59,40 +60,6 @@ MessagePool messagePool;
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)
-
-void segfaultHandler(int sig, siginfo_t *info, void *ucontext) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    void *array[10];
-    size_t size;
-    char **strings;
-
-    if(rank == 0) {
-        size = backtrace(array, 10);
-        cerr << "Error " << rank << ": signal " << sig \
-        << "at line " << info->si_code << endl;
-        size = backtrace(array, 10);
-        strings = backtrace_symbols(array, size);
-        fprintf(stderr, "Obtained %zd stack frames in rank %d\n", size, rank);
-        for (size_t i = 0; i < size; i++) {
-            fprintf(stderr, "%s\n", strings[i]);
-        }
-    }
-
-    MPI_Abort(MPI_COMM_WORLD, 1);
-}
-
-void setupSignalHandler() {
-    struct sigaction sa;
-
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = segfaultHandler;
-    sigemptyset(&sa.sa_mask);
-    if(sigaction(SIGSEGV, &sa, NULL) == -1) {
-        fprintf(stderr, "Error: cannot set signal handler\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-}
 
 /* 
  * The name passed down as an argument will be in the format 
@@ -256,7 +223,7 @@ int MPI_Recv(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* DEBUG0("MPI_Recv:%s:%d\n", orders[__order_index].c_str(), __order_index); */
+    /* DEBUG0("MPI_Recv:%s:%d\n", orders[__orderIndex].c_str(), __orderIndex); */
     bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
@@ -285,7 +252,7 @@ int MPI_Recv(
     msgs = getmsgs(
             orders, 
             lastInd, 
-            __order_index,
+            __orderIndex,
             &recSendNodes);
     int src = stoi(msgs[2]);
     MPI_EQUAL(msgs[0], "MPI_Recv");
@@ -351,9 +318,9 @@ int MPI_Irecv(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
-    /* DEBUG0("MPI_Irecv\n"); */
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    /* DEBUG("MPI_Irecv, rank: %d\n", rank); */
     // I need to look into the source first
     /* int ret = original_MPI_Irecv(buf, count, datatype, source, tag, comm, request); */
     // I just need to keep track of the request
@@ -384,18 +351,18 @@ int MPI_Irecv(
     vector<string> msgs = getmsgs(
             orders, 
             lastInd, 
-            __order_index);
+            __orderIndex);
 
     MPI_EQUAL(msgs[0], "MPI_Irecv");
     MPI_EQUAL(stoi(msgs[1]), rank);
     /* MPI_ASSERT(stoi(msgs[2]) == source); // commenting for the greedy alignment */
     // below is commented on purpose, do not uncomment
-    /* MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end()); */
+    /* MPI_ASSERT(__requests.find(msgs[3]) == __requests.end()); */
     __requests[msgs[3]] = request;
     if(source == MPI_ANY_SOURCE) {
         source = lookahead(
                 orders, 
-                __order_index, 
+                __orderIndex, 
                 msgs[3]);
     } 
     /*
@@ -414,6 +381,7 @@ int MPI_Irecv(
             comm, 
             request,
             messagePool);
+    /* DEBUG("MPI_Irecv returning, rank: %d, request: %p\n", rank, request); */
     return ret;
 }
 
@@ -428,6 +396,7 @@ int MPI_Isend(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    /* DEBUG("MPI_Isend, rank: %d\n", rank); */
     string currNodes = updateAndGetLastNodes(
             __looptrees, TraceType::REPLAY);
     int ret = __MPI_Isend(
@@ -457,25 +426,17 @@ int MPI_Isend(
         return ret;
     }
     // I just need to keep track of the request
+    /* DEBUG("lastInd: %zu at rank: %d\n", lastInd, rank); */
     vector<string> msgs = getmsgs(
             orders, 
             lastInd, 
-            __order_index);
-    if(rank == 4 && dest == 6) {
-        /* print(replayTraces, 0); */
-        /* print(recordTraces, 0); */
-        /* DEBUG("MPI_Isend: %s -> %p: %s\nrank: %d, currNodes:%s\n", */ 
-        /*         msgs[3].c_str(), */ 
-        /*         request, */ 
-        /*         orders[__order_index - 1].c_str(), */ 
-        /*         rank, */
-        /*         currNodes.c_str()); */
-    }
+            __orderIndex);
     MPI_EQUAL(msgs[0], "MPI_Isend");
     MPI_EQUAL(stoi(msgs[1]), rank);
     /* MPI_ASSERT(stoi(msgs[2]) == dest); */ // commenting for the greedy alignment
     __requests[msgs[3]] = request;
     __isends.insert(request);
+    /* DEBUG("MPI_Isend returning, rank: %d, request: %p\n", rank, request); */
     return ret;
 }
 
@@ -489,7 +450,7 @@ int MPI_Irsend(
     MPI_Request *request
 ) {
     FUNCGUARD();
-    DEBUG("MPI_Irsend not supported yet\n");
+    /* DEBUG("MPI_Irsend not supported yet\n"); */
     MPI_Abort(MPI_COMM_WORLD, 1);
 
     // check if this is correct
@@ -524,12 +485,12 @@ int MPI_Irsend(
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
-            __order_index);
+            __orderIndex);
     /* DEBUG("MPI_Irsend: %s -> %p\n", msgs[3].c_str(), request); */
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Irsend");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
-    MPI_ASSERTNALIGN(stoi(msgs[2]) == dest);
-    MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end());
+    MPI_ASSERT(msgs[0] == "MPI_Irsend");
+    MPI_ASSERT(stoi(msgs[1]) == rank);
+    MPI_ASSERT(stoi(msgs[2]) == dest);
+    MPI_ASSERT(__requests.find(msgs[3]) == __requests.end());
     __requests[msgs[3]] = request;
     __isends.insert(request);
     return ret;
@@ -557,11 +518,11 @@ int MPI_Cancel(
         return ret;
     }
     // I just need to keep track that it is cancelled
-    /* vector<string> msgs = parse(orders[__order_index++], ':'); */
+    /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
-            __order_index);
+            __orderIndex);
     MPI_EQUAL(ret, MPI_SUCCESS);
     MPI_EQUAL(msgs[0], "MPI_Cancel");
     MPI_EQUAL(stoi(msgs[1]), rank);
@@ -579,9 +540,9 @@ int MPI_Test(
     int *flag, 
     MPI_Status *status
 ) {
-    /* DEBUG0("MPI_Test"); */
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    /* DEBUG("MPI_Test, rank: %d\n", rank); */
     //DEBUG0(":%d:%p", rank, request);
     bool isAligned = true;
     size_t lastInd = 0;
@@ -599,12 +560,12 @@ int MPI_Test(
                 status,
                 messagePool);
     }
-    /* vector<string> msgs = parse(orders[__order_index++], ':'); */
+    /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     string recSendNodes = "";
     vector<string> msgs = getmsgs(
             orders, 
             lastInd, 
-            __order_index,
+            __orderIndex,
             &recSendNodes);
     MPI_ASSERT(msgs[0] == "MPI_Test");
     MPI_ASSERT(stoi(msgs[1]) == rank);
@@ -633,6 +594,7 @@ int MPI_Test(
          */
         *flag = 0;
     }
+    /* DEBUG("MPI_Test returning, rank: %d\n", rank); */
     
     return ret;
 }
@@ -661,11 +623,11 @@ int MPI_Testall (
                 array_of_statuses,
                 messagePool);
     }
-    /* vector<string> msgs = parse(orders[__order_index++], ':'); */
+    /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
-            __order_index);
+            __orderIndex);
     MPI_EQUAL(msgs[0], "MPI_Testall");
     MPI_EQUAL(stoi(msgs[1]), rank);
     MPI_EQUAL(stoi(msgs[2]), count);
@@ -718,7 +680,7 @@ int MPI_Testsome(
     // record which of the requests were filled in this
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* DEBUG0("MPI_Testsome:%d", rank); */
+    /* DEBUG("MPI_Testsome:%d\n", rank); */
     bool isaligned = true;
     size_t lastind = 0;
     __q = onlineAlignment(
@@ -738,11 +700,11 @@ int MPI_Testsome(
                 messagePool);
     }
 
-    /* vector<string> msgs = parse(orders[__order_index++], ':'); */
+    /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
-            __order_index);
+            __orderIndex);
     /* fprintf(stderr, "msgs[0]: %s\n", msgs[0].c_str()); */
     MPI_EQUAL(msgs[0], "MPI_Testsome");
     MPI_EQUAL(stoi(msgs[1]), rank);
@@ -780,15 +742,13 @@ int MPI_Testsome(
                 /* fprintf(stderr, "at %s, sendNodes: %s\n", */ 
                 /*         __func__, recSendNodes.c_str()); */
                 if(recSendNodes != repSendNodes) {
-                    if(rank == 6 && src == 4) {
-                        auto recSendNodesVec = parse(recSendNodes, '/');
-                        auto repSendNodesVec = parse(repSendNodes, '/');
-                        cerr << "rank: " << rank << ", src: " << src << endl 
-                            << "recSendNodes:\n" << recSendNodesVec << endl
-                            << "repSendNodes:\n" << repSendNodesVec << endl;
-                    }
-                    MPI_Abort(MPI_COMM_WORLD, 1);
+                    auto recSendNodesVec = parse(recSendNodes, '/');
+                    auto repSendNodesVec = parse(repSendNodes, '/');
+                    cerr << "rank: " << rank << ", src: " << src << endl 
+                        << "recSendNodes:\n" << recSendNodesVec << endl
+                        << "repSendNodes:\n" << repSendNodesVec << endl;
                 }
+                MPI_ASSERT(recSendNodes == repSendNodes);
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(
@@ -798,6 +758,7 @@ int MPI_Testsome(
             }
         }
         *outcount = oc;
+        /* DEBUG("MPI_Testsome returning, rank: %d\n", rank); */
         return MPI_SUCCESS;
     }
 
@@ -825,12 +786,12 @@ int MPI_Wait(
                 messagePool);
     }
     // I just need to keep track that it is cancelled
-    /* vector<string> msgs = parse(orders[__order_index++], ':'); */
+    /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     string recSendNodes = "";
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
-            __order_index,
+            __orderIndex,
             &recSendNodes);
     MPI_EQUAL(msgs[0], "MPI_Wait");
     MPI_EQUAL(stoi(msgs[1]), rank);
@@ -901,11 +862,11 @@ int MPI_Waitany(
                 index, 
                 status);
     }
-    /* vector<string> msgs = parse(orders[__order_index++], ':'); */
+    /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
-            __order_index);
+            __orderIndex);
     MPI_ASSERT(msgs[0] == "MPI_Waitany");
     MPI_ASSERT(stoi(msgs[1]) == rank);
     if(msgs[2] == "SUCCESS") {
@@ -932,7 +893,7 @@ int MPI_Waitall(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* DEBUG0("MPI_Waitall:%s\n", orders[__order_index].c_str()); */
+    /* DEBUG0("MPI_Waitall:%s\n", orders[orderIndex].c_str()); */
     bool isaligned = true;
     size_t lastind = 0;
     __q = onlineAlignment(
@@ -942,18 +903,32 @@ int MPI_Waitall(
             __looptrees);
     if(!isaligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitall\n", rank); */
-        // don't control anything
+        /*
+         * don't control anything
+         */
         return __MPI_Waitall(
                 count, 
                 array_of_requests, 
                 array_of_statuses,
                 messagePool);
     } 
-    /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
-            __order_index);
+            __orderIndex);
+    if(msgs[0] != "MPI_Waitall") {
+        string lastNodes = updateAndGetLastNodes(
+                __looptrees, 
+                TraceType::REPLAY);
+        DEBUG("rank: %d\nmsgs[0]: %s\norderIndex: %d\nlastNodes: %s\nlastind: %lu\n", 
+                rank, 
+                msgs[0].c_str(), 
+                __orderIndex, 
+                lastNodes.c_str(),
+                lastind);
+        /* DEBUG("replay traces:\n"); */
+        /* print(replayTraces, 0); */
+    }
     MPI_EQUAL(msgs[0], "MPI_Waitall");
     MPI_EQUAL(stoi(msgs[1]), rank);
     MPI_EQUAL(stoi(msgs[2]), count);
@@ -1025,7 +1000,7 @@ int MPI_Probe (
     vector<string> msgs = getmsgs(
             orders, 
             lastind,
-            __order_index);
+            __orderIndex);
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Probe");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
     MPI_ASSERTNALIGN(stoi(msgs[2]) == source);
@@ -1083,7 +1058,7 @@ int MPI_Iprobe (
     vector<string> msgs = getmsgs(
             orders, 
             lastind, 
-            __order_index);
+            __orderIndex);
     /* DEBUG0("MPI_Iprobe:%s\n", orders[__order_index].c_str()); */
     if(msgs[0] != "MPI_Iprobe") {
         string lastNodes = updateAndGetLastNodes(
@@ -1092,7 +1067,7 @@ int MPI_Iprobe (
         DEBUG("rank: %d\nmsgs[0]: %s\n__order_index: %d\nlastNodes: %s\n", 
                 rank, 
                 msgs[0].c_str(), 
-                __order_index, 
+                __orderIndex, 
                 lastNodes.c_str());
     }
     MPI_EQUAL(msgs[0], "MPI_Iprobe");
@@ -1145,11 +1120,11 @@ int MPI_Send_init (
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getmsgs(
             orders, 
-            __order_index, 
-            __order_index);
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Send_init");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
-    MPI_ASSERTNALIGN(stoi(msgs[2]) == dest);
+            0,
+            __orderIndex);
+    MPI_ASSERT(msgs[0] == "MPI_Send_init");
+    MPI_ASSERT(stoi(msgs[1]) == rank);
+    MPI_ASSERT(stoi(msgs[2]) == dest);
     // below is commented on purpose, do not uncomment
     /* MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end()); */ 
     __requests[msgs[3]] = request;
@@ -1182,18 +1157,18 @@ int MPI_Recv_init (
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getmsgs(
             orders, 
-            __order_index,
-            __order_index);
-    MPI_ASSERTNALIGN(msgs[0] == "MPI_Recv_init");
-    MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
-    MPI_ASSERTNALIGN(stoi(msgs[2]) == source);
+            __orderIndex,
+            __orderIndex);
+    MPI_ASSERT(msgs[0] == "MPI_Recv_init");
+    MPI_ASSERT(stoi(msgs[1]) == rank);
+    MPI_ASSERT(stoi(msgs[2]) == source);
     // below is commented on purpose, do not uncomment
     /* MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end()); */
     __requests[msgs[3]] = request;
     if(source == MPI_ANY_SOURCE) {
         source = lookahead(
                 orders, 
-                __order_index, 
+                __orderIndex, 
                 msgs[3]);
         MPI_ASSERTNALIGN(source != -1);
     }
@@ -1217,7 +1192,7 @@ int MPI_Startall (
     DEBUG0("MPI_Startall\n");
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    vector<string> msgs = parse(orders[__order_index++], ':');
+    vector<string> msgs = parse(orders[__orderIndex++], ':');
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Startall");
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
     MPI_ASSERTNALIGN(stoi(msgs[2]) == count);
@@ -1239,7 +1214,7 @@ int MPI_Request_free (
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     vector<string> msgs = parse(
-            orders[__order_index++], ':');
+            orders[__orderIndex++], ':');
     MPI_ASSERT(msgs[0] == "MPI_Request_free");
     MPI_ASSERT(stoi(msgs[1]) == rank);
     MPI_ASSERT(__requests.find(msgs[2]) != __requests.end());

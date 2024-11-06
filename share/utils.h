@@ -25,7 +25,6 @@
             int rank; \
             MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
             fprintf(stderr, "line: %d, rank: %d, func: %s assertion failed: %s\n", __LINE__, rank, __func__, #CONDITION); \
-            printStackTrace(); \
             MPI_Abort(MPI_COMM_WORLD, 1); \
         } \
     } while(0)

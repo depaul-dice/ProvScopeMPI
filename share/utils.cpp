@@ -267,3 +267,50 @@ void exceptionAssert(
         throw runtime_error(message);
     }
 }
+
+void __attribute__((visibility("default"))) printStackTrace() {
+    void *array[10];
+    size_t size;
+    char **strings;
+
+    size = backtrace(array, 10);
+    strings = backtrace_symbols(array, size);
+    fprintf(stderr, "Obtained %zd stack frames\n", size);
+    for (size_t i = 0; i < size; i++) {
+        fprintf(stderr, "%s\n", strings[i]);
+    }
+    free(strings);
+}
+
+void segfaultHandler(
+        int sig, 
+        siginfo_t *info, 
+        void *ucontext) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    void *array[10];
+    size_t size;
+    char **strings;
+
+    if(rank == 0) {
+        cerr << "Error " << rank << ": signal " << sig \
+        << "at line " << info->si_code << endl;
+        printStackTrace();
+    }
+
+    MPI_Abort(MPI_COMM_WORLD, 1);
+}
+
+void setupSignalHandler() {
+    struct sigaction sa;
+
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = segfaultHandler;
+    sigemptyset(&sa.sa_mask);
+    if(sigaction(SIGSEGV, &sa, NULL) == -1) {
+        fprintf(stderr, "Error: cannot set signal handler\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+}
+
+
