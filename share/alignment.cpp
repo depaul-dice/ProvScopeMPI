@@ -1109,7 +1109,7 @@ static inline bool matchbbmap(
 void getProperLastInd(size_t& lastInd, shared_ptr<element> curr) {
     while(curr->isLoop == true) {
         MPI_ASSERT(curr->funcs.size() == 1);
-        curr = curr->funcs.back().back();
+        curr = curr->funcs.back().front();
     }
     lastInd = max(lastInd, curr->index);
     MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
@@ -1707,9 +1707,9 @@ vector<string> getmsgs(
         } 
         ind = stoul(msgs.back());
         /* if(lastInd > ind) { */
-            /* int rank; */
-            /* MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-            /* DEBUG("we looping at rank: %d, lastInd %lu, ind %lu\n", rank, lastInd, ind); */
+        /*     int rank; */
+        /*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+        /*     DEBUG("we looping at rank: %d, lastInd %lu, ind %lu\n", rank, lastInd, ind); */
         /* } */
     } while(lastInd > ind);
     if(tmpRecSendNodes.size() > 0
