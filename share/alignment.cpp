@@ -932,7 +932,7 @@ static size_t findSize(FILE *fp) {
 
 deque<shared_ptr<lastaligned>> onlineAlignment(
         deque<shared_ptr<lastaligned>>& q, 
-        bool& isaligned, 
+        bool& isAligned, 
         size_t &lastInd, 
         unordered_map<string, loopNode *>& loopTrees) {
     int rank;
@@ -951,7 +951,7 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
          q.pop_back(); 
     } 
     deque<shared_ptr<lastaligned>> rq;
-    isaligned = true; 
+    isAligned = true; 
     
     // there's no parent for original nor the reproduced, so kept empty
     rq = greedyalignmentOnline(
@@ -962,10 +962,10 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
             j, 
             funcId, 
             rank, 
-            isaligned, 
+            isAligned, 
             lastInd); 
     MPI_ASSERT(lastInd != numeric_limits<size_t>::max()); 
-    MPI_ASSERT(lastInd > 0);
+    /* MPI_ASSERT(lastInd > 0); */
     return rq;
 }
 
@@ -1282,7 +1282,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         size_t &j, 
         const size_t& funcId, 
         const int &rank, 
-        bool& isaligned, 
+        bool& isAligned, 
         size_t& lastInd,
         shared_ptr<element> originalParent,
         shared_ptr<element> reproducedParent) {
@@ -1325,12 +1325,11 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     la->repIndex, 
                     tmpfuncId, 
                     rank, 
-                    isaligned, 
+                    isAligned, 
                     tmpLastInd,
                     original[i],
                     reproduced[j]);
             lastInd = max(lastInd, tmpLastInd);
-            MPI_ASSERT(lastInd > 0);
         }
     } else {
         firstTime = true;
@@ -1353,6 +1352,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     reproduced, 
                     i, 
                     j));
+        /* getProperLastInd(lastInd, original[i]); */
         rq.push_back(
                 make_shared<lastaligned>(
                     funcId, 
@@ -1404,13 +1404,14 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     tmpJ, 
                     k, 
                     rank, 
-                    isaligned, 
+                    isAligned, 
                     tmpLastInd,
                     original[i],
                     reproduced[j]);
         }
         lastInd = max(lastInd, tmpLastInd);
-        MPI_ASSERT(((rq.empty() || rq.back()->isSuccess()) && isaligned) || \
+        MPI_ASSERT(lastInd > 0);
+        MPI_ASSERT(((rq.empty() || rq.back()->isSuccess()) && isAligned) || \
                 (k == reproduced[j]->funcs.size() - 1));
     }
 
@@ -1421,6 +1422,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
     if(!rq.empty() && !(rq.back()->isSuccess())) {
         MPI_ASSERT(islastaligned(original, reproduced, i, j));
         // this logic is not correct, like funcs.size() would overflow
+        /* getProperLastInd(lastInd, original[i]); */
         rq.push_back(make_shared<lastaligned>(reproduced[j]->funcs.size() - 1, i, j));
         return rq;
     }
@@ -1453,7 +1455,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 i, 
                 j, 
                 rank, 
-                isaligned, 
+                isAligned, 
                 tmpLastInd,
                 isLoop);
     } else {
@@ -1466,6 +1468,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
          */
         if(tmpJ == reproduced.size()) {
             p = make_pair(i, j);
+            /* getProperLastInd(lastInd, original[i]); */
         } else {
             if(tmpI == original.size()) {
                 // this happens when the parents are loop node
@@ -1475,6 +1478,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         && reproducedParent->isLoop);
                 // we keep the point of last alignment as is
                 p = make_pair(i, j);
+                /* getProperLastInd(lastInd, original[i]); */
             } else if (tmpJ == reproduced.size()) {
                 // we should check if we have the same parent loop node
                 // below is a temporary solution, as we need to use the last node
@@ -1485,6 +1489,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         || (true));
                 // we keep the point of last alignment as is
                 p = make_pair(i, j);
+                /* getProperLastInd(lastInd, original[i]); */
             } else {
                 MPI_ASSERT(original[tmpI]->funcname == reproduced[tmpJ]->funcname);
                 MPI_ASSERT((originalParent == nullptr 
@@ -1497,7 +1502,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         tmpI, 
                         tmpJ, 
                         rank, 
-                        isaligned, 
+                        isAligned, 
                         tmpLastInd,
                         isLoop);
             }
@@ -1507,7 +1512,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
 
     deque<shared_ptr<lastaligned>> qs;
     // if we found some points that are aligned, let's do the alignment level below
-    bool tmpisaligned = true;
+    bool tmpIsAligned = true;
     // for each aligned pair (the 1st for loop), and for each function inside, we need to do the alignment
     size_t newfuncId;
     for(unsigned ind0 = 0; ind0 < aligned.size(); ind0++) {
@@ -1536,17 +1541,17 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         tmpj, 
                         tmpfuncId, 
                         rank, 
-                        tmpisaligned, 
+                        tmpIsAligned, 
                         tmpLastInd,
                         aligned[ind0].first,
                         aligned[ind0].second);
                 // we only expect the last of the last thing to be not successful
                 // why are we looking at funcids for isSuccess method?
                 /* if((!qs.back()->isSuccess() */ 
-                /*             || !tmpisaligned) && */ 
+                /*             || !tmpIsAligned) && */ 
                 /*         (ind0 != aligned.size() - 1 */ 
                 /*          || ind1 != aligned[ind0].second->funcs.size() - 1)) { */
-                /*     DEBUG("qs.back()->isSuccess(): %d, tmpisaligned: %d\n", qs.back()->isSuccess(), tmpisaligned); */
+                /*     DEBUG("qs.back()->isSuccess(): %d, tmpIsAligned: %d\n", qs.back()->isSuccess(), tmpIsAligned); */
                 /*     DEBUG("rank: %d, qs not successful, let's look\n\ */
                 /*             happened at function %s\n \ */
                 /*             ind0: %u, aligned.size(): %lu, ind1: %u\n \ */
@@ -1559,10 +1564,10 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 /*     printsurface(aligned[ind0].second->funcs[ind1]); */
                 /*     cerr << qs << endl; */
                 /* } */
-                MPI_ASSERT((qs.back()->isSuccess() && tmpisaligned) || \
+                MPI_ASSERT((qs.back()->isSuccess() && tmpIsAligned) || \
                         (ind0 == aligned.size() - 1 && \
                         ind1 == aligned[ind0].second->funcs.size() - 1));
-                if(!tmpisaligned) isaligned = false;
+                if(!tmpIsAligned) isAligned = false;
                 if(lastInd < tmpLastInd) {
                     /* DEBUG0("updating lastInd: %lu at %d\n", tmpLastInd, __LINE__); */
                     lastInd = tmpLastInd;
@@ -1570,8 +1575,11 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
             }
         }
     }
-    // if tmp said the alignment was not done at last, then we should expect the alignment did not finish at p either
-    // if that is the case, push them back to the queue 
+    /*
+     * if tmp said the alignment was not done at last, 
+     * then we should expect the alignment did not finish at p either
+     * if that is the case, push them back to the queue 
+     */
 
     rq = qs;
     // funcId is where you left off
@@ -1682,6 +1690,7 @@ vector<string> getmsgs(
         const size_t lastInd, 
         unsigned& orderIndex,
         string* recSendNodes) {
+    MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
     size_t ind = 0;
     vector<string> msgs;
     string nodes;
@@ -1690,8 +1699,9 @@ vector<string> getmsgs(
         if(orderIndex >= orders.size()) {
             int rank;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            DEBUG("order_index went beyong the size of orders, rank: %d\n", rank);
-            return vector<string>();
+            DEBUG("order_index went beyong the size of orders, rank: %d, lastInd: %lu\n", 
+                    rank, lastInd);
+            MPI_ASSERT(false);
         }
         msgs = parse(orders[orderIndex++], msgDelimiter);
 
@@ -1722,4 +1732,61 @@ vector<string> getmsgs(
 
 void appendRecordTracesRaw(vector<string> rawRecordTrace) {
     recordTracesRaw.push_back(rawRecordTrace);
+}
+
+size_t getIndex(shared_ptr<element>& eptr) {
+    while(eptr->isLoop) {
+        eptr = eptr->funcs.back().front();
+    }
+    return eptr->index; 
+}
+
+/*
+ * this is for debugging and we are pushing the bbs with the index
+ */
+vector<shared_ptr<element>> getCurrNodesByIndex(unsigned long index) {
+    vector<shared_ptr<element>> vec;
+    vector<shared_ptr<element>>& currLevel = recordTraces;
+    unsigned long currIndex = 0, nextIndex = 0;
+    bool pushed = false;
+    while(true) {
+        pushed = false;
+        for(unsigned i = 0; i < currLevel.size() - 1; i++) {
+            currIndex = getIndex(currLevel[i]);
+            nextIndex = getIndex(currLevel[i + 1]);
+            if(currIndex <= index && index < nextIndex) {
+                vec.push_back(currLevel[i]);
+                pushed = true;
+            }
+        } 
+        if(pushed == false) {
+            currIndex = getIndex(currLevel.back());
+            MPI_ASSERT(currIndex <= index);
+            vec.push_back(currLevel.back());
+        }
+        if(currIndex == index) {
+            break;
+        }
+
+        /* 
+         * you need to get the correct currLevel
+         */
+        pushed = false;
+        for(unsigned j = 0; j < vec.back()->funcs.size() - 1; j++) {
+            currIndex = getIndex(vec.back()->funcs[j].front());
+            nextIndex = getIndex(vec.back()->funcs[j + 1].front());
+            if(currIndex <= index && index < nextIndex) {
+                currLevel = vec.back()->funcs[j];
+                pushed = true;
+                break;
+            }
+        }
+        if(pushed == false) {
+            currIndex = getIndex(vec.back()->funcs.front().front());
+            MPI_ASSERT(currIndex <= index);
+            currLevel = vec.back()->funcs.back();
+        }
+    }
+    return vec;
+
 }

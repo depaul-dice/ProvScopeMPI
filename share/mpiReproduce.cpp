@@ -178,11 +178,11 @@ int MPI_Finalize(
     /*
      * last alignment before finalizing
      */
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
 
@@ -465,14 +465,14 @@ int MPI_Irsend(
             tag, 
             comm, 
             request);
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Irsend\n", rank); */
         // don't control anything, but keep track of the request
         // I don't know what to do with general requests
@@ -505,14 +505,14 @@ int MPI_Cancel(
             MPI_COMM_WORLD, &rank);
     int ret = __MPI_Cancel(
             request, messagePool);
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Cancel\n", rank); */
         // don't control anything
         return ret;
@@ -607,14 +607,14 @@ int MPI_Testall (
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         // don't control anything
         return __MPI_Testall(
                 count, 
@@ -681,14 +681,14 @@ int MPI_Testsome(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Testsome:%d\n", rank); */
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Testsome\n", myrank); */
         // don't control anything
         return __MPI_Testsome(
@@ -770,14 +770,14 @@ int MPI_Wait(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Wait\n", rank); */
         // don't control anything
         return __MPI_Wait(
@@ -846,14 +846,14 @@ int MPI_Waitany(
     int rank;
     int ret = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitany\n", rank); */
         // don't control anything
         return PMPI_Waitany(
@@ -894,14 +894,14 @@ int MPI_Waitall(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG0("MPI_Waitall:%s\n", orders[orderIndex].c_str()); */
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitall\n", rank); */
         /*
          * don't control anything
@@ -978,14 +978,14 @@ int MPI_Probe (
     /* DEBUG0("MPI_Probe\n"); */
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Probe\n", rank); */
         // don't control anything
         return __MPI_Probe(
@@ -1037,14 +1037,14 @@ int MPI_Iprobe (
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    bool isaligned = true;
+    bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
             __q, 
-            isaligned, 
+            isAligned, 
             lastInd, 
             __loopTrees);
-    if(!isaligned) {
+    if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Iprobe\n", rank); */
         // don't control anything
         return __MPI_Iprobe(

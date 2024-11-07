@@ -165,4 +165,8 @@ std::vector<std::string> getmsgs(
         std::string *recSendNodes = nullptr);
 
 void appendRecordTracesRaw(std::vector<std::string> rawRecordTrace);
+
+size_t getIndex(std::shared_ptr<element>& eptr);
+std::vector<std::shared_ptr<element>> getCurrNodesByIndex(unsigned long index);
+
 #endif // ALIGNMENT_H
