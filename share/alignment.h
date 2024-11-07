@@ -158,7 +158,7 @@ std::deque<std::shared_ptr<lastaligned>> greedyalignmentOnline(
         std::shared_ptr<element> originalParent = nullptr,
         std::shared_ptr<element> reproducedParent = nullptr);
 
-std::vector<std::string> getmsgs(
+std::vector<std::string> getMsgs(
         std::vector<std::string> &orders, 
         const size_t lastind, 
         unsigned& order_index,

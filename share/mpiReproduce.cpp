@@ -249,7 +249,7 @@ int MPI_Recv(
         return ret;
     } 
     string recSendNodes = "";
-    msgs = getmsgs(
+    msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex,
@@ -348,7 +348,7 @@ int MPI_Irecv(
         return ret;
     }
     
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -427,7 +427,7 @@ int MPI_Isend(
     }
     // I just need to keep track of the request
     /* DEBUG("lastInd: %zu at rank: %d\n", lastInd, rank); */
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -482,7 +482,7 @@ int MPI_Irsend(
         return ret;
     }
     // I just need to keep track of the request
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -519,7 +519,7 @@ int MPI_Cancel(
     }
     // I just need to keep track that it is cancelled
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -562,7 +562,7 @@ int MPI_Test(
     }
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     string recSendNodes = "";
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex,
@@ -624,7 +624,7 @@ int MPI_Testall (
                 messagePool);
     }
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -701,7 +701,7 @@ int MPI_Testsome(
     }
 
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -788,7 +788,7 @@ int MPI_Wait(
     // I just need to keep track that it is cancelled
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     string recSendNodes = "";
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex,
@@ -863,7 +863,7 @@ int MPI_Waitany(
                 status);
     }
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -912,7 +912,7 @@ int MPI_Waitall(
                 array_of_statuses,
                 messagePool);
     } 
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -997,7 +997,7 @@ int MPI_Probe (
     } 
  
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd,
             __orderIndex);
@@ -1055,7 +1055,7 @@ int MPI_Iprobe (
                 status,
                 messagePool);
     } 
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             lastInd, 
             __orderIndex);
@@ -1118,7 +1118,7 @@ int MPI_Send_init (
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             0,
             __orderIndex);
@@ -1155,7 +1155,7 @@ int MPI_Recv_init (
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
-    vector<string> msgs = getmsgs(
+    vector<string> msgs = getMsgs(
             orders, 
             __orderIndex,
             __orderIndex);

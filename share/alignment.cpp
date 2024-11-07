@@ -1685,7 +1685,7 @@ bool greedyalignmentWholeOffline() {
 }
 
 // returns an empty vector in case of error
-vector<string> getmsgs(
+vector<string> getMsgs(
         vector<string> &orders, 
         const size_t lastInd, 
         unsigned& orderIndex,
@@ -1764,10 +1764,16 @@ vector<shared_ptr<element>> getCurrNodesByIndex(unsigned long index) {
             MPI_ASSERT(currIndex <= index);
             vec.push_back(currLevel.back());
         }
+        /*
+         * here we found the exact point to stop
+         */
         if(currIndex == index) {
             break;
         }
 
+        if(vec.back()->funcs.size() == 0) {
+            break;
+        }
         /* 
          * you need to get the correct currLevel
          */
