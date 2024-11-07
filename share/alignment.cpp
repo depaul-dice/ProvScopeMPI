@@ -123,6 +123,15 @@ bool element::operator ==(const element &e) const {
             && isLoop == e.isLoop);
 }
 
+ostream& operator<<(ostream& os, const element& e) {
+    if(e.isLoop == true) {
+        os << e.bb() <<  ":loop:" << e.index;
+    } else {
+        os << e.bb() << ':' << e.index;
+    }
+    return os;
+}
+
 lastaligned::lastaligned() : 
     funcId(numeric_limits<unsigned long>::max()), 
     origIndex(numeric_limits<unsigned long>::max()), 
@@ -1286,7 +1295,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         size_t& lastInd,
         shared_ptr<element> originalParent,
         shared_ptr<element> reproducedParent) {
-    MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
+    MPI_EQUAL(original[i]->funcname, reproduced[j]->funcname);
     // if the queue is not empty, let's do the alignment level below first
     deque<shared_ptr<lastaligned>> rq;
     /* DEBUG0("greedyalignmentOnline at %s with i: %lu, j: %lu, funcId:%lu\n",\ */
@@ -1723,6 +1732,13 @@ vector<string> getMsgs(
         /*     DEBUG("we looping at rank: %d, lastInd %lu, ind %lu\n", rank, lastInd, ind); */
         /* } */
     } while(lastInd > ind);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(rank == 3) {
+        DEBUG("rank: %d, lastInd: %lu, ind: %lu\n", rank, lastInd, ind);
+        auto vecs = getCurrNodesByIndex(ind);
+        cerr << vecs << endl;
+    }
     if(tmpRecSendNodes.size() > 0
             && recSendNodes != nullptr) {
         *recSendNodes = tmpRecSendNodes;

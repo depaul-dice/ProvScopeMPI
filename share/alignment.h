@@ -51,6 +51,8 @@ public:
 
     bool operator == (const element &e) const;
 
+    friend std::ostream& operator<<(std::ostream& os, const element& e);
+
     std::string bb() const;
     std::string content() const;
 
