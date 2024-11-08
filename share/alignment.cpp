@@ -13,7 +13,9 @@ vector<shared_ptr<element>> replayTraces;
 
 static  unordered_map<string, unordered_set<string>> divs;
 
-// below stores points of divergences and dumps at MPI_Finalize
+/*
+ * below stores points of divergences and dumps at MPI_Finalize
+ */
 unordered_set<string> pods;
 
 const unordered_set<string> mpiCallsWithSendNodesAtLast = {
@@ -123,7 +125,7 @@ bool element::operator ==(const element &e) const {
             && isLoop == e.isLoop);
 }
 
-ostream& operator<<(ostream& os, const element& e) {
+ostream& operator << (ostream& os, const element& e) {
     if(e.isLoop == true) {
         os << e.bb() <<  ":loop:" << e.index;
     } else {
@@ -201,7 +203,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
         }
         index++;
     
-        while(!isExit 
+        while(isExit == false 
                 && index < traces.size() 
                 && traces[index][1] == "entry") {
             eptr->funcs.push_back(
@@ -1096,6 +1098,11 @@ static inline void create_map(
     return;
 }
 
+/*
+ * this function just checks that 
+ * there are some basic blocks that aligns till the end
+ * it does NOT verify that it might have the divergence afterwards
+ */
 static inline bool matchbbmap(
         unordered_map<string, vector<size_t>>& bbMap, 
         vector<shared_ptr<element>>& original, 
@@ -1151,6 +1158,12 @@ static pair<size_t, size_t> __greedyalignmentOnline(
      * we initialize bbMap here in case the misalignment happens
      */
     unordered_map<string, vector<size_t>> bbMap;
+    /* if(original[0]->funcname == "hypre_FinalizeCommunication" && rank == 3) { */
+        /* cerr << "original\n"; */
+        /* printsurface(original); */
+        /* cerr << "reproduced\n"; */
+        /* printsurface(reproduced); */
+    /* } */
     while(i < original.size() 
             && j < reproduced.size()) {
         if(original[i]->bb() == reproduced[j]->bb()) {
@@ -1168,14 +1181,23 @@ static pair<size_t, size_t> __greedyalignmentOnline(
              * reproduced traces (in case they are not filled up already), 
              * and then we try to match the traces in the original execution
              */
-            /* printf("pod: %s, rank: %d\n", original[i - 1]->bb().c_str(), rank); */
+            string pod;
             if(original[i - 1]->isLoop == true) {
-                pods.insert(original[i - 1]->bb() 
-                        + ':' 
-                        + to_string(original[i - 1]->index));
+                pod = original[i - 1]->bb() 
+                    + ':' 
+                    + to_string(original[i - 1]->index);
+                if(pods.find(pod) == pods.end()) {
+                    printf("pods: %s, rank: %d\n", pod.c_str(), rank);
+                }
+                pods.insert(pod);
             } else {
-                pods.insert(original[i - 1]->bb());
+                pod = original[i - 1]->bb();
+                if(pods.find(pod) == pods.end()) {
+                    printf("pods: %s, rank: %d\n", pod.c_str(), rank);
+                }
+                pods.insert(pod);
             }
+            
             size_t oldj = j, oldi = i;
 
             /*
@@ -1190,6 +1212,10 @@ static pair<size_t, size_t> __greedyalignmentOnline(
                  * so we set the lastInd to the last index of the original execution 
                  */
                 getProperLastInd(lastInd, original[oldi]);
+            
+                /* if(rank == 3) { */
+                    /* cerr << "returning lastInd: " << lastInd << endl; */
+                /* } */
                 
                 MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
                 isAligned = false;
@@ -1216,6 +1242,9 @@ static pair<size_t, size_t> __greedyalignmentOnline(
     if(i < original.size()) {
         getProperLastInd(lastInd, original[i - 1]);
         MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
+        /* if(rank == 3) { */
+            /* cerr << "i < original.size() returning lastInd: " << lastInd << endl; */
+        /* } */
         return make_pair(i - 1, j - 1);
 
     /*
@@ -1229,6 +1258,9 @@ static pair<size_t, size_t> __greedyalignmentOnline(
         getProperLastInd(lastInd, original[i - 1]);
         // do we really need this?
         MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
+        /* if(rank == 3) { */
+            /* cerr << "j < reproduced.size() returning lastInd: " << lastInd << endl; */
+        /* } */
         return make_pair(
                 numeric_limits<size_t>::max(), numeric_limits<size_t>::max());
 
@@ -1242,6 +1274,9 @@ static pair<size_t, size_t> __greedyalignmentOnline(
         getProperLastInd(lastInd, original[i - 1]);
         // do we really need this?
         MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
+        /* if(rank == 3) { */
+            /* cerr << "i == original.size() && j == reproduced.size() returning lastInd: " << lastInd << endl; */
+        /* } */
         return make_pair(
                 numeric_limits<size_t>::max(), numeric_limits<size_t>::max());
     }
@@ -1253,7 +1288,7 @@ static bool issuccessful(pair<size_t, size_t> p) {
 }
 
 // this function is just to make sure
-static bool islastaligned(
+static bool isLastAligned(
         vector<shared_ptr<element>>& original, 
         vector<shared_ptr<element>>& reproduced, 
         size_t i, 
@@ -1320,7 +1355,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 tmpfuncId = 0;
             }
             size_t tmpLastInd = 0;
-            MPI_ASSERT(original[i]->funcs[funcId][0]->funcname == reproduced[j]->funcs[funcId][0]->funcname);
+            MPI_EQUAL(
+                    original[i]->funcs[funcId][0]->funcname, 
+                    reproduced[j]->funcs[funcId][0]->funcname);
             /*
              * We are calling greedyalignment online here recursively
              * where one level of stack is popped and used as arguments
@@ -1356,7 +1393,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 /* funcId: %lu, i: %lu, j: %lu\n", \ */
                 /* original[i]->bb().c_str(), funcId, i, j); */
         MPI_ASSERT(
-                islastaligned(
+                isLastAligned(
                     original, 
                     reproduced, 
                     i, 
@@ -1367,6 +1404,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     funcId, 
                     i, 
                     j));
+        MPI_ASSERT(lastInd > 0);
         return rq;
     }
 
@@ -1400,10 +1438,10 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         if(original[i]->funcs[k][0]->funcname != reproduced[j]->funcs[k][0]->funcname) {
             MPI_ASSERT(original[i]->isLoop == false);
             pods.insert(original[i]->bb());
-            /* printf("different function called from %s: %s vs. %s\n", */ 
-                    /* original[i]->bb().c_str(), */ 
-                    /* original[i]->funcs[k][0]->funcname.c_str(), */ 
-                    /* reproduced[j]->funcs[k][0]->funcname.c_str()); */
+            printf("different function called from %s: %s vs. %s\n", 
+                    original[i]->bb().c_str(), 
+                    original[i]->funcs[k][0]->funcname.c_str(), 
+                    reproduced[j]->funcs[k][0]->funcname.c_str());
         } else {
             rq = greedyalignmentOnline(
                     original[i]->funcs[k], 
@@ -1429,10 +1467,10 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
      * one has to return back because the last point of misalignment is already found
      */
     if(!rq.empty() && !(rq.back()->isSuccess())) {
-        MPI_ASSERT(islastaligned(original, reproduced, i, j));
+        MPI_ASSERT(isLastAligned(original, reproduced, i, j));
         // this logic is not correct, like funcs.size() would overflow
-        /* getProperLastInd(lastInd, original[i]); */
         rq.push_back(make_shared<lastaligned>(reproduced[j]->funcs.size() - 1, i, j));
+        MPI_ASSERT(lastInd > 0);
         return rq;
     }
 
@@ -1467,6 +1505,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 isAligned, 
                 tmpLastInd,
                 isLoop);
+        MPI_ASSERT(tmpLastInd > 0);
     } else {
         size_t tmpI = i + 1, tmpJ = j + 1;
         /* DEBUG0("tmpi: %lu, tmpj: %lu, original.size(): %lu, reproduced.size(): %lu\n", tmpi, tmpj, original.size(), reproduced.size()); */
@@ -1477,6 +1516,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
          */
         if(tmpJ == reproduced.size()) {
             p = make_pair(i, j);
+            /*
+             * below might be wrong
+             */
             /* getProperLastInd(lastInd, original[i]); */
         } else {
             if(tmpI == original.size()) {
@@ -1526,16 +1568,19 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
     size_t newfuncId;
     for(unsigned ind0 = 0; ind0 < aligned.size(); ind0++) {
         MPI_ASSERT(aligned[ind0].first->bb() == aligned[ind0].second->bb());
-        MPI_ASSERT(aligned[ind0].first->funcs.size() == aligned[ind0].second->funcs.size() 
-                || ind0 == aligned.size() - 1);
-        MPI_ASSERT(aligned[ind0].first->funcs.size() >= aligned[ind0].second->funcs.size());
+        MPI_ASSERT(aligned[ind0].first->funcs.size() 
+                == aligned[ind0].second->funcs.size() 
+                    || ind0 == aligned.size() - 1);
+        MPI_ASSERT(aligned[ind0].first->funcs.size() 
+                >= aligned[ind0].second->funcs.size());
         newfuncId = aligned[ind0].second->funcs.size() - 1;
         tmpLastInd = 0;
         for(unsigned ind1 = 0; ind1 < aligned[ind0].second->funcs.size(); ind1++) {
             size_t tmpi = 0, 
                    tmpj = 0, 
                    tmpfuncId = 0;
-            if(aligned[ind0].first->funcs[ind1][0]->funcname != aligned[ind0].second->funcs[ind1][0]->funcname) {
+            if(aligned[ind0].first->funcs[ind1][0]->funcname 
+                    != aligned[ind0].second->funcs[ind1][0]->funcname) {
                 /* printf("different function called from %s: %s vs. %s\n", \ */
                         /* aligned[ind0].first->bb().c_str(), \ */
                         /* aligned[ind0].first->funcs[ind1][0]->funcname.c_str(), \ */
@@ -1556,31 +1601,14 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                         aligned[ind0].second);
                 // we only expect the last of the last thing to be not successful
                 // why are we looking at funcids for isSuccess method?
-                /* if((!qs.back()->isSuccess() */ 
-                /*             || !tmpIsAligned) && */ 
-                /*         (ind0 != aligned.size() - 1 */ 
-                /*          || ind1 != aligned[ind0].second->funcs.size() - 1)) { */
-                /*     DEBUG("qs.back()->isSuccess(): %d, tmpIsAligned: %d\n", qs.back()->isSuccess(), tmpIsAligned); */
-                /*     DEBUG("rank: %d, qs not successful, let's look\n\ */
-                /*             happened at function %s\n \ */
-                /*             ind0: %u, aligned.size(): %lu, ind1: %u\n \ */
-                /*             aligned[%u].first->funcs.size(): %lu\n", \ */
-                /*             rank, aligned[ind0].first->funcs[ind1][0]->funcname.c_str(), ind0, \ */
-                /*             aligned.size(), ind1, ind0, aligned[ind0].second->funcs.size()); */
-                /*     DEBUG("original\n"); */
-                /*     printsurface(aligned[ind0].first->funcs[ind1]); */
-                /*     DEBUG("reproduced\n"); */
-                /*     printsurface(aligned[ind0].second->funcs[ind1]); */
-                /*     cerr << qs << endl; */
-                /* } */
                 MPI_ASSERT((qs.back()->isSuccess() && tmpIsAligned) || \
                         (ind0 == aligned.size() - 1 && \
                         ind1 == aligned[ind0].second->funcs.size() - 1));
-                if(!tmpIsAligned) isAligned = false;
-                if(lastInd < tmpLastInd) {
-                    /* DEBUG0("updating lastInd: %lu at %d\n", tmpLastInd, __LINE__); */
-                    lastInd = tmpLastInd;
+                MPI_ASSERT(tmpLastInd > 0);
+                if(!tmpIsAligned) {
+                    isAligned = false;
                 }
+                lastInd = max(tmpLastInd, lastInd);
             }
         }
     }
@@ -1732,13 +1760,6 @@ vector<string> getMsgs(
         /*     DEBUG("we looping at rank: %d, lastInd %lu, ind %lu\n", rank, lastInd, ind); */
         /* } */
     } while(lastInd > ind);
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if(rank == 3) {
-        DEBUG("rank: %d, lastInd: %lu, ind: %lu\n", rank, lastInd, ind);
-        auto vecs = getCurrNodesByIndex(ind);
-        cerr << vecs << endl;
-    }
     if(tmpRecSendNodes.size() > 0
             && recSendNodes != nullptr) {
         *recSendNodes = tmpRecSendNodes;
@@ -1804,11 +1825,41 @@ vector<shared_ptr<element>> getCurrNodesByIndex(unsigned long index) {
             }
         }
         if(pushed == false) {
-            currIndex = getIndex(vec.back()->funcs.front().front());
+            currIndex = getIndex(vec.back()->funcs.back().front());
             MPI_ASSERT(currIndex <= index);
             currLevel = vec.back()->funcs.back();
         }
     }
     return vec;
 
+}
+
+/*
+ * this is not working for some reason
+ * it's looking into main and it's coming back to main, 
+ * which makes no sense
+ */
+size_t getIndexFromDeque(deque<shared_ptr<lastaligned>>& q) {
+    shared_ptr<element> eptr = nullptr;
+    auto currTrace = recordTraces;
+    cerr << "recordTraces.size(): " << recordTraces.size() << endl;
+    for(auto i = q.size() - 1; 0 <= i; i--) {
+        auto origIndex = q[i]->origIndex; 
+        auto funcId = q[i]->funcId;
+        MPI_ASSERT(origIndex != numeric_limits<size_t>::max());
+        cerr << *currTrace[origIndex] << endl;
+        MPI_ASSERT(origIndex < currTrace.size());
+        if(funcId != numeric_limits<size_t>::max()) {
+            funcId = 0;
+            currTrace = currTrace[origIndex]->funcs[funcId]; 
+            cerr << "currTrace.size(): " << currTrace.size() << endl;
+        } else {
+            eptr = currTrace[origIndex];
+            break;
+        }
+    }
+    if(eptr == nullptr) {
+        return -1;
+    }
+    return eptr->index;
 }

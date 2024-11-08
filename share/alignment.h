@@ -171,4 +171,6 @@ void appendRecordTracesRaw(std::vector<std::string> rawRecordTrace);
 size_t getIndex(std::shared_ptr<element>& eptr);
 std::vector<std::shared_ptr<element>> getCurrNodesByIndex(unsigned long index);
 
+size_t getIndexFromDeque(std::deque<std::shared_ptr<lastaligned>>& q);
+
 #endif // ALIGNMENT_H

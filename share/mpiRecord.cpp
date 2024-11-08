@@ -7,7 +7,18 @@
 
 using namespace std;
 
+using json = nlohmann::json;
+
 static map<MPI_Request *, string> __requests;
+
+/*
+ * this shows where the locations of calls are
+ * the first string is the name of the function (e.g. MPI_Recv)
+ * the second string is the location of the call
+ * value is the nodecnt
+ * dump it at the very end
+ */
+unordered_map<string, map<string, unsigned long>> __callLocations;
 
 FILE *recordFile = nullptr;
 FILE *traceFile = nullptr;
@@ -81,6 +92,20 @@ int MPI_Init(
     for(auto lt: loopTrees) {
         lt.second->fixExclusives();
     }
+    
+    __callLocations["MPI_Recv"] = map<string, unsigned long>();
+    __callLocations["MPI_Irecv"] = map<string, unsigned long>();
+    __callLocations["MPI_Isend"] = map<string, unsigned long>();
+    __callLocations["MPI_Test"] = map<string, unsigned long>();
+    __callLocations["MPI_Testall"] = map<string, unsigned long>();
+    __callLocations["MPI_Testsome"] = map<string, unsigned long>();
+    __callLocations["MPI_Wait"] = map<string, unsigned long>();
+    __callLocations["MPI_Waitany"] = map<string, unsigned long>();
+    __callLocations["MPI_Waitall"] = map<string, unsigned long>();
+    __callLocations["MPI_Probe"] = map<string, unsigned long>();
+    __callLocations["MPI_Iprobe"] = map<string, unsigned long>();
+    __callLocations["MPI_Request_free"] = map<string, unsigned long>();
+    __callLocations["MPI_Cancel"] = map<string, unsigned long>();
 
     return ret;
 }
@@ -96,6 +121,20 @@ int MPI_Finalize(void) {
     for(auto lt: loopTrees) {
         delete lt.second;
     }
+    json j;
+    for(const auto &[key, inner_map]: __callLocations) {
+        for(const auto &[subkey, value]: inner_map) {
+            j[key][subkey] = value;
+        }
+    }
+    string jsonFileName = "callLocations-" + to_string(rank) + ".json";
+    std::ofstream jsonFile(jsonFileName);
+    if(jsonFile.is_open()) {
+        jsonFile << j.dump(4) << std::endl;
+        jsonFile.close();
+    } else {
+        fprintf(stderr, "failed to open callLocations.json\n");
+    }
     int ret = PMPI_Finalize();
     /* DEBUG("MPI_Finalize done, rank:%d\n", rank); */
     return ret;
@@ -109,7 +148,8 @@ int MPI_Recv(
     int tag, 
     MPI_Comm comm, 
     MPI_Status *status) {
-    return __MPI_Recv(
+    
+    int ret =  __MPI_Recv(
             buf, 
             count, 
             datatype, 
@@ -121,6 +161,12 @@ int MPI_Recv(
             nullptr,
             recordFile,
             nodecnt);
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Recv"].find(lastNodes) 
+            == __callLocations["MPI_Recv"].end());
+    __callLocations["MPI_Recv"][lastNodes] = nodecnt;
+    return ret;
 }
 
 int MPI_Send(
@@ -170,6 +216,12 @@ int MPI_Irecv(
             recordFile,
             nodecnt);
     __requests[request] = "MPI_Irecv";
+    // updating the call locations
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Irecv"].find(lastNodes) 
+            == __callLocations["MPI_Irecv"].end());
+    __callLocations["MPI_Irecv"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -211,6 +263,10 @@ int MPI_Isend(
 
     MPI_ASSERT(ret == MPI_SUCCESS);
     __requests[request] = "MPI_Isend";
+
+    MPI_ASSERT(__callLocations["MPI_Isend"].find(lastNodes)
+            == __callLocations["MPI_Isend"].end());
+    __callLocations["MPI_Isend"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -266,6 +322,11 @@ int MPI_Cancel(
             recordFile, 
             nodecnt);
     __requests.erase(request);
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Cancel"].find(lastNodes)
+            == __callLocations["MPI_Cancel"].end());
+    __callLocations["MPI_Cancel"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -286,6 +347,11 @@ int MPI_Test(
     if(*flag) {
         __requests.erase(request);
     }
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Test"].find(lastNodes)
+            == __callLocations["MPI_Test"].end());
+    __callLocations["MPI_Test"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -312,6 +378,11 @@ int MPI_Testall(
             MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
         }
     }
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Testall"].find(lastNodes)
+            == __callLocations["MPI_Testall"].end());
+    __callLocations["MPI_Testall"][lastNodes] = nodecnt;
 
     return ret;
 }
@@ -340,6 +411,11 @@ int MPI_Testsome(
                     __requests.find(&array_of_requests[ind]) != __requests.end());
         }
     }
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Testsome"].find(lastNodes)
+            == __callLocations["MPI_Testsome"].end());
+    __callLocations["MPI_Testsome"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -355,6 +431,11 @@ int MPI_Wait(
             nullptr,
             recordFile, 
             nodecnt);
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Wait"].find(lastNodes)
+            == __callLocations["MPI_Wait"].end());
+    __callLocations["MPI_Wait"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -390,6 +471,11 @@ int MPI_Waitany(
                 stat.MPI_SOURCE, 
                 nodecnt);
     }
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Waitany"].find(lastNodes)
+            == __callLocations["MPI_Waitany"].end());
+    __callLocations["MPI_Waitany"][lastNodes] = nodecnt;
 
     return ret;
 }
@@ -423,6 +509,11 @@ int MPI_Waitall(
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Waitall"].find(lastNodes)
+            == __callLocations["MPI_Waitall"].end());
+    __callLocations["MPI_Waitall"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -454,6 +545,11 @@ int MPI_Probe (
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Probe"].find(lastNodes)
+            == __callLocations["MPI_Probe"].end());
+    __callLocations["MPI_Probe"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -485,6 +581,11 @@ int MPI_Iprobe (
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Iprobe"].find(lastNodes)
+            == __callLocations["MPI_Iprobe"].end());
+    __callLocations["MPI_Iprobe"][lastNodes] = nodecnt;
     return ret;
 }
 
@@ -591,6 +692,11 @@ int MPI_Request_free (
             rank, request);
     __requests.erase(request);
     messagePool.deleteMessage(request); 
+    string lastNodes = updateAndGetLastNodes(
+            loopTrees, TraceType::RECORD);
+    MPI_ASSERT(__callLocations["MPI_Request_free"].find(lastNodes)
+            == __callLocations["MPI_Request_free"].end());
+    __callLocations["MPI_Request_free"][lastNodes] = nodecnt;
     return ret;
 }
 

@@ -920,12 +920,18 @@ int MPI_Waitall(
         string lastNodes = updateAndGetLastNodes(
                 __loopTrees, 
                 TraceType::REPLAY);
-        DEBUG("rank: %d\nmsgs[0]: %s\norderIndex: %d\nlastNodes: %s\nlastInd: %lu\n", 
+        DEBUG("rank: %d\nmsgs[0]: %s\norderIndex: %d\nlastNodes: %s\nlastInd: %lu\nreplayTracesRaw.size(): %lu\n", 
                 rank, 
                 msgs[0].c_str(), 
                 __orderIndex, 
                 lastNodes.c_str(),
-                lastInd);
+                lastInd,
+                replayTracesRaw.size());
+        /* auto vec = getCurrNodesByIndex(lastInd); */
+        /* cerr << "rank: " << rank << endl << vec << endl; */
+        cerr << "__q: " << __q << endl;
+        size_t indexByQ = getIndexFromDeque(__q);
+        cerr << "indexByQ: " << indexByQ << endl;
         /* DEBUG("replay traces:\n"); */
         /* print(replayTraces, 0); */
     }
