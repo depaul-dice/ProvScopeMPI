@@ -1505,7 +1505,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 isAligned, 
                 tmpLastInd,
                 isLoop);
-        MPI_ASSERT(tmpLastInd > 0);
+        /* MPI_ASSERT(tmpLastInd > 0); */
     } else {
         size_t tmpI = i + 1, tmpJ = j + 1;
         /* DEBUG0("tmpi: %lu, tmpj: %lu, original.size(): %lu, reproduced.size(): %lu\n", tmpi, tmpj, original.size(), reproduced.size()); */

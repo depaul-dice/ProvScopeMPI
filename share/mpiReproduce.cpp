@@ -8,10 +8,12 @@
 #include "mpiRecordReplay.h"
 
 using namespace std;
+using json = nlohmann::json;
 
 static vector<string> orders;
 /* static unsigned __order_index = 0; */
 static unsigned __orderIndex = 0;
+unordered_map<string, unordered_map<string, unsigned long>> __callLocations;
 
 /* static vector<vector<string>> recordtraces; */
 /* static unsigned __recordtrace_index = 0; */
@@ -163,6 +165,26 @@ int MPI_Init(
      */
     unsigned long index = 0;
     recordTraces = makeHierarchyMain(rawTraces, index, __loopTrees); 
+
+    /*
+     * reading the json file
+     */
+    string jsonfile = "callLocations-" + to_string(rank) + ".json";
+    ifstream ifs(jsonfile);
+    if(!ifs.is_open()) {
+        cerr << "Error: cannot open file " << jsonfile << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    json j;
+    ifs >> j;
+    for(const auto& [key, inner_json] : j.items()) {
+        unordered_map<string, unsigned long> inner_map;
+        for(const auto& [inner_key, inner_val] : inner_json.items()) {
+            inner_map[inner_key] = inner_val;
+        }
+        __callLocations[key] = inner_map;
+    }
+    cerr << __callLocations << endl;
 
     return ret;
 }

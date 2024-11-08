@@ -126,6 +126,17 @@ std::ostream& operator<<(
     return os;
 }
 
+template <typename S, typename T>
+std::ostream& operator<<(
+        std::ostream& os, const std::unordered_map<S, T>& um) {
+    os << "{";
+    for(auto it = um.begin(); it != um.end(); ++it) {
+        os << it->first << ':' << it->second << std::endl;
+    }
+    os << "}";
+    return os;
+}
+
 template <typename T>
 std::unordered_set<T> operator+=(
         std::unordered_set<T>& lhs, const std::unordered_set<T>& rhs) {
