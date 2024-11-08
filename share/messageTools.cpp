@@ -18,13 +18,13 @@ void recordMPIIprobeSuccess(
                 source, 
                 tag, 
                 stat->MPI_SOURCE, 
-                nodeCount);
+                nodeCount - 1);
     } else {
         fprintf(recordFile, "MPI_Iprobe|%d|%d|%d|SUCCESS|%lu\n", 
                 rank, 
                 source, 
                 tag, 
-                nodeCount);
+                nodeCount - 1);
     }
 
 }
@@ -45,13 +45,13 @@ void recordMPIProbe (
                 source, 
                 tag, 
                 status->MPI_SOURCE, 
-                nodeCount);
+                nodeCount - 1);
     } else {
         fprintf(recordFile, "MPI_Probe|%d|%d|%d|%lu\n", 
                 rank, 
                 source, 
                 tag, 
-                nodeCount);
+                nodeCount - 1);
     }
 }
 
@@ -195,7 +195,7 @@ int __MPI_Recv(
             fprintf(recordFile, "MPI_Recv|%d|%d|%lu|%s\n",
                     rank,
                     retSrc,
-                    nodeCnt,
+                    nodeCnt - 1,
                     sendNodes.c_str());
         }
         return MPI_SUCCESS;
@@ -259,7 +259,7 @@ int __MPI_Recv(
         fprintf(recordFile, "MPI_Recv|%d|%d|%lu|%s\n",
                 rank,
                 status->MPI_SOURCE,
-                nodeCnt,
+                nodeCnt - 1,
                 msgs[msgs.size() - 2].c_str());
     }
     return ret;
@@ -379,7 +379,7 @@ int __MPI_Irecv(
                 rank, 
                 source, 
                 request, 
-                nodeCnt);
+                nodeCnt - 1);
     }
     return ret;
 }
@@ -447,7 +447,7 @@ int __MPI_Isend(
                 rank, 
                 dest, 
                 request, 
-                nodeCnt);
+                nodeCnt - 1);
     }
     return ret;
 }
@@ -504,7 +504,7 @@ int __MPI_Wait(
                     rank, 
                     request, 
                     retSrc, 
-                    nodeCnt,
+                    nodeCnt - 1,
                     retNodes.c_str());
         }
         MPI_ASSERT(status->MPI_ERROR == MPI_SUCCESS);
@@ -537,7 +537,7 @@ int __MPI_Wait(
                 rank, 
                 request, 
                 stat.MPI_SOURCE, 
-                nodeCnt,
+                nodeCnt - 1,
                 sendNodes.c_str());
     }
     return ret;
@@ -597,7 +597,7 @@ int __MPI_Test(
                     rank, 
                     request, 
                     retSrc, 
-                    nodeCnt,
+                    nodeCnt - 1,
                     lastNodes.c_str());
         }
         return MPI_SUCCESS;
@@ -645,7 +645,7 @@ int __MPI_Test(
                     rank, 
                     request, 
                     localStat.MPI_SOURCE, 
-                    nodeCnt,
+                    nodeCnt - 1,
                     sendNodes.c_str());
         }
     } else {
@@ -653,7 +653,7 @@ int __MPI_Test(
             fprintf(recordFile, "MPI_Test|%d|%p|FAIL|%lu\n", \
                     rank, 
                     request, 
-                    nodeCnt);
+                    nodeCnt - 1);
         }
     }
     return ret;
@@ -711,7 +711,7 @@ int __MPI_Waitall(
                         rank, 
                         &array_of_requests[i], 
                         src, 
-                        nodeCnt);
+                        nodeCnt - 1);
             }
         }
     }
@@ -761,7 +761,7 @@ int __MPI_Waitall(
                     localStats[i].MPI_SOURCE,
                     sendNodes[i].c_str());
         }
-        fprintf(recordFile, "|%lu\n", nodeCnt);
+        fprintf(recordFile, "|%lu\n", nodeCnt - 1);
     }
     return ret;
 }
@@ -817,7 +817,7 @@ int __MPI_Testall(
                         rank, 
                         &array_of_requests[i], 
                         src, 
-                        nodeCnt);
+                        nodeCnt - 1);
             }
         }
     }
@@ -861,13 +861,13 @@ int __MPI_Testall(
                         localStats[i].MPI_SOURCE,
                         lastNodes[i].c_str());
             }
-            fprintf(recordFile, "|%lu\n", nodeCnt);
+            fprintf(recordFile, "|%lu\n", nodeCnt - 1);
         }
     } else if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Testall|%d|%d|FAIL|%lu\n", 
                 rank, 
                 count,
-                nodeCnt);
+                nodeCnt - 1);
     }
     return ret;
 }
@@ -924,7 +924,7 @@ int __MPI_Testsome(
                         rank, 
                         &array_of_requests[i], 
                         src, 
-                        nodeCnt);
+                        nodeCnt - 1);
             }
         }
     }
@@ -974,7 +974,7 @@ int __MPI_Testsome(
     }
     if(recordFile != nullptr) {
         fprintf(recordFile, "|%lu\n", 
-                nodeCnt);
+                nodeCnt - 1);
     }
     return ret;
 }
@@ -992,7 +992,7 @@ int __MPI_Cancel(
         fprintf(recordFile, "MPI_Cancel|%d|%p|%lu\n", 
                 rank, 
                 request, 
-                nodeCnt);
+                nodeCnt - 1);
     }
     return ret;
 }
@@ -1203,7 +1203,7 @@ int __MPI_Iprobe(
                     rank, 
                     source, 
                     tag, 
-                    nodeCnt);
+                    nodeCnt - 1);
         }
     }
     return ret;

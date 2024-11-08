@@ -165,7 +165,7 @@ int MPI_Recv(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Recv"].find(lastNodes) 
             == __callLocations["MPI_Recv"].end());
-    __callLocations["MPI_Recv"][lastNodes] = nodecnt;
+    __callLocations["MPI_Recv"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -221,7 +221,7 @@ int MPI_Irecv(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Irecv"].find(lastNodes) 
             == __callLocations["MPI_Irecv"].end());
-    __callLocations["MPI_Irecv"][lastNodes] = nodecnt;
+    __callLocations["MPI_Irecv"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -266,7 +266,7 @@ int MPI_Isend(
 
     MPI_ASSERT(__callLocations["MPI_Isend"].find(lastNodes)
             == __callLocations["MPI_Isend"].end());
-    __callLocations["MPI_Isend"][lastNodes] = nodecnt;
+    __callLocations["MPI_Isend"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -326,7 +326,7 @@ int MPI_Cancel(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Cancel"].find(lastNodes)
             == __callLocations["MPI_Cancel"].end());
-    __callLocations["MPI_Cancel"][lastNodes] = nodecnt;
+    __callLocations["MPI_Cancel"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -351,7 +351,7 @@ int MPI_Test(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Test"].find(lastNodes)
             == __callLocations["MPI_Test"].end());
-    __callLocations["MPI_Test"][lastNodes] = nodecnt;
+    __callLocations["MPI_Test"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -382,7 +382,7 @@ int MPI_Testall(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Testall"].find(lastNodes)
             == __callLocations["MPI_Testall"].end());
-    __callLocations["MPI_Testall"][lastNodes] = nodecnt;
+    __callLocations["MPI_Testall"][lastNodes] = nodecnt - 1;
 
     return ret;
 }
@@ -415,7 +415,7 @@ int MPI_Testsome(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Testsome"].find(lastNodes)
             == __callLocations["MPI_Testsome"].end());
-    __callLocations["MPI_Testsome"][lastNodes] = nodecnt;
+    __callLocations["MPI_Testsome"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -435,7 +435,7 @@ int MPI_Wait(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Wait"].find(lastNodes)
             == __callLocations["MPI_Wait"].end());
-    __callLocations["MPI_Wait"][lastNodes] = nodecnt;
+    __callLocations["MPI_Wait"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -475,7 +475,7 @@ int MPI_Waitany(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Waitany"].find(lastNodes)
             == __callLocations["MPI_Waitany"].end());
-    __callLocations["MPI_Waitany"][lastNodes] = nodecnt;
+    __callLocations["MPI_Waitany"][lastNodes] = nodecnt - 1;
 
     return ret;
 }
@@ -513,7 +513,7 @@ int MPI_Waitall(
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Waitall"].find(lastNodes)
             == __callLocations["MPI_Waitall"].end());
-    __callLocations["MPI_Waitall"][lastNodes] = nodecnt;
+    __callLocations["MPI_Waitall"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -549,7 +549,7 @@ int MPI_Probe (
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Probe"].find(lastNodes)
             == __callLocations["MPI_Probe"].end());
-    __callLocations["MPI_Probe"][lastNodes] = nodecnt;
+    __callLocations["MPI_Probe"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -585,7 +585,7 @@ int MPI_Iprobe (
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Iprobe"].find(lastNodes)
             == __callLocations["MPI_Iprobe"].end());
-    __callLocations["MPI_Iprobe"][lastNodes] = nodecnt;
+    __callLocations["MPI_Iprobe"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
@@ -696,7 +696,7 @@ int MPI_Request_free (
             loopTrees, TraceType::RECORD);
     MPI_ASSERT(__callLocations["MPI_Request_free"].find(lastNodes)
             == __callLocations["MPI_Request_free"].end());
-    __callLocations["MPI_Request_free"][lastNodes] = nodecnt;
+    __callLocations["MPI_Request_free"][lastNodes] = nodecnt - 1;
     return ret;
 }
 
