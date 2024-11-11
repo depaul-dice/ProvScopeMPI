@@ -8,7 +8,11 @@ using namespace std;
  */
 vector<vector<string>> recordTracesRaw;
 vector<shared_ptr<element>> recordTraces;
-vector<vector<string>> replayTracesRaw; // this is necessary for bbprinter
+
+/*
+ * this is necessary for bbprinter
+ */
+vector<vector<string>> replayTracesRaw; 
 vector<shared_ptr<element>> replayTraces;
 
 static  unordered_map<string, unordered_set<string>> divs;
@@ -62,7 +66,7 @@ element::element(
     id(id), 
     isEntry(isEntry), 
     isExit(isExit), 
-    isLoop(isLoop){
+    isLoop(isLoop) {
 }
 
 /*
@@ -161,6 +165,22 @@ ostream& operator<<(ostream& os, const lastaligned& l) {
     return os;
 }
 
+void fixIterations(
+        vector<shared_ptr<element>>& functionalTraces,
+        shared_ptr<element> newChild) {
+    if(functionalTraces.size() == 0) {
+        return;
+    }
+    if(functionalTraces.back() == newChild) {
+        if(functionalTraces.back()->loopIndex == -1) {
+            functionalTraces.back()->loopIndex = 1;
+            newChild->loopIndex = 2;
+        } else {
+            newChild->loopIndex = functionalTraces.back()->loopIndex + 1;
+        }
+    } 
+}
+
 vector<shared_ptr<element>> makeHierarchyMain(
         vector<vector<string>>& traces, unsigned long& index) {
     vector<shared_ptr<element>> functionalTraces;
@@ -168,7 +188,8 @@ vector<shared_ptr<element>> makeHierarchyMain(
          isExit;
     string funcname = "main", 
            bbname;
-    while(index < traces.size() && funcname != traces[index][0]) {
+    while(index < traces.size() 
+            && funcname != traces[index][0]) {
         index++;
     }
 
@@ -209,6 +230,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
             eptr->funcs.push_back(
                     makeHierarchy(traces, index));
         }
+        fixIterations(functionalTraces, eptr);
         functionalTraces.push_back(eptr);
     } while(!isExit 
             && index < traces.size());
@@ -259,7 +281,10 @@ vector<shared_ptr<element>> makeHierarchyLoop(
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
 
-        // case 1: if we are in the inner loop, recursively call the function
+        /* 
+         * case 1: if we are in the inner loop, 
+         * recursively call the function
+         */
         if((child = isNewLoop(bbname, currloop)) != nullptr) {
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
                         traces, 
@@ -296,6 +321,7 @@ vector<shared_ptr<element>> makeHierarchyLoop(
                             index, 
                             loopTrees)); 
             }
+            fixIterations(functionalTraces, eptr);
             functionalTraces.push_back(eptr);
         }
     } 
@@ -311,8 +337,10 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
         int iterationCnt) {
     vector<shared_ptr<element>> iterations, curriter;
     shared_ptr<element> eptr;
-    bool isEntry = false, isExit = false;
-    string bbname, funcname = traces[index][0];
+    bool isEntry = false, 
+         isExit = false;
+    string bbname, 
+           funcname = traces[index][0];
     loopNode *child = nullptr;
 
     // here we are getting the entry 
@@ -330,7 +358,10 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
 
-        // case 1: if we are in the inner loop, recursively call the function
+        /* 
+         * case 1: if we are in the inner loop, 
+         * recursively call the function
+         */
         if((child = isNewLoop(bbname, currloop)) != nullptr) {
             /* DEBUG0("printing bbname: %s\n", bbname.c_str()); */
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
@@ -344,25 +375,24 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
                     loops.end());
             continue;
         
-        // case 2: if we are not in the current loop, we should return what we have so far
+        /* 
+         * case 2: if we are not in the current loop, 
+         * we should return what we have so far
+         */
         } else if(currloop->nodes.find(bbname) == currloop->nodes.end()) {
             eptr = make_shared<element>(
                     entryindex, 
                     funcname, 
                     iterationCnt++); 
-            /* if(eptr->bb() == "neighbor_communication:neither:3:loop") { */
-            /*     int rank; */ 
-            /*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-            /*     if(rank == 4) { */
-            /*         cerr << "found!!\n" << eptr->bb() << ":" << iterationCnt - 1 << endl; */
-            /*     } */
-            /* } */
             eptr->funcs.push_back(curriter);
             curriter.clear();
+            fixIterations(iterations, eptr);
             iterations.push_back(eptr);
             return iterations;
 
-        // case 3: we have gone through the back edge
+        /*
+         * case 3: we have gone through the back edge
+         */
         } else if(curriter.size() > 0 
                 && bbname == currloop->entry) {
             eptr = make_shared<element>(
@@ -371,9 +401,12 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
                     iterationCnt++);
             eptr->funcs.push_back(curriter);
             curriter.clear();
+            fixIterations(iterations, eptr);
             iterations.push_back(eptr);
         }
-        // else
+        /* 
+         * else
+         */
         if(traces[index].size() == 4) {
             eptr = make_shared<element>(
                     isEntry, 
@@ -388,6 +421,8 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
                     stoi(traces[index][2]), 
                     traces[index][0]);
         }
+
+        fixIterations(curriter, eptr);
         curriter.push_back(eptr);
         index++;
         if(index >= traces.size()) {
@@ -419,6 +454,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
     /*     } */
     /* } */
     eptr->funcs.push_back(curriter);
+    fixIterations(iterations, eptr);
     iterations.push_back(eptr);
     
     return iterations; 
@@ -452,7 +488,9 @@ vector<shared_ptr<element>> makeHierarchyMain(
         MPI_EQUAL(traces[index][0], funcname);
         MPI_ASSERT(traces[index].size() == 3 
                 || traces[index].size() == 4);
-        bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        bbname = traces[index][0] + ":" 
+            + traces[index][1] + ":" 
+            + traces[index][2];
 
         /*
          * this returns the ptr of a child that has bbname in it
@@ -498,6 +536,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
                         index, 
                         loopTrees));
         }
+        fixIterations(functionalTraces, eptr);
         functionalTraces.push_back(eptr);
     }
     return functionalTraces;
@@ -547,6 +586,7 @@ vector<shared_ptr<element>> makeHierarchy(
             eptr->funcs.push_back(
                     makeHierarchy(traces, index)); 
         }
+        fixIterations(functionalTraces, eptr);
         functionalTraces.push_back(eptr);
     } while(!isExit 
             && index < traces.size());
@@ -656,7 +696,10 @@ void addHierarchy(
          * in either case, it is taken care of by __makeHierarchyLoop
          */
         if(isLoopEntry(bb, parent, currloop)) {
-            // implement the case where we have to go through the current loop
+            /* 
+             * implement the case where we have to 
+             * go through the current loop
+             */
             /* if(parent->funcname != curr->funcname) { */
                 /* cerr << parent->bb() << " " << curr->bb() << endl; */
                 /* print(replayTraces, 0); */
@@ -677,8 +720,10 @@ void addHierarchy(
                         iterationCnt);
             if(!__stack.empty()) {
                 /*
-                 * inserting the loop iteration as a children of the top of the stack
-                 * notice, they are at the level of the children, and not the parents
+                 * inserting the loop iteration as a children of 
+                 * the top of the stack
+                 * notice, they are at the level of the children, 
+                 * and not the parents
                  */
                 __stack.top()->funcs.back().insert(
                         __stack.top()->funcs.back().end(), 
@@ -689,8 +734,10 @@ void addHierarchy(
                 __stack.pop();
             } else {
                 /*
-                 * if there are no parents anymore, since they are also at the same level
-                 * the parent, we need to directly insert to functionalTraces here
+                 * if there are no parents anymore, 
+                 * since they are also at the same level
+                 * the parent, we need to directly insert 
+                 * to functionalTraces here
                  */
                 functionalTraces.insert(
                         functionalTraces.end(), 
@@ -719,8 +766,10 @@ void addHierarchy(
         while((tmploop = isNewLoop(bb, currloop)) 
                 != nullptr) {
             /*
-             * here you will create a loop iterations through __makeHierarchyLoop
-             * but this iterations are at the same level as the children of the parent
+             * here you will create a loop iterations through 
+             * __makeHierarchyLoop
+             * but this iterations are at the same level 
+             * as the children of the parent
              */
             vector<shared_ptr<element>> loops 
                 = __makeHierarchyLoop(
@@ -729,7 +778,8 @@ void addHierarchy(
                         loopTrees, 
                         tmploop);
             /*
-             * since these iterations are the same level as children of the parent,
+             * since these iterations are the same level 
+             * as children of the parent,
              * we push it as the children of the same parent here
              */
             if(parent != nullptr) {
@@ -739,7 +789,8 @@ void addHierarchy(
                         loops.end());
             } else {
                 /* 
-                 * if there are no parents, we directly insert to functionalTraces
+                 * if there are no parents, 
+                 * we directly insert to functionalTraces
                  */
                 functionalTraces.insert(
                         functionalTraces.end(), 
@@ -752,18 +803,21 @@ void addHierarchy(
 
         if(index >= traces.size()) break;
         /*
-         * the node cannot be an entry, because if it is, we should be at the beginning of 
+         * the node cannot be an entry, 
+         * because if it is, we should be at the beginning of 
          * this function
          */
         MPI_ASSERT(traces[index][1] != "entry");
         /* 
          * here we check if we are getting out of this loop
-         * while we are, we need to update the currloop as well as curr, parent, and stack
+         * while we are, we need to update the currloop 
+         * as well as curr, parent, and stack
          */
         while(currloop->nodes.size() > 0 
                 && currloop->nodes.find(bb) == currloop->nodes.end()) {
             /*
-             * because of the condition above, we made sure that we are in the loop in curr
+             * because of the condition above, 
+             * we made sure that we are in the loop in curr
              * hence parent has to be a loop node
              */
             MPI_ASSERT(parent != nullptr);
@@ -809,18 +863,26 @@ void addHierarchy(
                 parent->funcs.push_back(
                         vector<shared_ptr<element>>());
             }
+            /*
+             * making sure that the loop index is correct
+             */
+            fixIterations(parent->funcs.back(), newchild);
             parent->funcs.back().push_back(
                     newchild);
         } else {
             /*
-             * in case there's no parents, you push back directly to functionalTraces
+             * in case there's no parents, 
+             * you push back directly to functionalTraces
              */
+            fixIterations(functionalTraces, newchild);
             functionalTraces.push_back(newchild);
         }
         
         /*
-         * if we are ending this batch, it should be either a loop iteration, or a function
-         * just add a condition || and add the condition of the end of the loop
+         * if we are ending this batch, 
+         * it should be either a loop iteration, or a function
+         * just add a condition || and add the condition 
+         * of the end of the loop
          */
         if(index >= traces.size()) {
             break;
@@ -828,18 +890,23 @@ void addHierarchy(
      
         /*
          * this is the next node to be taken care of
-         * we try to break with a code block before in case we don't have one anymore
+         * we try to break with a code block before 
+         * in case we don't have one anymore
          */
         bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
 
         /*
-         * if the last node was an exit node, then we need to update the curr, parent, and stack
+         * if the last node was an exit node, 
+         * then we need to update the curr, parent, and stack
          */
         if(traces[index - 1][1] == "exit") {
             if(parent == nullptr) {
                 /* 
-                 * if we don't have a parent anymore, and the last node was an exit node
-                 * then this node should be the main and we should not have any more nodes to be recorded
+                 * if we don't have a parent anymore, 
+                 * and the last node was an exit node
+                 * then this node should be the main 
+                 * and we should not have anymore nodes 
+                 * to be recorded
                  */
                 MPI_ASSERT(traces[index - 1][0] == "main");
                 break;
@@ -864,10 +931,14 @@ void addHierarchy(
                 /* 
                  * the situation is... 
                  * 1. the last node was an exit bb of the function
-                 * 2. and now the current trace is an entry of the loop
-                 * if the parent is the virtual node of this loop, you need to make another virtual node for this iterations
-                 * if not, you stil need to make another virtual node
-                */
+                 * 2. and now the current trace is an entry 
+                 * of the loop
+                 * if the parent is the virtual node 
+                 * of this loop, you need to make another virtual
+                 * node for this iterations
+                 * if not, you stil need to make another virtual 
+                 * node
+                 */
                 if(parent->isLoop == true
                         && parent->bb() == currloop->entry + ":loop") {
                     auto loopIterations = __makeHierarchyLoop(
@@ -906,16 +977,19 @@ void addHierarchy(
 }
 
 void print(
-        vector<shared_ptr<element>>& functionalTraces, unsigned depth) {
+        vector<shared_ptr<element>>& functionalTraces, 
+        unsigned depth) {
     for(auto& eptr : functionalTraces) {
         for(unsigned i = 0; i < depth; i++) {
             fprintf(stderr, "\t"); 
         }
         if(eptr->index != numeric_limits<unsigned long>::max()) {
             if(eptr->isLoop) {
-                fprintf(stderr, "%s:%lu\n", eptr->bb().c_str(), eptr->index);
+                fprintf(stderr, "%s:%lu\n", 
+                        eptr->bb().c_str(), eptr->index);
             } else {
-                fprintf(stderr, "%s:%lu\n", eptr->bb().c_str(), eptr->index);
+                fprintf(stderr, "%s:%lu\n", 
+                        eptr->bb().c_str(), eptr->index);
             }
         } else {
             fprintf(stderr, "%s\n", eptr->bb().c_str());
@@ -927,7 +1001,8 @@ void print(
     }
 }
 
-void printsurface(vector<shared_ptr<element>>& functionalTraces) {
+void printsurface(
+        vector<shared_ptr<element>>& functionalTraces) {
     for(auto& eptr : functionalTraces) {
         fprintf(stderr, "%s\n", eptr->bb().c_str());
     }

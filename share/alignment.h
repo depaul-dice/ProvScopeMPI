@@ -51,7 +51,8 @@ public:
 
     bool operator == (const element &e) const;
 
-    friend std::ostream& operator<<(std::ostream& os, const element& e);
+    friend std::ostream& operator<<(
+            std::ostream& os, const element& e);
 
     std::string bb() const;
     std::string content() const;
@@ -63,6 +64,7 @@ public:
     bool isEntry;
     bool isExit;
     bool isLoop = false;
+    int loopIndex = -1;
 };
 
 struct lastaligned {
