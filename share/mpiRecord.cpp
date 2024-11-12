@@ -33,6 +33,7 @@ MessagePool messagePool;
 
 #ifdef DEBUG_MODE
 extern vector<vector<string>> recordTracesRaw;
+extern vector<shared_ptr<element>> recordTraces;
 #define RECORDTRACE(...)
 #endif
 
@@ -54,19 +55,23 @@ extern "C" void printBBname(const char *name) {
     return;
 }
 
-void checkCallLocations(string mpiCall, string& lastNodes) {
+void checkCallLocations(
+        string mpiCall, string& lastNodes) {
     static unordered_map<string, unsigned long> lastCallLocations;
     if(__callLocations[mpiCall].find(lastNodes) 
             != __callLocations[mpiCall].end()
             && __callLocations[mpiCall][lastNodes] != nodecnt - 1) {
-        if(lastCallLocations[mpiCall] + 1 != nodecnt - 1) {
-            fprintf(stderr, "mpiCall: %s, lastNodes: %s\nlastCallLocations:%lu, nodecnt:%lu\n", 
-                    mpiCall.c_str(),
-                    lastNodes.c_str(),
-                    lastCallLocations[mpiCall], 
-                    nodecnt - 1);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
+        //if(lastCallLocations[mpiCall] + 1 != nodecnt - 1) {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        fprintf(stderr, "rank: %d, mpiCall: %s, lastNodes: %s\nlastCallLocations:%lu, nodecnt:%lu\n", 
+            rank,
+            mpiCall.c_str(),
+            lastNodes.c_str(),
+            lastCallLocations[mpiCall], 
+            nodecnt - 1);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+        //}
     } else {
         __callLocations[mpiCall][lastNodes] = nodecnt - 1;
     }

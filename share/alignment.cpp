@@ -131,7 +131,7 @@ bool element::operator ==(const element &e) const {
 
 ostream& operator << (ostream& os, const element& e) {
     if(e.isLoop == true) {
-        os << e.bb() <<  ":loop:" << e.index;
+        os << e.bb() <<  e.index;
     } else {
         os << e.bb() << ':' << e.index;
     }
@@ -171,7 +171,9 @@ void fixIterations(
     if(functionalTraces.size() == 0) {
         return;
     }
-    if(functionalTraces.back() == newChild) {
+    if(functionalTraces.back()->bb() == newChild->bb() 
+            && functionalTraces.back()->isLoop == false
+            && newChild->isLoop == false) {
         if(functionalTraces.back()->loopIndex == -1) {
             functionalTraces.back()->loopIndex = 1;
             newChild->loopIndex = 2;
@@ -274,7 +276,9 @@ vector<shared_ptr<element>> makeHierarchyLoop(
     while (!isExit 
             && index < traces.size()) {
         MPI_ASSERT(index < traces.size());
-        bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        bbname = traces[index][0] 
+            + ":" + traces[index][1] 
+            + ":" + traces[index][2];
         MPI_EQUAL(traces[index][0], funcname);
         MPI_ASSERT(traces[index].size() == 3 
                 || traces[index].size() == 4);
@@ -754,7 +758,9 @@ void addHierarchy(
 
         if(index >= traces.size()) break;
 
-        bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        bb = traces[index][0] 
+            + ":" + traces[index][1] 
+            + ":" + traces[index][2];
         /*
          * we assert that current loop node has some nodes in it, or a dummy loop node
          */
@@ -1120,16 +1126,23 @@ static string getLastNodes(vector<shared_ptr<element>>& traces) {
     MPI_ASSERT(traces.size() > 0);
     stringstream ss;
     shared_ptr<element> curr = traces.back();
+    int funcId = 0;
     do {
-        ss << '/' << curr->bb(); 
+        ss << '/' << funcId << ':' << curr->bb(); 
+        if(curr->loopIndex != -1) {
+            ss << ':' << curr->loopIndex; 
+        }
         if(curr->isLoop) {
             ss << ':' << curr->index; 
+            MPI_ASSERT(curr->loopIndex == -1);
         }
         if(curr->funcs.size() == 0) {
             MPI_ASSERT(!curr->isLoop);
             break;
         } else {
+            funcId = curr->funcs.size() - 1;
             curr = curr->funcs.back().back();
+            MPI_ASSERT(funcId >= 0);
         }
     } while (true);
     return ss.str();
@@ -1155,7 +1168,8 @@ string getVeryLastNode(TraceType traceType) {
 }
 
 string updateAndGetLastNodes(
-        unordered_map<string, loopNode *>& loopTrees, TraceType traceType) {
+        unordered_map<string, loopNode *>& loopTrees, 
+        TraceType traceType) {
     appendTraces(loopTrees, traceType);
     return getLastNodes(traceType);
 }
@@ -1479,7 +1493,6 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                     funcId, 
                     i, 
                     j));
-        MPI_ASSERT(lastInd > 0);
         return rq;
     }
 

@@ -184,7 +184,7 @@ int MPI_Init(
         }
         __callLocations[key] = inner_map;
     }
-    cerr << __callLocations << endl;
+    //cerr << __callLocations << endl;
 
     return ret;
 }
