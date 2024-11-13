@@ -2,7 +2,8 @@
 /* 
  * Assumptions:
  * 1. The MPI program is written in C
- * 2. We don't mix the blocking calls with non-blocking calls <- subject to relaxation
+ * 2. We don't mix the blocking calls with non-blocking calls 
+ * <- subject to relaxation
  */
 
 #include "mpiRecordReplay.h"
@@ -71,10 +72,14 @@ extern "C" void printBBname(const char *name) {
     }
 }
 
-bool easyOnlineAlignment(
+unsigned long easyOnlineAlignment(
         const string& mpiCall,
         const string& lastNodes) {
-    return __callLocations[mpiCall].find(lastNodes) != __callLocations[mpiCall].end();
+    if(__callLocations[mpiCall].find(lastNodes) == __callLocations[mpiCall].end()) {
+        return numeric_limits<unsigned long>::max(); 
+    } else {
+        return __callLocations[mpiCall][lastNodes];
+    }
 }
 
 int MPI_Init(
@@ -241,28 +246,19 @@ int MPI_Recv(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* DEBUG0("MPI_Recv:%s:%d\n", orders[__orderIndex].c_str(), __orderIndex); */
-    bool isAligned = true;
-    size_t lastInd = 0;
+    /* 
+     * DEBUG0("MPI_Recv:%s:%d\n", orders[__orderIndex].c_str(), __orderIndex); */
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Recv", 
             lastNodes);
 
-    /*
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
-    */
     vector<string> msgs;
     int ret;
-    if(!isAlignedWithLastNodes) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /*
-         * you still need to convert the message into the way 
-         * it should be
+         * don't control anything
          */
         ret = __MPI_Recv(
                 buf, 
@@ -275,16 +271,10 @@ int MPI_Recv(
                 messagePool);
         return ret;
     } 
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     string recSendNodes = "";
     msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex, 
             __orderIndex,
             &recSendNodes);
     int src = stoi(msgs[2]);
@@ -357,20 +347,13 @@ int MPI_Irecv(
     // I need to look into the source first
     /* int ret = original_MPI_Irecv(buf, count, datatype, source, tag, comm, request); */
     // I just need to keep track of the request
-    bool isAligned = true;
-    size_t lastInd = 0;
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Irecv", 
             lastNodes);
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
     int ret;
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank); */
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
@@ -383,31 +366,20 @@ int MPI_Irecv(
                 comm, 
                 request,
                 messagePool);
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\nit is not aligned with the long way and aligned in the short way\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         return ret;
     }
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     
+    /*
+     * we don't have recv send nodes 
+     * because this is when the request is created
+     */
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex,
             __orderIndex);
 
     MPI_EQUAL(msgs[0], "MPI_Irecv");
     MPI_EQUAL(stoi(msgs[1]), rank);
-    /* MPI_ASSERT(stoi(msgs[2]) == source); // commenting for the greedy alignment */
-    // below is commented on purpose, do not uncomment
-    /* MPI_ASSERT(__requests.find(msgs[3]) == __requests.end()); */
     __requests[msgs[3]] = request;
     if(source == MPI_ANY_SOURCE) {
         source = lookahead(
@@ -431,7 +403,8 @@ int MPI_Irecv(
             comm, 
             request,
             messagePool);
-    /* DEBUG("MPI_Irecv returning, rank: %d, request: %p\n", rank, request); */
+    /* DEBUG("MPI_Irecv returning, rank: %d, request: %p\n", 
+     * rank, request); */
     return ret;
 }
 
@@ -460,41 +433,22 @@ int MPI_Isend(
             messagePool,
             lastNodes);
         
-    bool isAligned = true;
-    size_t lastInd = 0;
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Isend", 
             lastNodes);
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank); */
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
         __isends.insert(request);
         // Isend is already called above
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         return ret;
     }
     // I just need to keep track of the request
     /* DEBUG("lastInd: %zu at rank: %d\n", lastInd, rank); */
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex, 
             __orderIndex);
     MPI_EQUAL(msgs[0], "MPI_Isend");
     MPI_EQUAL(stoi(msgs[1]), rank);
@@ -570,40 +524,21 @@ int MPI_Cancel(
             MPI_COMM_WORLD, &rank);
     int ret = __MPI_Cancel(
             request, messagePool);
-    bool isAligned = true;
-    size_t lastInd = 0;
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Cancel", 
             lastNodes);
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Cancel\n", rank); */
         // don't control anything
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         return ret;
-    }
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
     }
     // I just need to keep track that it is cancelled
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex, 
             __orderIndex);
     MPI_EQUAL(ret, MPI_SUCCESS);
     MPI_EQUAL(msgs[0], "MPI_Cancel");
@@ -626,44 +561,25 @@ int MPI_Test(
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Test, rank: %d\n", rank); */
     //DEBUG0(":%d:%p", rank, request);
-    bool isAligned = true;
-    size_t lastInd = 0;
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Test", 
             lastNodes);
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Test\n", rank); */
         // don't control anything
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         return __MPI_Test(
                 request, 
                 flag, 
                 status,
                 messagePool);
     }
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     string recSendNodes = "";
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex, 
             __orderIndex,
             &recSendNodes);
     MPI_ASSERT(msgs[0] == "MPI_Test");
@@ -706,26 +622,13 @@ int MPI_Testall (
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    bool isAligned = true;
-    size_t lastInd = 0;
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Testall", 
             lastNodes);
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         // don't control anything
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         return __MPI_Testall(
                 count, 
                 array_of_requests, 
@@ -734,15 +637,9 @@ int MPI_Testall (
                 messagePool);
     }
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex,
             __orderIndex);
     MPI_EQUAL(msgs[0], "MPI_Testall");
     MPI_EQUAL(stoi(msgs[1]), rank);
@@ -797,27 +694,14 @@ int MPI_Testsome(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Testsome:%d\n", rank); */
-    bool isAligned = true;
-    size_t lastInd = 0;
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Testsome", 
             lastNodes);
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Testsome\n", myrank); */
         // don't control anything
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         return __MPI_Testsome(
                 incount, 
                 array_of_requests, 
@@ -827,16 +711,10 @@ int MPI_Testsome(
                 messagePool);
     }
 
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex,
             __orderIndex);
     /* fprintf(stderr, "msgs[0]: %s\n", msgs[0].c_str()); */
     MPI_EQUAL(msgs[0], "MPI_Testsome");
@@ -874,13 +752,6 @@ int MPI_Testsome(
                 auto recSendNodes = msgs[3 + 3 * i + 2];
                 /* fprintf(stderr, "at %s, sendNodes: %s\n", */ 
                 /*         __func__, recSendNodes.c_str()); */
-                if(recSendNodes != repSendNodes) {
-                    auto recSendNodesVec = parse(recSendNodes, '/');
-                    auto repSendNodesVec = parse(repSendNodes, '/');
-                    cerr << "rank: " << rank << ", src: " << src << endl 
-                        << "recSendNodes:\n" << recSendNodesVec << endl
-                        << "repSendNodes:\n" << repSendNodesVec << endl;
-                }
                 MPI_ASSERT(recSendNodes == repSendNodes);
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
@@ -903,44 +774,25 @@ int MPI_Wait(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    bool isAligned = true;
-    size_t lastInd = 0;
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Wait", 
             lastNodes);
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Wait\n", rank); */
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         // don't control anything
         return __MPI_Wait(
                 request, 
                 status,
                 messagePool);
     }
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     // I just need to keep track that it is cancelled
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     string recSendNodes = "";
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex,
             __orderIndex,
             &recSendNodes);
     MPI_EQUAL(msgs[0], "MPI_Wait");
@@ -1044,26 +896,13 @@ int MPI_Waitall(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG0("MPI_Waitall:%s\n", orders[orderIndex].c_str()); */
-    bool isAligned = true;
-    size_t lastInd = 0;
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Waitall", 
             lastNodes);
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitall\n", rank); */
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         /*
          * don't control anything
          */
@@ -1073,15 +912,9 @@ int MPI_Waitall(
                 array_of_statuses,
                 messagePool);
     } 
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex, 
             __orderIndex);
     if(msgs[0] != "MPI_Waitall") {
         string lastNodes = updateAndGetLastNodes(
@@ -1092,7 +925,7 @@ int MPI_Waitall(
                 msgs[0].c_str(), 
                 __orderIndex, 
                 lastNodes.c_str(),
-                lastInd,
+                alignedIndex,
                 replayTracesRaw.size());
         /* auto vec = getCurrNodesByIndex(lastInd); */
         /* cerr << "rank: " << rank << endl << vec << endl; */
@@ -1210,26 +1043,13 @@ int MPI_Iprobe (
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    bool isAligned = true;
-    size_t lastInd = 0;
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
-    bool isAlignedWithLastNodes = easyOnlineAlignment(
+    auto alignedIndex = easyOnlineAlignment(
             "MPI_Iprobe", 
             lastNodes);
-    if(!isAligned) {
+    if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Iprobe\n", rank); */
-        if(isAlignedWithLastNodes == true) {
-            DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                    rank, 
-                    lastNodes.c_str(),
-                    __func__);
-        }
         // don't control anything
         return __MPI_Iprobe(
                 source, 
@@ -1239,15 +1059,9 @@ int MPI_Iprobe (
                 status,
                 messagePool);
     } 
-    if(isAlignedWithLastNodes == false) {
-        DEBUG("at rank: %d, mismatch in alignment at %s in %s\n", 
-                rank, 
-                lastNodes.c_str(),
-                __func__);
-    }
     vector<string> msgs = getMsgs(
             orders, 
-            lastInd, 
+            alignedIndex,
             __orderIndex);
     /* DEBUG0("MPI_Iprobe:%s\n", orders[__order_index].c_str()); */
     if(msgs[0] != "MPI_Iprobe") {
