@@ -1275,9 +1275,11 @@ static pair<size_t, size_t> __greedyalignmentOnline(
                 pod = original[i - 1]->bb() 
                     + ':' 
                     + to_string(original[i - 1]->index);
+                /*
                 if(pods.find(pod) == pods.end()) {
                     printf("pods: %s, rank: %d\n", pod.c_str(), rank);
                 }
+                */
                 pods.insert(pod);
             } else {
                 pod = original[i - 1]->bb();
@@ -1526,10 +1528,12 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         if(original[i]->funcs[k][0]->funcname != reproduced[j]->funcs[k][0]->funcname) {
             MPI_ASSERT(original[i]->isLoop == false);
             pods.insert(original[i]->bb());
+            /*
             printf("different function called from %s: %s vs. %s\n", 
                     original[i]->bb().c_str(), 
                     original[i]->funcs[k][0]->funcname.c_str(), 
                     reproduced[j]->funcs[k][0]->funcname.c_str());
+            */
         } else {
             rq = greedyalignmentOnline(
                     original[i]->funcs[k], 
