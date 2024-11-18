@@ -191,20 +191,9 @@ int MPI_Init(
 int MPI_Finalize() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* DEBUG("MPI_Finalize:%d\n", rank); */
-    /* appendReplayTrace(); */
-    /* greedyalignmentWholeOffline(); */
-
-    /*
-     * last alignment before finalizing
-     */
-    bool isAligned = true;
-    size_t lastInd = 0;
-    __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
-            __loopTrees);
+    //DEBUG("MPI_Finalize:%d\n", rank);
+    appendTraces(__loopTrees, TraceType::REPLAY);
+    greedyAlignmentWholeOffline(); 
 
     /*
      * deleting the looptrees

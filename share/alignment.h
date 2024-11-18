@@ -14,6 +14,7 @@
 
 #include "utils.h"
 #include "loops.h"
+#include "alignmentUtils.h"
 
 enum class TraceType {
     RECORD = 0,
@@ -143,11 +144,11 @@ void print(
         std::vector<std::shared_ptr<element>>& functionalTraces, unsigned int depth);
 void printsurface(std::vector<std::shared_ptr<element>>& functionalTraces);
 
-bool greedyalignmentWholeOffline(
+bool greedyAlignmentWholeOffline(
         std::vector<std::shared_ptr<element>>& original, 
         std::vector<std::shared_ptr<element>>& reproduced, 
         const int& rank);
-bool greedyalignmentWholeOffline();
+bool greedyAlignmentWholeOffline();
 
 std::deque<std::shared_ptr<lastaligned>> greedyalignmentOnline(
         std::vector<std::shared_ptr<element>>& original, 

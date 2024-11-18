@@ -8,18 +8,18 @@ LD_FLAGS_LT = -lcgraph -lgvc
 CC = mpicc
 CXX = mpicxx
 SRCS = mpiRecord.cpp mpiReplay.cpp mpiReproduce.cpp \
-	   tools.cpp alignment.cpp loops.cpp messagePool.cpp messageTools.cpp
+	   utils.cpp alignment.cpp alignmentUtils.cpp loops.cpp messagePool.cpp messageTools.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 all: $(SHARED_LIB)
 
-libmpirecord.so: mpiRecord.o utils.o alignment.o loops.o messagePool.o messageTools.o
+libmpirecord.so: mpiRecord.o utils.o alignment.o loops.o messagePool.o messageTools.o alignmentUtils.o
 	$(CXX) $(STD) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS_LT)
 
 libmpireplay.so: mpiReplay.o utils.o alignment.o
 	$(CXX) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS)
 
-libmpireproduce.so: mpiReproduce.o utils.o alignment.o loops.o messagePool.o messageTools.o
+libmpireproduce.so: mpiReproduce.o utils.o alignment.o loops.o messagePool.o messageTools.o alignmentUtils.o
 	$(CXX) $(STD) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS_LT)
 
 # Explicit rule for loops.o

@@ -165,24 +165,6 @@ ostream& operator<<(ostream& os, const lastaligned& l) {
     return os;
 }
 
-void fixIterations(
-        vector<shared_ptr<element>>& functionalTraces,
-        shared_ptr<element> newChild) {
-    if(functionalTraces.size() == 0) {
-        return;
-    }
-    if(functionalTraces.back()->bb() == newChild->bb() 
-            && functionalTraces.back()->isLoop == false
-            && newChild->isLoop == false) {
-        if(functionalTraces.back()->loopIndex == -1) {
-            functionalTraces.back()->loopIndex = 1;
-            newChild->loopIndex = 2;
-        } else {
-            newChild->loopIndex = functionalTraces.back()->loopIndex + 1;
-        }
-    } 
-}
-
 vector<shared_ptr<element>> makeHierarchyMain(
         vector<vector<string>>& traces, unsigned long& index) {
     vector<shared_ptr<element>> functionalTraces;
@@ -722,34 +704,16 @@ void addHierarchy(
                         loopTrees, 
                         currloop,
                         iterationCnt);
-            if(!__stack.empty()) {
-                /*
-                 * inserting the loop iteration as a children of 
-                 * the top of the stack
-                 * notice, they are at the level of the children, 
-                 * and not the parents
-                 */
-                __stack.top()->funcs.back().insert(
-                        __stack.top()->funcs.back().end(), 
-                        iterations.begin(), 
-                        iterations.end());
-                curr = parent;
-                parent = __stack.top();
-                __stack.pop();
-            } else {
-                /*
-                 * if there are no parents anymore, 
-                 * since they are also at the same level
-                 * the parent, we need to directly insert 
-                 * to functionalTraces here
-                 */
-                functionalTraces.insert(
-                        functionalTraces.end(), 
-                        iterations.begin(), 
-                        iterations.end());
-                curr = parent;
-                parent = nullptr;
-            }
+            /* 
+             * inserting iterations to the appropriate place
+             * and fixing the curr, parent, and functionalTraces
+             */
+            insertIterationsAndFixStack(
+                    iterations,
+                    __stack,
+                    curr,
+                    parent,
+                    functionalTraces);
 
             MPI_ASSERT(currloop->nodes.size() > 0 
                     && currloop->parent);
@@ -783,26 +747,11 @@ void addHierarchy(
                         index, 
                         loopTrees, 
                         tmploop);
-            /*
-             * since these iterations are the same level 
-             * as children of the parent,
-             * we push it as the children of the same parent here
-             */
-            if(parent != nullptr) {
-                parent->funcs.back().insert(
-                        parent->funcs.back().end(), 
-                        loops.begin(), 
-                        loops.end());
-            } else {
-                /* 
-                 * if there are no parents, 
-                 * we directly insert to functionalTraces
-                 */
-                functionalTraces.insert(
-                        functionalTraces.end(), 
-                        loops.begin(), 
-                        loops.end());
-            }
+            insertIterations(
+                    loops,
+                    parent,
+                    functionalTraces);
+
             if(index >= traces.size()) break;
             bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         }
@@ -827,15 +776,12 @@ void addHierarchy(
              * hence parent has to be a loop node
              */
             MPI_ASSERT(parent != nullptr);
-            MPI_ASSERT(parent->isLoop);
+            MPI_ASSERT(parent->isLoop == true);
             currloop = currloop->parent;
-            curr = parent;
-            if(!__stack.empty()) {
-                parent = __stack.top();
-                __stack.pop();
-            } else {
-                parent = nullptr;
-            }
+            levelUpStack(
+                    __stack, 
+                    curr, 
+                    parent); 
             MPI_ASSERT(curr->isLoop);
         }
 
@@ -857,7 +803,7 @@ void addHierarchy(
                     traces[index][0], 
                     stoul(traces[index][3]));
         }
-        MPI_ASSERT(traces[index][0] == curr->funcname);
+        MPI_EQUAL(traces[index][0], curr->funcname);
         index++;
     
         if(parent != nullptr) {
@@ -969,8 +915,20 @@ void addHierarchy(
                                 loopIterations.end());
                     }
                 } else {
+                    auto loopIterations = __makeHierarchyLoop(
+                            traces, 
+                            index, 
+                            loopTrees, 
+                            currloop,
+                            1);
+                    if(rank == 3) {
+                        cerr << "curr: " << curr->bb() << endl;
+                        cerr << "parent: " << parent->bb() << endl;
+                    }
                     cerr << "we are not dealing with this case yet\n";
-                    MPI_ASSERT(false);
+                    sleep(5);
+                    MPI_ASSERT(parent->isLoop == true); 
+                    MPI_ASSERT(parent->bb() == currloop->entry + ":loop");
                 }
             }
         } else {
@@ -1283,9 +1241,11 @@ static pair<size_t, size_t> __greedyalignmentOnline(
                 pods.insert(pod);
             } else {
                 pod = original[i - 1]->bb();
+                /*
                 if(pods.find(pod) == pods.end()) {
                     printf("pods: %s, rank: %d\n", pod.c_str(), rank);
                 }
+                */
                 pods.insert(pod);
             }
             
@@ -1326,8 +1286,10 @@ static pair<size_t, size_t> __greedyalignmentOnline(
     isAligned = true;
 
     /*
-     * if we have some nodes in original, either because reproduced nodes have not finished
-     * or because we are in the loop, and original simply have more amount of nodes in the
+     * if we have some nodes in original, 
+     * either because reproduced nodes have not finished
+     * or because we are in the loop, 
+     * and original simply have more amount of nodes in the
      * iteration, we need to return the last aligned point
      */
     if(i < original.size()) {
@@ -1339,10 +1301,11 @@ static pair<size_t, size_t> __greedyalignmentOnline(
         return make_pair(i - 1, j - 1);
 
     /*
-     * Or, if this alignment is done on loop iteration, we could have more reproduced nodes,
+     * Or, if this alignment is done on loop iteration, 
+     * we could have more reproduced nodes,
      * in this case, we assure that this is aligned on a loop iteration 
-     * since this is the end of the alignment, we should make the return value to be the
-     * max
+     * since this is the end of the alignment, 
+     * we should make the return value to be the max
      */
     } else if (j < reproduced.size()) {
         MPI_ASSERT(isLoop == true);
@@ -1727,7 +1690,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
 /*
  * it returns true iff the traces are aligned at the end
  */
-static bool __greedyalignmentOffline(
+static bool __greedyAlignmentOffline(
         vector<shared_ptr<element>>& original, 
         vector<shared_ptr<element>>& reproduced, 
         vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, 
@@ -1736,19 +1699,46 @@ static bool __greedyalignmentOffline(
     unordered_map<string, vector<size_t>> bbMap;
     /* unsigned div = 0; */
     while(i < original.size() && j < reproduced.size()) {
-        if(original[i]->bb() == reproduced[j]->bb()) {
+        MPI_ASSERT(original[i] != nullptr);
+        MPI_ASSERT(reproduced[j] != nullptr);
+        if(original[i]->bb() == reproduced[j]->bb()
+                && original[i]->isLoop == false
+                && reproduced[j]->isLoop == false) {
             /* fprintf(stderr, "aligned: %s\n", original[i]->bb.c_str()); */
             aligned.push_back(make_pair(original[i], reproduced[j]));
             i++; j++;
+        } else if (original[i]->bb() == reproduced[j]->bb()
+                && original[i]->isLoop == true
+                && reproduced[j]->isLoop == true) {
+            /* fprintf(stderr, "aligned: %s\n", original[i]->bb.c_str()); */
+            MPI_EQUAL(original[i]->index, reproduced[j]->index);
+            MPI_EQUAL(original[i]->funcs.size(), (size_t)1);
+            MPI_EQUAL(reproduced[j]->funcs.size(), (size_t)1);
+            __greedyAlignmentOffline(
+                    original[i]->funcs[0], 
+                    reproduced[j]->funcs[0], 
+                    aligned, 
+                    rank);
+            i++; j++;
         } else {
             //fprintf(stderr, "option 1, rank:%d, pod:%s\n", rank, original[i - 1]->bb().c_str());
-            /* div++; */
-            if(bbMap.size() == 0) create_map(bbMap, reproduced, j);
+            MPI_ASSERT(i > 0);
+            /* if(rank == 0 && pods.find(original[i - 1]->bb()) == pods.end()) { */
+            /*     cerr << "original\n"; */
+            /*     printsurface(original); */
+            /*     cerr << "reproduced\n"; */
+            /*     printsurface(reproduced); */
+            /* } */
+            pods.insert(original[i - 1]->bb());
+            if(bbMap.size() == 0) {
+                create_map(bbMap, reproduced, j);
+            }
 
             // matchbbmap will update i and j
-            if(!matchbbmap(bbMap, original, i, j)) return false;
-            else {
-                fprintf(stderr, "rank:%d, poc:%s", rank, original[i]->bb().c_str());
+            if(!matchbbmap(bbMap, original, i, j)) {
+                return false;
+            } else {
+                //fprintf(stderr, "rank:%d, poc:%s", rank, original[i]->bb().c_str());
                 aligned.push_back(make_pair(original[i], reproduced[j]));
                 i++; j++;
             }
@@ -1757,11 +1747,19 @@ static bool __greedyalignmentOffline(
 
     if(i < original.size()) {
         //fprintf(stderr, "option 2, rank:%d, pod:%s\n", rank, original[i - 1]->bb().c_str());
-        /* div++; */
+        /*
+        if(original[i - 1]->bb() == reproduced[reproduced.size() - 1]->bb()) {
+            pods.insert(original[original.size() - 1]->bb());
+        }
+        */
         return false;
     } else if(j < reproduced.size()) {
         //fprintf(stderr, "option 3, rank:%d, pod:%s\n", rank, reproduced[j - 1]->bb().c_str());
-        /* div++; */
+        /*
+        if(original[original.size() - 1]->bb() == reproduced[j - 1]->bb()) {
+            pods.insert(original[i]->bb());
+        }
+        */
         return false;
     } 
 
@@ -1770,29 +1768,34 @@ static bool __greedyalignmentOffline(
     return true;
 }
 
-bool greedyalignmentWholeOffline(
+bool greedyAlignmentWholeOffline(
         vector<shared_ptr<element>>& original, 
         vector<shared_ptr<element>>& reproduced, 
         const int& rank) { 
     vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned;
     /* fprintf(stderr, "greedy alignment on %s at %d original.size: %lu, reproduced.size: %lu\n", \ */
             /* original[0]->bb.c_str(), rank, original.size(), reproduced.size()); */
-    bool rv = __greedyalignmentOffline(
+    bool rv = __greedyAlignmentOffline(
             original, 
             reproduced, 
             aligned, 
             rank); 
     for(auto p : aligned) {
         /* cout << p.first->bb << " " << p.second->bb << endl; */
-        MPI_ASSERT(p.first->bb() == p.second->bb());
+        MPI_EQUAL(p.first->bb() ,p.second->bb());
         /* MPI_ASSERT(p.first->funcs.size() == p.second->funcs.size()); */
-        unsigned long len = p.first->funcs.size() < p.second->funcs.size() ? p.first->funcs.size() : p.second->funcs.size();
+        unsigned long len = p.first->funcs.size() < p.second->funcs.size()
+            ? p.first->funcs.size() : p.second->funcs.size();
         for(unsigned i = 0; i < len; i++) {
             // update rv at the end
-            rv = greedyalignmentWholeOffline(
-                    p.first->funcs[i], 
-                    p.second->funcs[i], 
-                    rank);
+            if(p.first->funcs[i][0]->funcname != p.second->funcs[i][0]->funcname) {
+                pods.insert(p.first->bb());
+            } else {
+                rv = greedyAlignmentWholeOffline(
+                        p.first->funcs[i], 
+                        p.second->funcs[i], 
+                        rank);
+            }
         }
         if(p.first->funcs.size() != p.second->funcs.size()) {
             DEBUG("at %s, p.first->funcs.size(): %lu, p.second->funcs.size(): %lu\n", 
@@ -1804,10 +1807,10 @@ bool greedyalignmentWholeOffline(
     return rv;
 }
 
-bool greedyalignmentWholeOffline() {
+bool greedyAlignmentWholeOffline() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    return greedyalignmentWholeOffline(
+    return greedyAlignmentWholeOffline(
             recordTraces, 
             replayTraces, 
             rank);
@@ -1852,6 +1855,7 @@ vector<string> getMsgs(
         /*     DEBUG("we looping at rank: %d, lastInd %lu, ind %lu\n", rank, lastInd, ind); */
         /* } */
     } while(lastInd > ind);
+    MPI_ASSERT(lastInd == ind);
     if(tmpRecSendNodes.size() > 0
             && recSendNodes != nullptr) {
         *recSendNodes = tmpRecSendNodes;
