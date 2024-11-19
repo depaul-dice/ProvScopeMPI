@@ -1,7 +1,7 @@
 
 .PHONY: clean all
 # SHARED_LIB = libmpirecord.so libmpireplay.so libmpireproduce.so
-SHARED_LIB = libmpirecord.so libmpireproduce.so 
+SHARED_LIB = libmpirecord.so libmpireproduce.so libmpiprovscope.so
 STD = -std=c++20
 LD_FLAGS = 
 LD_FLAGS_LT = -lcgraph -lgvc
@@ -20,6 +20,9 @@ libmpireplay.so: mpiReplay.o utils.o alignment.o
 	$(CXX) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS)
 
 libmpireproduce.so: mpiReproduce.o utils.o alignment.o loops.o messagePool.o messageTools.o alignmentUtils.o
+	$(CXX) $(STD) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS_LT)
+
+libmpiprovscope.so: mpiProvScope.o utils.o alignment.o loops.o alignmentUtils.o
 	$(CXX) $(STD) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS_LT)
 
 # Explicit rule for loops.o

@@ -1,0 +1,137 @@
+
+#include "mpiRecordReplay.h"
+
+using namespace std;
+
+extern vector<shared_ptr<element>> recordTraces;
+extern vector<vector<string>> replayTracesRaw;
+
+/*
+ * This is referring to points of divergences (also named pods,
+ * of course) in alignment.cpp.
+ * It stores points of divergences at dump it at MPI_Finalize.
+ */
+extern unordered_set<string> pods;
+
+/* 
+ * key is the function name
+ */
+static unordered_map<string, loopNode *> __loopTrees;
+
+/* 
+ * The name passed down as an argument will be in the format 
+ * FunctionName:Type:Count:(node count)
+ * Type is a type of a node (e.g. entry node, exit node, neither)
+ * Count is a unique identifier
+ * node count is the counter for nodes to be passed
+ */
+extern "C" void printBBname(const char *name) {
+    int rank, flag1, flag2;
+    MPI_Initialized(&flag1);
+    MPI_Finalized(&flag2);
+    vector<string> tokens;
+    if(flag1 && !flag2) {
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        string str(name);
+        tokens = parse(str, ':');
+        replayTracesRaw.push_back(tokens);
+        // if it is a replay trace the trace length will be 3, but for record 4
+        /* MPI_ASSERT(replayTracesRaw.size() > 0); */
+    }
+}
+
+int MPI_Init(
+    int *argc, 
+    char ***argv
+) {
+    int ret = PMPI_Init(argc, argv);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    /*
+     * opening the file that records the traces
+     */
+    char *line = nullptr;
+    size_t len = 0;
+    ssize_t read;
+
+    string tracefile = ".record" + to_string(rank) + ".tr";
+    vector<vector<string>> rawTraces;
+    FILE *fp = fopen(tracefile.c_str(), "r");
+    if(fp == nullptr) {
+        fprintf(stderr, "Error: cannot open file %s\n", tracefile.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    while((read = getline(&line, &len, fp)) != -1) {
+        if(read > 0 && line[read - 1] == '\n') {
+            line[read - 1] = '\0';
+        }
+        string str(line);
+        rawTraces.push_back(parse(str, ':'));
+        if(line != nullptr) {
+            free(line);
+            line = nullptr;
+        }
+    }
+    if(line != nullptr) {
+        free(line);
+        line = nullptr;
+    }
+    fclose(fp);
+
+    MPI_ASSERT(rawTraces.size() > 0);
+
+    /*
+     * opening the file that has loop information
+     */
+    string loopTreeFile = "loops.dot";
+    __loopTrees = parseDotFile(loopTreeFile);
+    for(auto lt: __loopTrees) {
+        lt.second->fixExclusives();
+    }
+
+    /*
+     * creating the hierarchy of traces for recorded traces
+     */
+    unsigned long index = 0;
+    recordTraces = makeHierarchyMain(
+            rawTraces, 
+            index, 
+            __loopTrees); 
+
+    return ret;
+}
+
+int MPI_Finalize() {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    /* DEBUG("MPI_Finalize:%d\n", rank); */
+    appendTraces(__loopTrees, TraceType::REPLAY);
+    greedyAlignmentWholeOffline(); 
+
+    /*
+     * deleting the looptrees
+     */
+    for(auto it = __loopTrees.begin(); it != __loopTrees.end(); it++) {
+        delete it->second;
+    }
+    /*
+     * should probably delete all the elements in the recordTraces
+     */
+
+    /*
+     * print the pods to a file 
+     * (to avoid writing everything at console at once)
+     */
+    string podfile = "pods" + to_string(rank) + ".txt";
+    FILE *fp = fopen(podfile.c_str(), "w");
+    for(auto it = pods.begin(); it != pods.end(); it++) {
+        fprintf(fp, "%s\n", it->c_str());
+    }
+    fclose(fp);
+
+    int rv = PMPI_Finalize();
+    return rv;
+}
+
+
