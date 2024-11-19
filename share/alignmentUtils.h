@@ -25,3 +25,22 @@ void levelUpStack(
 void fixIterations(
         std::vector<std::shared_ptr<element>>& functionalTraces,
         std::shared_ptr<element> newChild);
+
+bool isLoopEntry(
+        std::string bbname, 
+        std::shared_ptr<element> parent, 
+        loopNode *currloop);
+
+void print(
+        std::vector<std::shared_ptr<element>>& functionalTraces, 
+        unsigned depth);
+ 
+void printsurface(
+        std::vector<std::shared_ptr<element>>& functionalTraces);
+
+void printSurfaceFunc(
+        std::vector<std::shared_ptr<element>>& functionalTraces,
+        unsigned depth, 
+        std::string funcName = "");
+
+ 

@@ -191,7 +191,7 @@ int MPI_Init(
 int MPI_Finalize() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    //DEBUG("MPI_Finalize:%d\n", rank);
+    /* DEBUG("MPI_Finalize:%d\n", rank); */
     appendTraces(__loopTrees, TraceType::REPLAY);
     greedyAlignmentWholeOffline(); 
 

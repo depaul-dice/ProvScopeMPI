@@ -138,6 +138,17 @@ std::ostream& operator<<(
 }
 
 template <typename T>
+std::ostream& operator<<(
+        std::ostream& os, const std::unordered_set<T>& us) {
+    os << "{";
+    for(auto it = us.begin(); it != us.end(); ++it) {
+        os << *it << std::endl;
+    }
+    os << "}";
+    return os;
+}
+
+template <typename T>
 std::unordered_set<T> operator+=(
         std::unordered_set<T>& lhs, const std::unordered_set<T>& rhs) {
     lhs.insert(rhs.begin(), rhs.end());
