@@ -1,8 +1,12 @@
 
 #include "mpiRecordReplay.h"
+#define PROVRECORD
 
 using namespace std;
 
+Logger logger;
+
+#ifndef PROVRECORD
 extern vector<shared_ptr<element>> recordTraces;
 extern vector<vector<string>> replayTracesRaw;
 
@@ -115,9 +119,6 @@ int MPI_Finalize() {
     for(auto it = __loopTrees.begin(); it != __loopTrees.end(); it++) {
         delete it->second;
     }
-    /*
-     * should probably delete all the elements in the recordTraces
-     */
 
     /*
      * print the pods to a file 
@@ -134,4 +135,57 @@ int MPI_Finalize() {
     return rv;
 }
 
+#else
+FILE *traceFile = nullptr;
+unsigned long nodecnt = 0;
 
+extern "C" void printBBname(const char *name) {
+    int rank, flag1, flag2;
+    MPI_Initialized(&flag1);
+    MPI_Finalized(&flag2);
+    if(flag1 && !flag2) {
+        char filename[100];
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_ASSERT(traceFile != nullptr);
+        fprintf(traceFile, 
+                "%s:%lu\n", 
+                name, 
+                nodecnt++);
+    }
+    return;
+}
+
+int MPI_Init(
+    int *argc, 
+    char ***argv
+) {
+    int ret = PMPI_Init(argc, argv);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    //DEBUG("MPI_Init rank:%d\n", rank);
+
+    /*
+     * open the trace file
+     */
+    string filename = ".record" + to_string(rank) + ".tr";
+    traceFile = fopen(filename.c_str(), "w");
+    if(traceFile == nullptr) {
+        fprintf(stderr, "failed to open trace file\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    return ret;
+}
+
+int MPI_Finalize(void) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_ASSERT(traceFile != nullptr);
+    fflush(traceFile);
+    fclose(traceFile);
+    int ret = PMPI_Finalize();
+    /* DEBUG("MPI_Finalize done, rank:%d\n", rank); */
+    return ret;
+}
+
+#endif // PROVRECORD
