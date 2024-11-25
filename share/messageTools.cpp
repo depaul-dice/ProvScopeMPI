@@ -2,6 +2,8 @@
 
 using namespace std;
 
+#define LOCALALIGNMENT
+
 void recordMPIIprobeSuccess(
        FILE *recordFile,
         int rank,
@@ -159,6 +161,8 @@ int __MPI_Recv(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Status localStatus;
+    string localRepSendNodes = "";
+#ifndef LOCALALIGNMENT
     int ind = messagePool.peekPeekedMessage(
             source,
             tag,
@@ -252,15 +256,37 @@ int __MPI_Recv(
                 sizeof(MPI_Status));
         status->_ucount = (msgs.size() - 2) * size;
     }
+
+    localRepSendNodes = msgs[msgs.size() - 2];
     if(repSendNodes != nullptr) {
-        *repSendNodes = msgs[msgs.size() - 2];
+        *repSendNodes = localRepSendNodes;
     }
+
+#else // LOCALALIGNMENT
+    int ret = PMPI_Recv(
+            buf, 
+            count, 
+            datatype, 
+            source, 
+            tag, 
+            comm, 
+            &localStatus);
+    if(status != MPI_STATUS_IGNORE) {
+        memcpy(
+                status, 
+                &localStatus, 
+                sizeof(MPI_Status));
+    }
+    if(repSendNodes != nullptr) {
+        *repSendNodes = localRepSendNodes;
+    }
+#endif
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Recv|%d|%d|%lu|%s\n",
                 rank,
-                status->MPI_SOURCE,
+                localStatus.MPI_SOURCE,
                 nodeCnt - 1,
-                msgs[msgs.size() - 2].c_str());
+                localRepSendNodes.c_str());
     }
     return ret;
 }
@@ -274,6 +300,7 @@ int __MPI_Send(
         MPI_Comm comm,
         MessagePool &messagePool,
         string &lastNodes) {
+#ifndef LOCALALIGNMENT
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int size;
@@ -297,6 +324,15 @@ int __MPI_Send(
             dest, 
             tag, 
             comm);
+#else // LOCALALIGNMENT
+    int ret = PMPI_Send(
+            buf, 
+            count, 
+            datatype, 
+            dest, 
+            tag, 
+            comm);
+#endif // LOCALALIGNMENT
     return ret;
 }
 

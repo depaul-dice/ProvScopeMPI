@@ -1,12 +1,15 @@
 
 #include "mpiRecordReplay.h"
-#define PROVRECORD
+/* #define PROVRECORD */
 
 using namespace std;
 
 Logger logger;
 
 #ifndef PROVRECORD
+
+#include <chrono> 
+
 extern vector<shared_ptr<element>> recordTraces;
 extern vector<vector<string>> replayTracesRaw;
 
@@ -98,10 +101,16 @@ int MPI_Init(
      * creating the hierarchy of traces for recorded traces
      */
     unsigned long index = 0;
+    auto tik = chrono::high_resolution_clock::now();
     recordTraces = makeHierarchyMain(
             rawTraces, 
             index, 
             __loopTrees); 
+    auto tok = chrono::high_resolution_clock::now();
+    if(rank == 0) {
+        printf("making Hierarchy took %ld ms\n", 
+                chrono::duration_cast<chrono::milliseconds>(tok - tik).count());
+    }
 
     return ret;
 }
