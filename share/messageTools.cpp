@@ -1094,7 +1094,9 @@ int __MPI_Cancel(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#ifndef LOCALALIGNMENT
     messagePool.deleteMessage(request);
+#endif // LOCALALIGNMENT
     int ret = PMPI_Cancel(request);
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Cancel|%d|%p|%lu\n", 
@@ -1184,18 +1186,11 @@ int __MPI_Probe(
     stat._ucount = (tokens.size() - 2) * size;
     status->_ucount = stat._ucount;
 #else // LOCALALIGNMENT
-    MPI_Status stat;
     ret = PMPI_Probe(
             source, 
             tag, 
             comm, 
-            &stat);
-    if(status != MPI_STATUS_IGNORE) {
-        memcpy(
-                status, 
-                &stat, 
-                sizeof(MPI_Status));
-    }
+            status);
 #endif // LOCALALIGNMENT
 
     recordMPIProbe(
@@ -1203,7 +1198,7 @@ int __MPI_Probe(
             rank, 
             source, 
             tag, 
-            &stat,
+            status,
             nodeCnt);
     return ret;
 }
