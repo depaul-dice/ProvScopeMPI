@@ -350,6 +350,7 @@ int __MPI_Irecv(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret;
+#ifndef LOCALALIGNMENT
     /*
      * let's not support the case where there exists a peeked message
      * for now
@@ -409,6 +410,16 @@ int __MPI_Irecv(
             comm, 
             request);
  
+#else // LOCALALIGNMENT
+    ret = PMPI_Irecv(
+            buf, 
+            count, 
+            datatype, 
+            source, 
+            tag, 
+            comm, 
+            request);
+#endif
     // I just need to keep track of the request
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Irecv|%d|%d|%p|%lu\n",
@@ -437,6 +448,8 @@ int __MPI_Isend(
     int size;
     MPI_Type_size(datatype, &size);
     int ret = 0;
+
+#ifndef LOCALALIGNMENT
     stringstream ss = convertData2StringStream(
             buf, 
             datatype, 
@@ -478,6 +491,17 @@ int __MPI_Isend(
             comm, 
             request);
 
+#else // LOCALALIGNMENT
+    ret = PMPI_Isend(
+            buf, 
+            count, 
+            datatype, 
+            dest, 
+            tag, 
+            comm, 
+            request);
+#endif
+
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Isend|%d|%d|%p|%lu\n", 
                 rank, 
@@ -498,6 +522,9 @@ int __MPI_Wait(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int ret = 0;
+    
+#ifndef LOCALALIGNMENT
     /*
      * Look for the message buffer information in MPI_Request
      */
@@ -505,7 +532,7 @@ int __MPI_Wait(
     MPI_ASSERT(msgBuf != nullptr);
     int retSrc;
     string retNodes;
-    int ret = messagePool.loadPeekedMessage(
+    ret = messagePool.loadPeekedMessage(
             msgBuf->buf_, 
             msgBuf->dataType_,
             msgBuf->count_,
@@ -553,7 +580,6 @@ int __MPI_Wait(
      * and record the information
      */
     MPI_Status stat;
-    memset(&stat, 0, sizeof(MPI_Status));
     ret = PMPI_Wait(request, &stat);
     if(status != MPI_STATUS_IGNORE) {
         memcpy(
@@ -565,6 +591,18 @@ int __MPI_Wait(
     MPI_ASSERT(ret == MPI_SUCCESS);
     /* DEBUG("load message at line: %d, rank: %d\n", __LINE__, rank); */
     string sendNodes = messagePool.loadMessage(request, status);
+
+#else // LOCALALIGNMENT
+    MPI_Status stat;
+    ret = PMPI_Wait(request, &stat);
+    if(status != MPI_STATUS_IGNORE) {
+        memcpy(
+                status, 
+                &stat, 
+                sizeof(MPI_Status));
+    }
+    string sendNodes = "";
+#endif // LOCALALIGNMENT
     if(repSendNodes != nullptr) {
         *repSendNodes = sendNodes;
     }
@@ -588,13 +626,15 @@ int __MPI_Test(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int ret;
+#ifndef LOCALALIGNMENT
     /*
      * first check if we have any matching peeked message
      */
     MessageBuffer *msgBuf = messagePool.peekMessage(request);
     int retSrc;
     string retNodes;
-    int ret = messagePool.loadPeekedMessage(
+    ret = messagePool.loadPeekedMessage(
             msgBuf->buf_, 
             msgBuf->dataType_,
             msgBuf->count_,
@@ -638,6 +678,7 @@ int __MPI_Test(
         }
         return MPI_SUCCESS;
     }
+#endif // LOCALALIGNMENT
 
     /*
      * if the peeked message is not found, then call the actual MPI_Test
@@ -662,8 +703,13 @@ int __MPI_Test(
     if(*flag) {
         /* DEBUG("load message at line: %d, rank: %d, request: %p\n", */ 
         /*         __LINE__, rank, request); */
+#ifndef LOCALALIGNMENT
         string sendNodes = messagePool.loadMessage(request, status);
+#else // LOCALALIGNMENT
+        string sendNodes = "";
+#endif // LOCALALIGNMENT
         if(recordFile != nullptr) {
+#ifndef LOCALALIGNMENT
             /*
              * this is a temporary solution, 
              * we should not get localStat.MPI_SOURCE == MPI_ANY_SOURCE
@@ -677,6 +723,7 @@ int __MPI_Test(
                 localStat.MPI_SOURCE = messagePool.getSource(request);    
                 MPI_ASSERT(localStat.MPI_SOURCE != MPI_ANY_SOURCE);
             }
+#endif // LOCALALIGNMENT
             fprintf(recordFile, "MPI_Test|%d|%p|SUCCESS|%d|%lu|%s\n", \
                     rank, 
                     request, 
@@ -706,6 +753,7 @@ int __MPI_Waitall(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret;
+#ifndef LOCALALIGNMENT
     /*
      * first check if we have any matching peeked message
      */
@@ -751,6 +799,7 @@ int __MPI_Waitall(
             }
         }
     }
+#endif // LOCALALIGNMENT
     /*
      * if the peeked message is not found, then call the actual MPI_Waitall
      * and update the status and record the information
@@ -770,6 +819,7 @@ int __MPI_Waitall(
                 localStats, 
                 sizeof(MPI_Status) * count);
     }
+#ifndef LOCALALIGNMENT
     for(int i = 0; i < count; i++) {
         /*
         if(!messagePool.isSend(&array_of_requests[i])) {
@@ -787,6 +837,14 @@ int __MPI_Waitall(
             repSendNodes[i] = sendNodes[i];
         }
     }
+#else // LOCALALIGNMENT
+    for(int i = 0; i < count; i++) {
+        sendNodes[i] = "";
+        if(repSendNodes != nullptr) {
+            repSendNodes[i] = sendNodes[i];
+        }
+    }
+#endif // LOCALALIGNMENT
 
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Waitall|%d|%d", 
@@ -813,6 +871,7 @@ int __MPI_Testall(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret;
+#ifndef LOCALALIGNMENT
     /*
      * first check if we have any matching peeked message
      */
@@ -858,6 +917,7 @@ int __MPI_Testall(
         }
     }
 
+#endif // LOCALALIGNMENT
     /*
      * if the peeked message is not found, then call the actual MPI_Testall
      * and update the status and record the information
@@ -879,6 +939,7 @@ int __MPI_Testall(
     }
     if(*flag) {
         string lastNodes [count];
+#ifndef LOCALALIGNMENT
         for(int i = 0; i < count; i++) {
             /* DEBUG("loadMessage at line: %d, rank: %d\n", __LINE__, rank); */
             lastNodes[i] = messagePool.loadMessage(
@@ -886,7 +947,13 @@ int __MPI_Testall(
                     &array_of_statuses[i]);
             MPI_ASSERT(lastNodes[i].length() > 0 
                     || messagePool.isSend(&array_of_requests[i]));
+
         }
+#else // LOCALALIGNMENT
+        for(int i = 0; i < count; i++) {
+            lastNodes[i] = "";
+        }
+#endif // LOCALALIGNMENT
         if(recordFile != nullptr) {
             fprintf(recordFile, "MPI_Testall|%d|%d|SUCCESS", 
                     rank, 
@@ -920,6 +987,7 @@ int __MPI_Testsome(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret;
+#ifndef LOCALALIGNMENT
     /*
      * first check if we have any matching peeked message
      */
@@ -964,6 +1032,7 @@ int __MPI_Testsome(
             }
         }
     }
+#endif // LOCALALIGNMENT
 
     /*
      * if the peeked message is not found, then call the actual MPI_Testsome
@@ -985,7 +1054,6 @@ int __MPI_Testsome(
                 sizeof(MPI_Status) * incount);
     } 
 
-    // below this part is not done yet, IMPLEMENT!!
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Testsome|%d|%d", 
                 rank, *outcount);
@@ -995,11 +1063,15 @@ int __MPI_Testsome(
         int ind;
         for(int i = 0; i < *outcount; i++) {
             ind = array_of_indices[i];
+#ifndef LOCALALIGNMENT
             /* DEBUG("loadMessage at line: %d, rank: %d, request: %p\n", */ 
             /*         __LINE__, rank, &array_of_requests[ind]); */
             lastNodes = messagePool.loadMessage(
                     &array_of_requests[ind], 
                     &array_of_statuses[ind]);
+#else // LOCALALIGNMENT
+            lastNodes = "";
+#endif // LOCALALIGNMENT
             if(recordFile != nullptr) {
                 fprintf(recordFile, "|%p|%d|%s", 
                         &array_of_requests[ind], 
@@ -1044,13 +1116,15 @@ int __MPI_Probe(
     int rank;
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
+    int ret;
+#ifndef LOCALALIGNMENT
     /*
      * first, let's check if we have any appropriate message at peeked
      * if so, set the status to be appropriate values
      * CAUTION: status cannot be nullptr or STATUS_IGNORE 
      * (otherwise why would you call probe?)
      */
-    int ret = messagePool.peekPeekedMessage(
+    ret = messagePool.peekPeekedMessage(
             source, 
             tag, 
             comm, 
@@ -1107,14 +1181,29 @@ int __MPI_Probe(
     auto tokens = parse(tmpStr, '|');
     MPI_ASSERT(tokens.size() >= 2);
     int size = stoi(tokens.back());
-    status->_ucount = (tokens.size() - 2) * size;
+    stat._ucount = (tokens.size() - 2) * size;
+    status->_ucount = stat._ucount;
+#else // LOCALALIGNMENT
+    MPI_Status stat;
+    ret = PMPI_Probe(
+            source, 
+            tag, 
+            comm, 
+            &stat);
+    if(status != MPI_STATUS_IGNORE) {
+        memcpy(
+                status, 
+                &stat, 
+                sizeof(MPI_Status));
+    }
+#endif // LOCALALIGNMENT
 
     recordMPIProbe(
             recordFile,
             rank, 
             source, 
             tag, 
-            status,
+            &stat,
             nodeCnt);
     return ret;
 }
@@ -1130,6 +1219,9 @@ int __MPI_Iprobe(
         unsigned long nodeCnt) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int ret;
+    MPI_Status statIprobe;
+#ifndef LOCALALIGNMENT
     //DEBUG("MPI_Iprobe:%d, at rank:%d\n", source, rank);
 
     /*
@@ -1137,8 +1229,7 @@ int __MPI_Iprobe(
      * if we have appropriate message, we don't even call the function
      * and return
      */
-    MPI_Status statIprobe;
-    int ret = messagePool.peekPeekedMessage(
+    ret = messagePool.peekPeekedMessage(
             source, 
             tag, 
             comm, 
@@ -1166,6 +1257,7 @@ int __MPI_Iprobe(
         */
         return MPI_SUCCESS;
     }
+#endif // LOCALALIGNMENT
 
     ret = PMPI_Iprobe(
             source, 
@@ -1181,6 +1273,7 @@ int __MPI_Iprobe(
                 sizeof(MPI_Status));
     }
     if(*flag) {
+#ifndef LOCALALIGNMENT
         /*
          * if iprobe found any message, 
          * receive it and add it to peeked messages
@@ -1221,6 +1314,7 @@ int __MPI_Iprobe(
                     rank, status->MPI_SOURCE, tag, status->_ucount);
              */
         }
+#endif // LOCALALIGNMENT
         /* 
          * record the result of Iprobe 
          */
