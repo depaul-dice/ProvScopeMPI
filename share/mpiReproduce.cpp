@@ -343,7 +343,7 @@ int MPI_Irecv(
             lastNodes);
     int ret;
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
-        /* DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank); */
+        DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank);
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
         ret = __MPI_Irecv(
@@ -1038,7 +1038,7 @@ int MPI_Iprobe (
             "MPI_Iprobe", 
             lastNodes);
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
-        /* DEBUG("at rank %d, the alignment was not successful at MPI_Iprobe\n", rank); */
+        DEBUG("at rank %d, the alignment was not successful at MPI_Iprobe\n", rank);
         // don't control anything
         return __MPI_Iprobe(
                 source, 

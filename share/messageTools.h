@@ -16,6 +16,8 @@
 #include "loops.h"
 #include "messagePool.h"
 
+#define LOCALALIGNMENT
+
 class MessagePool;
 
 /* 

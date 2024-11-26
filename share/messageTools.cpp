@@ -2,7 +2,6 @@
 
 using namespace std;
 
-#define LOCALALIGNMENT
 
 void recordMPIIprobeSuccess(
        FILE *recordFile,
@@ -596,6 +595,9 @@ int __MPI_Wait(
     MPI_Status stat;
     ret = PMPI_Wait(request, &stat);
     if(status != MPI_STATUS_IGNORE) {
+        if(rank == 2 && stat.MPI_SOURCE == 2) {
+            DEBUG("request: %p, source: %d\n", request, stat.MPI_SOURCE);
+        }
         memcpy(
                 status, 
                 &stat, 
@@ -1053,6 +1055,13 @@ int __MPI_Testsome(
                 localStats, 
                 sizeof(MPI_Status) * incount);
     } 
+    for(unsigned i = 0; i < incount; i++) {
+        if(array_of_indices[i] != MPI_UNDEFINED) {
+            continue;
+        } else {
+            printf("localStats[%d].MPI_SOURCE: %d\n", i, localStats[i].MPI_SOURCE);
+        }
+    }
 
     if(recordFile != nullptr) {
         fprintf(recordFile, "MPI_Testsome|%d|%d", 
@@ -1062,20 +1071,24 @@ int __MPI_Testsome(
         string lastNodes;
         int ind;
         for(int i = 0; i < *outcount; i++) {
+            /*
+             * we are keeping this as an i intentionally
+             * (because it's the right index)
+             */
             ind = array_of_indices[i];
 #ifndef LOCALALIGNMENT
             /* DEBUG("loadMessage at line: %d, rank: %d, request: %p\n", */ 
             /*         __LINE__, rank, &array_of_requests[ind]); */
             lastNodes = messagePool.loadMessage(
                     &array_of_requests[ind], 
-                    &array_of_statuses[ind]);
+                    &array_of_statuses[i]);
 #else // LOCALALIGNMENT
             lastNodes = "";
 #endif // LOCALALIGNMENT
             if(recordFile != nullptr) {
                 fprintf(recordFile, "|%p|%d|%s", 
                         &array_of_requests[ind], 
-                        array_of_statuses[ind].MPI_SOURCE,
+                        array_of_statuses[i].MPI_SOURCE,
                         lastNodes.c_str());
             }
         }
