@@ -21,6 +21,7 @@ unordered_map<string, map<string, unsigned long>> __callLocations;
 
 FILE *recordFile = nullptr;
 FILE *traceFile = nullptr;
+unsigned numSends = 0;
 
 /*
  * nodecnt is incremented at printBBname
@@ -42,7 +43,6 @@ extern "C" void printBBname(const char *name) {
     MPI_Initialized(&flag1);
     MPI_Finalized(&flag2);
     if(flag1 && !flag2) {
-        char filename[100];
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_ASSERT(traceFile != nullptr);
         fprintf(traceFile, 
@@ -160,6 +160,7 @@ int MPI_Finalize(void) {
     }
     int ret = PMPI_Finalize();
     /* DEBUG("MPI_Finalize done, rank:%d\n", rank); */
+    fprintf(stderr, "rank: %d, numSends: %u\n", rank, numSends);
     return ret;
 }
 
@@ -211,6 +212,7 @@ int MPI_Send(
             messagePool,
             lastNodes);
     MPI_ASSERT(ret == MPI_SUCCESS);
+    numSends++;
     return ret;
 }
 
@@ -286,6 +288,7 @@ int MPI_Isend(
     __requests[request] = "MPI_Isend";
 
     checkCallLocations("MPI_Isend", lastNodes);
+    numSends++;
     return ret;
 }
 
@@ -480,9 +483,11 @@ int MPI_Waitany(
                 stat.MPI_SOURCE, 
                 nodecnt);
     }
+    /*
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
     checkCallLocations("MPI_Waitany", lastNodes);
+    */
 
     return ret;
 }

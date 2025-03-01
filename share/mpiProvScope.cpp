@@ -118,8 +118,11 @@ int MPI_Init(
 int MPI_Finalize() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    auto tik = chrono::high_resolution_clock::now();
     /* DEBUG("MPI_Finalize:%d\n", rank); */
     appendTraces(__loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    auto unrollTime = chrono::duration_cast<chrono::microseconds>(tok - tik).count();
     greedyAlignmentWholeOffline(); 
 
     /*
@@ -139,6 +142,8 @@ int MPI_Finalize() {
         fprintf(fp, "%s\n", it->c_str());
     }
     fclose(fp);
+
+    printf("Unroll time:%ld microseconds\n", unrollTime);
 
     int rv = PMPI_Finalize();
     return rv;

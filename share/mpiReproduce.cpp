@@ -50,6 +50,8 @@ deque<shared_ptr<lastaligned>> __q;
 Logger logger;
 MessagePool messagePool;
 
+chrono::microseconds timeUnroll;
+
 /* 
  * The name passed down as an argument will be in the format 
  * FunctionName:Type:Count:(node count)
@@ -192,7 +194,12 @@ int MPI_Finalize() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Finalize:%d\n", rank); */
+    auto tik = chrono::high_resolution_clock::now();
     appendTraces(__loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
+    std::cout << "Time to unroll: " << timeUnroll.count() << "microseconds" << std::endl;
+
     greedyAlignmentWholeOffline(); 
 
     /*
@@ -237,8 +244,11 @@ int MPI_Recv(
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* 
      * DEBUG0("MPI_Recv:%s:%d\n", orders[__orderIndex].c_str(), __orderIndex); */
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Recv", 
             lastNodes);
@@ -306,9 +316,12 @@ int MPI_Send(
     int tag, 
     MPI_Comm comm
 ) {
+    auto tik = chrono::high_resolution_clock::now();
     string currNodes = updateAndGetLastNodes(
             __loopTrees, 
             TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     int ret = __MPI_Send(
             buf, 
             count, 
@@ -336,14 +349,17 @@ int MPI_Irecv(
     // I need to look into the source first
     /* int ret = original_MPI_Irecv(buf, count, datatype, source, tag, comm, request); */
     // I just need to keep track of the request
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Irecv", 
             lastNodes);
     int ret;
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
-        DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank);
+        /* DEBUG("at rank %d, the alignment was not successful at MPI_Irecv\n", rank); */
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
         ret = __MPI_Irecv(
@@ -409,8 +425,11 @@ int MPI_Isend(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Isend, rank: %d\n", rank); */
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     int ret = __MPI_Isend(
             buf, 
             count, 
@@ -513,8 +532,11 @@ int MPI_Cancel(
             MPI_COMM_WORLD, &rank);
     int ret = __MPI_Cancel(
             request, messagePool);
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Cancel", 
             lastNodes);
@@ -550,8 +572,12 @@ int MPI_Test(
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Test, rank: %d\n", rank); */
     //DEBUG0(":%d:%p", rank, request);
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
+
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Test", 
             lastNodes);
@@ -611,8 +637,13 @@ int MPI_Testall (
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
+
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Testall", 
             lastNodes);
@@ -683,8 +714,12 @@ int MPI_Testsome(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG("MPI_Testsome:%d\n", rank); */
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
+
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Testsome", 
             lastNodes);
@@ -763,8 +798,11 @@ int MPI_Wait(
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Wait", 
             lastNodes);
@@ -885,8 +923,12 @@ int MPI_Waitall(
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* DEBUG0("MPI_Waitall:%s\n", orders[orderIndex].c_str()); */
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
+
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Waitall", 
             lastNodes);
@@ -1032,8 +1074,12 @@ int MPI_Iprobe (
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
+    auto tok = chrono::high_resolution_clock::now();
+    timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
+
     auto alignedIndex = easyOnlineAlignment(
             "MPI_Iprobe", 
             lastNodes);
