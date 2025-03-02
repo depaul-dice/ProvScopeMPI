@@ -46,11 +46,14 @@ double updateAndGetLastNodesTime = 0.0;
 double appendRecordConstCharTime = 0.0;
 
 extern "C" void printBBname(const char *name) {
-    int rank, flag1, flag2;
+    static int rank = -1;
+    int flag1, flag2;
     MPI_Initialized(&flag1);
     MPI_Finalized(&flag2);
     if(flag1 && !flag2) {
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if(rank == -1) {
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        }
         MPI_ASSERT(traceFile != nullptr);
         auto tik = MPI_Wtime();
         fprintf(traceFile, 
@@ -58,8 +61,8 @@ extern "C" void printBBname(const char *name) {
                 name, 
                 nodecnt++);
         auto tok = MPI_Wtime();
-        string str(name);
-        appendRecordTracesRaw(parse(str, ':'));
+        // avoid reallocations
+        appendRecordTracesRaw(parse(name, ':'));
         double tok2 = MPI_Wtime();
         appendRecordTracesRaw(name);
         double tok3 = MPI_Wtime();

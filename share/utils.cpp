@@ -45,18 +45,19 @@ void close_debugfile() {
 #endif // DEBUG_MODE
 
 vector<string> parse(string line, char delimit) {
-    vector<string> res;
-    string tmp = "";
-    for (unsigned i = 0; i < line.size(); i++) {
-        if (line[i] == delimit) {
-            res.push_back(tmp);
-            tmp = "";
-        } else {
-            tmp += line[i];
-        }
+    vector<string> result;
+    result.reserve(8);
+    size_t start = 0;
+    size_t end = line.find(delimit);
+
+    while(end != string::npos) {
+        result.push_back(line.substr(start, end - start));
+        start = end + 1;
+        end = line.find(delimit, start);
     }
-    res.push_back(tmp);
-    return move(res);
+
+    result.push_back(line.substr(start, end));
+    return result;
 }
 
 int lookahead(vector<string>& orders, unsigned start, string& request) {

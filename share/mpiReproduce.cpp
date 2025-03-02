@@ -20,6 +20,7 @@ unordered_map<string, unordered_map<string, unsigned long>> __callLocations;
 /* static unsigned __recordtrace_index = 0; */
 extern vector<shared_ptr<element>> recordTraces;
 extern vector<vector<string>> replayTracesRaw;
+extern vector<const char *> replayTracesRawTmp;
 /*
  * below is for the debugging purpose, delete when done
  */
@@ -162,11 +163,13 @@ int MPI_Init(
     /*
      * creating the hierarchy of traces for recorded traces
      */
+    /*
     unsigned long index = 0;
     recordTraces = makeHierarchyMain(
             rawTraces, 
             index, 
             __loopTrees); 
+    */
 
     /*
      * reading the json file
