@@ -980,6 +980,7 @@ void appendTraces(
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     //static unsigned long index = 0;
     unsigned long index = 0;
+    cerr << rawTraces.size() << rank << endl;
     if(traces.size() == 0) {
         //MPI_ASSERT(index == 0);
         traces = makeHierarchyMain(
