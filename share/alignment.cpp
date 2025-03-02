@@ -7,12 +7,14 @@ using namespace std;
  * recordTracesRaw should not be visible to mpireproduce.cpp
  */
 vector<vector<string>> recordTracesRaw;
+vector<const char *> recordTracesRawTmp;
 vector<shared_ptr<element>> recordTraces;
 
 /*
  * this is necessary for bbprinter
  */
 vector<vector<string>> replayTracesRaw; 
+vector<const char *> replayTracesRawTmp;
 vector<shared_ptr<element>> replayTraces;
 
 static  unordered_map<string, unordered_set<string>> divs;
@@ -117,7 +119,7 @@ string element::content() const {
     } else {
         str += "neither:" + to_string(id);
     }
-    return str;
+    return move(str);
 }
 
 bool element::operator ==(const element &e) const {
@@ -166,7 +168,8 @@ ostream& operator<<(ostream& os, const lastaligned& l) {
 }
 
 vector<shared_ptr<element>> makeHierarchyMain(
-        vector<vector<string>>& traces, unsigned long& index) {
+        vector<vector<string>>& traces, 
+        unsigned long& index) {
     vector<shared_ptr<element>> functionalTraces;
     bool isEntry, 
          isExit;
@@ -451,14 +454,15 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
  */
 vector<shared_ptr<element>> makeHierarchyMain(
         vector<vector<string>>& traces, 
+        vector<const char *>& tracesTmp,
         unsigned long &index, 
         unordered_map<string, loopNode *>& loopTrees) {
     vector<shared_ptr<element>> functionalTraces;
     bool isEntry = false, 
          isExit = false;
-    string funcname = "main";
+    const string mainname = "main";
     MPI_ASSERT(loopTrees.find("main") != loopTrees.end());
-    loopNode *loopTree = loopTrees[funcname], 
+    loopNode *loopTree = loopTrees[mainname], 
              *child = nullptr;
     string bbname;
     /*
@@ -466,17 +470,18 @@ vector<shared_ptr<element>> makeHierarchyMain(
      * just ignore
      */
     while(index < traces.size() 
-            && funcname != traces[index][0]) {
+            && mainname != traces[index][0]) {
         index++;
     }
     while(!isExit 
             && index < traces.size()) {
-        MPI_EQUAL(traces[index][0], funcname);
+        MPI_EQUAL(traces[index][0], mainname);
         MPI_ASSERT(traces[index].size() == 3 
                 || traces[index].size() == 4);
         bbname = traces[index][0] + ":" 
             + traces[index][1] + ":" 
             + traces[index][2];
+        MPI_EQUAL(bbname, tracesTmp[index]);
 
         /*
          * this returns the ptr of a child that has bbname in it
@@ -525,6 +530,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
         fixIterations(functionalTraces, eptr);
         functionalTraces.push_back(eptr);
     }
+    MPI_ASSERT(functionalTraces.size() > 0);
     return functionalTraces;
     
 }
@@ -920,6 +926,7 @@ deque<shared_ptr<lastaligned>> onlineAlignment(
     appendTraces(
             loopTrees, 
             replayTracesRaw, 
+            replayTracesRawTmp,
             replayTraces);
     
     size_t i = 0, j = 0; 
@@ -958,6 +965,7 @@ void appendReplayTrace(
         MPI_ASSERT(index == 0);
         replayTraces = makeHierarchyMain(
                 replayTracesRaw, 
+                replayTracesRawTmp,
                 index, 
                 loopTrees);
     } else {
@@ -974,6 +982,7 @@ void appendReplayTrace(
 void appendTraces(
         unordered_map<string, loopNode *>& loopTrees,
         vector<vector<string>>& rawTraces,
+        vector<const char *>& rawTracesTmp,
         vector<shared_ptr<element>>& traces) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -983,6 +992,7 @@ void appendTraces(
         //MPI_ASSERT(index == 0);
         traces = makeHierarchyMain(
                 rawTraces, 
+                rawTracesTmp,
                 index, 
                 loopTrees);
     } else {
@@ -993,6 +1003,7 @@ void appendTraces(
                 loopTrees);
     }
     rawTraces.clear();
+    rawTracesTmp.clear();
     return;
 }
 
@@ -1003,16 +1014,19 @@ void appendTraces(
         appendTraces(
                 loopTrees, 
                 recordTracesRaw, 
+                recordTracesRawTmp,
                 recordTraces);
     } else if (traceType == TraceType::REPLAY) {
         appendTraces(
                 loopTrees, 
                 replayTracesRaw, 
+                replayTracesRawTmp,
                 replayTraces);
     }
 }
 
-static string getLastNodes(vector<shared_ptr<element>>& traces) {
+static string getLastNodes(
+        vector<shared_ptr<element>>& traces) {
     MPI_ASSERT(traces.size() > 0);
     stringstream ss;
     shared_ptr<element> curr = traces.back();
@@ -1050,7 +1064,9 @@ string getLastNodes(TraceType traceType) {
 string getVeryLastNode(TraceType traceType) {
     vector<string> vec;
     if(traceType == TraceType::RECORD) {
-        vec = recordTracesRaw.back();
+        /* vec = recordTracesRaw.back(); */
+        const char *bb = recordTracesRawTmp.back();
+        vec = parse(bb, ':');
     } else if (traceType == TraceType::REPLAY) {
         vec = replayTracesRaw.back();
     }
@@ -1796,6 +1812,10 @@ vector<string> getMsgs(
 
 void appendRecordTracesRaw(vector<string> rawRecordTrace) {
     recordTracesRaw.push_back(rawRecordTrace);
+}
+
+void appendRecordTracesRaw(const char * rawRecordTrace) {
+    recordTracesRawTmp.push_back(rawRecordTrace);
 }
 
 size_t getIndex(shared_ptr<element>& eptr) {

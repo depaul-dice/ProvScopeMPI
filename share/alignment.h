@@ -102,6 +102,7 @@ void appendReplayTrace(
 void appendTraces(
         std::unordered_map<std::string, loopNode *>& loopTrees,
         std::vector<std::vector<std::string>>& rawTraces,
+        std::vector<const char *>& rawTracesTmp,
         std::vector<std::shared_ptr<element>>& traces);
  
 void appendTraces(
@@ -127,6 +128,7 @@ std::vector<std::shared_ptr<element>> makeHierarchy(
  */
 std::vector<std::shared_ptr<element>> makeHierarchyMain(
         std::vector<std::vector<std::string>>& traces, 
+        std::vector<const char *>& tracesTmp,
         unsigned long &index, 
         std::unordered_map<std::string, loopNode *>& loopNodes);
 std::vector<std::shared_ptr<element>> makeHierarchy(
@@ -170,6 +172,7 @@ std::vector<std::string> getMsgs(
         std::string *recSendNodes = nullptr);
 
 void appendRecordTracesRaw(std::vector<std::string> rawRecordTrace);
+void appendRecordTracesRaw(const char *rawRecordTrace);
 
 size_t getIndex(std::shared_ptr<element>& eptr);
 std::vector<std::shared_ptr<element>> getCurrNodesByIndex(unsigned long index);

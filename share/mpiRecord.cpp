@@ -34,13 +34,16 @@ MessagePool messagePool;
 
 #ifdef DEBUG_MODE
 extern vector<vector<string>> recordTracesRaw;
+extern vector<const char *> recordTracesTmp;
 extern vector<shared_ptr<element>> recordTraces;
+
 #define RECORDTRACE(...)
 #endif
 double writeTime = 0.0;
 double appendRecordTime = 0.0;
 double checkCallLocationsTime = 0.0;
 double updateAndGetLastNodesTime = 0.0;
+double appendRecordConstCharTime = 0.0;
 
 extern "C" void printBBname(const char *name) {
     int rank, flag1, flag2;
@@ -57,9 +60,12 @@ extern "C" void printBBname(const char *name) {
         auto tok = MPI_Wtime();
         string str(name);
         appendRecordTracesRaw(parse(str, ':'));
-        auto tok2 = MPI_Wtime();
+        double tok2 = MPI_Wtime();
+        appendRecordTracesRaw(name);
+        double tok3 = MPI_Wtime();
         writeTime += tok - tik;
         appendRecordTime += tok2 - tok;
+        appendRecordConstCharTime += tok3 - tok2;
     }
     return;
 }
@@ -175,12 +181,14 @@ int MPI_Finalize(void) {
     //fprintf(stderr, "rank: %d, numSends: %u\n", rank, numSends);
     fprintf(stderr, "rank: %d, writeTime: %f, \
             appendRecordTime: %f, \
+            appendRecordConstCharTime: %f, \
             checkCallLocationsTime: %f, \
             updateAndGetLastNodesTime: %f, \
             numSends: %u\n",
             rank, 
             writeTime, 
             appendRecordTime, 
+            appendRecordConstCharTime,
             checkCallLocationsTime,
             updateAndGetLastNodesTime,
             numSends);
