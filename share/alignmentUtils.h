@@ -5,11 +5,17 @@
 #include <stack>
 #include <string>
 #include <limits>
+#include <memory>
 
-// 修改前向声明 - 只声明结构不使用实际类型
+// 前向声明
+struct element;
 struct loopNode;
-class ElementPtr;
 
+// 确保使用原始代码中的ElementPtr类型
+// 而不是我们之前添加的ElementSharedPtr
+class ElementPtr;  // 或者这里需要完整的声明，取决于原始定义
+
+// 修改所有函数声明使用ElementPtr
 void insertIterationsAndFixStack(
         std::vector<ElementPtr>& iterations,
         std::stack<ElementPtr>& stack,
@@ -34,7 +40,7 @@ void fixIterations(
 bool isLoopEntry(
         std::string bbname,
         ElementPtr parent,
-        struct loopNode *currloop);
+        loopNode *currloop);
 
 void print(
         std::vector<ElementPtr>& functionalTraces,
@@ -46,6 +52,6 @@ void printsurface(
 void printSurfaceFunc(
         std::vector<ElementPtr>& functionalTraces,
         unsigned depth,
-        std::string funcName = "");
+        std::string funcName);
 
 #endif // ALIGNMENT_UTILS_H

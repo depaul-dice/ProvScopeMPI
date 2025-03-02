@@ -114,10 +114,10 @@ int MPI_Init(
      */
     unsigned long index = 0;
     auto tik = chrono::high_resolution_clock::now();
-    recordTraces = makeHierarchyMain(
+    recordTraces = convertToSharedPtr(makeHierarchyMain(
             rawTraces,
             index,
-            __loopTrees);
+            __loopTrees));
     auto tok = chrono::high_resolution_clock::now();
     if(rank == 0) {
         printf("making Hierarchy took %ld ms\n",
