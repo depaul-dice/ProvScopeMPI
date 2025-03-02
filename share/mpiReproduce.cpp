@@ -163,10 +163,10 @@ int MPI_Init(
      * creating the hierarchy of traces for recorded traces
      */
     unsigned long index = 0;
-    recordTraces = makeHierarchyMain(
-            rawTraces, 
-            index, 
-            __loopTrees); 
+    /* recordTraces = makeHierarchyMain( */
+    /*         rawTraces, */ 
+    /*         index, */ 
+    /*         __loopTrees); */ 
 
     /*
      * reading the json file
