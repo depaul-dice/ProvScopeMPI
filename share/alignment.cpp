@@ -1,4 +1,3 @@
-
 #include "alignment.h"
 
 using namespace std;
@@ -12,7 +11,7 @@ vector<shared_ptr<element>> recordTraces;
 /*
  * this is necessary for bbprinter
  */
-vector<vector<string>> replayTracesRaw; 
+vector<vector<string>> replayTracesRaw;
 vector<shared_ptr<element>> replayTraces;
 
 static  unordered_map<string, unordered_set<string>> divs;
@@ -28,44 +27,61 @@ const unordered_set<string> mpiCallsWithSendNodesAtLast = {
     "MPI_Wait"
 };
 
+void optimizeVectorAllocation() {
+    recordTracesRaw.reserve(10000);
+    recordTraces.reserve(5000);
+    replayTracesRaw.reserve(10000);
+    replayTraces.reserve(5000);
+}
+
+namespace {
+    struct VectorAllocInitializer {
+        VectorAllocInitializer() {
+            optimizeVectorAllocation();
+        }
+    } vectorAllocInitializer;
+}
+
+
+
 /*
  * this is simply the declaration of the function for a reference
  */
 vector<shared_ptr<element>> __makeHierarchyLoop(
-        vector<vector<string>>& traces, 
-        unsigned long& index, 
-        unordered_map<string, loopNode *>& loopTrees, 
+        vector<vector<string>>& traces,
+        unsigned long& index,
+        unordered_map<string, loopNode *>& loopTrees,
         loopNode *currloop,
         int iterationCnt = 1);
 
 element::element(
-        bool isEntry, 
-        bool isExit, 
-        int id, 
-        string& funcname, 
-        bool isLoop) : 
-    funcs(vector<vector<shared_ptr<element>>>()), 
-    funcname(funcname), 
-    index(numeric_limits<unsigned long>::max()), 
-    id(id), 
-    isEntry(isEntry), 
-    isExit(isExit), 
+        bool isEntry,
+        bool isExit,
+        int id,
+        string& funcname,
+        bool isLoop) :
+    funcs(vector<vector<shared_ptr<element>>>() ),
+    funcname(funcname),
+    index(numeric_limits<unsigned long>::max()),
+    id(id),
+    isEntry(isEntry),
+    isExit(isExit),
     isLoop(isLoop) {
 }
 
 element::element(
-        bool isEntry, 
-        bool isExit, 
-        int id, 
-        string& funcname, 
-        unsigned long index, 
+        bool isEntry,
+        bool isExit,
+        int id,
+        string& funcname,
+        unsigned long index,
         bool isLoop) :
-    funcs(vector<vector<shared_ptr<element>>>()), 
-    funcname(funcname), 
-    index(index), 
-    id(id), 
-    isEntry(isEntry), 
-    isExit(isExit), 
+    funcs(vector<vector<shared_ptr<element>>>()),
+    funcname(funcname),
+    index(index),
+    id(id),
+    isEntry(isEntry),
+    isExit(isExit),
     isLoop(isLoop) {
 }
 
@@ -73,16 +89,16 @@ element::element(
  * this is an initialization for a loop node
  */
 element::element(
-        int id, 
-        string& funcname, 
-        unsigned long index, 
+        int id,
+        string& funcname,
+        unsigned long index,
         bool isLoop) :
-    funcs(vector<vector<shared_ptr<element>>>()), 
-    funcname(funcname), 
-    index(index), 
-    id(id), 
-    isEntry(false), 
-    isExit(false), 
+    funcs(vector<vector<shared_ptr<element>>>()),
+    funcname(funcname),
+    index(index),
+    id(id),
+    isEntry(false),
+    isExit(false),
     isLoop(isLoop) {
 }
 
@@ -122,10 +138,10 @@ string element::content() const {
 
 bool element::operator ==(const element &e) const {
     return (
-            isEntry == e.isEntry 
-            && isExit == e.isExit 
-            && id == e.id 
-            && funcname == e.funcname 
+            isEntry == e.isEntry
+            && isExit == e.isExit
+            && id == e.id
+            && funcname == e.funcname
             && isLoop == e.isLoop);
 }
 
@@ -138,85 +154,101 @@ ostream& operator << (ostream& os, const element& e) {
     return os;
 }
 
-lastaligned::lastaligned() : 
-    funcId(numeric_limits<unsigned long>::max()), 
-    origIndex(numeric_limits<unsigned long>::max()), 
+lastaligned::lastaligned() :
+    funcId(numeric_limits<unsigned long>::max()),
+    origIndex(numeric_limits<unsigned long>::max()),
     repIndex(numeric_limits<unsigned long>::max()) {
 }
 
 lastaligned::lastaligned(
-        unsigned long funcId, 
-        unsigned long origIndex, 
-        unsigned long repIndex) : 
-    funcId(funcId), 
-    origIndex(origIndex), 
+        unsigned long funcId,
+        unsigned long origIndex,
+        unsigned long repIndex) :
+    funcId(funcId),
+    origIndex(origIndex),
     repIndex(repIndex) {
 }
 
 bool lastaligned::isSuccess() {
-    return origIndex == numeric_limits<unsigned long>::max() 
+    return origIndex == numeric_limits<unsigned long>::max()
         && repIndex == numeric_limits<unsigned long>::max();
 }
 
 ostream& operator<<(ostream& os, const lastaligned& l) {
-    os << "funcId: " << l.funcId << 
-        ", origIndex: " << l.origIndex << 
+    os << "funcId: " << l.funcId <<
+        ", origIndex: " << l.origIndex <<
         ", repIndex: " << l.repIndex;
     return os;
+}
+
+string makeBBName(const vector<vector<string>>& traces, size_t idx) {
+    size_t totalLen = traces[idx][0].length() + traces[idx][1].length() +
+                      traces[idx][2].length() + 2;
+
+    string result;
+    result.reserve(totalLen);
+    result.append(traces[idx][0]);
+    result.push_back(':');
+    result.append(traces[idx][1]);
+    result.push_back(':');
+    result.append(traces[idx][2]);
+
+    return result;
 }
 
 vector<shared_ptr<element>> makeHierarchyMain(
         vector<vector<string>>& traces, unsigned long& index) {
     vector<shared_ptr<element>> functionalTraces;
-    bool isEntry, 
+    bool isEntry,
          isExit;
-    string funcname = "main", 
+    string funcname = "main",
            bbname;
-    while(index < traces.size() 
+    while(index < traces.size()
             && funcname != traces[index][0]) {
         index++;
     }
 
     if(index >= traces.size()) {
-        DEBUG("index: %lu, traces.size(): %lu\n", 
-                index, traces.size()); 
+        DEBUG("index: %lu, traces.size(): %lu\n",
+                index, traces.size());
         return functionalTraces;
     }
 
     do {
         MPI_EQUAL(traces[index][0], funcname);
-        MPI_ASSERT(traces[index].size() == 3 
+        MPI_ASSERT(traces[index].size() == 3
                 || traces[index].size() == 4);
-        bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
+        // bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        bbname = makeBBName(traces, index);
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
         /* DEBUG0("bbname: %s\n", bbname.c_str()); */
         shared_ptr<element> eptr;
         if(traces[index].size() == 4) {
             eptr = make_shared<element>(
-                    isEntry, 
-                    isExit, 
-                    stoi(traces[index][2]), 
-                    traces[index][0], 
+                    isEntry,
+                    isExit,
+                    stoi(traces[index][2]),
+                    traces[index][0],
                     stoul(traces[index][3]));
         } else {
             eptr = make_shared<element>(
-                    isEntry, 
-                    isExit, 
-                    stoi(traces[index][2]), 
+                    isEntry,
+                    isExit,
+                    stoi(traces[index][2]),
                     traces[index][0]);
         }
         index++;
-    
-        while(isExit == false 
-                && index < traces.size() 
+
+        while(isExit == false
+                && index < traces.size()
                 && traces[index][1] == "entry") {
             eptr->funcs.push_back(
                     makeHierarchy(traces, index));
         }
         fixIterations(functionalTraces, eptr);
         functionalTraces.push_back(eptr);
-    } while(!isExit 
+    } while(!isExit
             && index < traces.size());
 
     return functionalTraces;
@@ -226,7 +258,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
  * returns the child loopNode
  */
 static loopNode *isNewLoop(
-        string bbname, 
+        string bbname,
         loopNode *ln) {
     MPI_ASSERT(ln != nullptr);
     /* DEBUG0("isNewLoop with bbname: %s, at ln of %s\n", bbname.c_str(), ln->entry.c_str()); */
@@ -239,97 +271,98 @@ static loopNode *isNewLoop(
 }
 
 vector<shared_ptr<element>> makeHierarchyLoop(
-        vector<vector<string>>& traces, 
-        unsigned long& index, 
+        vector<vector<string>>& traces,
+        unsigned long& index,
         unordered_map<string, loopNode *>& loopTrees)  {
     vector<shared_ptr<element>> functionalTraces;
     shared_ptr<element> eptr;
-    bool isEntry = false, 
+    bool isEntry = false,
          isExit = false;
     string bbname, funcname = traces[index][0];
-    loopNode *currloop = nullptr, 
+    loopNode *currloop = nullptr,
              *child = nullptr;
     int iterationcnt = 1;
 
-    // here we are getting the entry 
+    // here we are getting the entry
     MPI_EQUAL(traces[index][1], "entry");
     currloop = loopTrees[funcname];
 
-    while (!isExit 
+    while (!isExit
             && index < traces.size()) {
         MPI_ASSERT(index < traces.size());
-        bbname = traces[index][0] 
-            + ":" + traces[index][1] 
-            + ":" + traces[index][2];
+        // bbname = traces[index][0]
+        //     + ":" + traces[index][1]
+        //     + ":" + traces[index][2];
+        bbname = makeBBName(traces, index);
         MPI_EQUAL(traces[index][0], funcname);
-        MPI_ASSERT(traces[index].size() == 3 
+        MPI_ASSERT(traces[index].size() == 3
                 || traces[index].size() == 4);
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
 
-        /* 
-         * case 1: if we are in the inner loop, 
+        /*
+         * case 1: if we are in the inner loop,
          * recursively call the function
          */
         if((child = isNewLoop(bbname, currloop)) != nullptr) {
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
-                        traces, 
-                        index, 
-                        loopTrees, 
+                        traces,
+                        index,
+                        loopTrees,
                         child);
             functionalTraces.insert(
-                    functionalTraces.end(), 
-                    loops.begin(), 
+                    functionalTraces.end(),
+                    loops.begin(),
                     loops.end());
-        } else {       
+        } else {
             if(traces[index].size() == 4) {
                 eptr = make_shared<element>(
-                        isEntry, 
-                        isExit, 
-                        stoi(traces[index][2]), 
-                        traces[index][0], 
+                        isEntry,
+                        isExit,
+                        stoi(traces[index][2]),
+                        traces[index][0],
                         stoul(traces[index][3]));
             } else {
                 eptr = make_shared<element>(
-                        isEntry, 
-                        isExit, 
-                        stoi(traces[index][2]), 
+                        isEntry,
+                        isExit,
+                        stoi(traces[index][2]),
                         traces[index][0]);
             }
             index++;
-            while(!isExit 
-                    && index < traces.size() 
+            while(!isExit
+                    && index < traces.size()
                     && traces[index][1] == "entry") {
 
                 eptr->funcs.push_back(
                         makeHierarchyLoop(
-                            traces, 
-                            index, 
-                            loopTrees)); 
+                            traces,
+                            index,
+                            loopTrees));
             }
             fixIterations(functionalTraces, eptr);
             functionalTraces.push_back(eptr);
         }
-    } 
+    }
 
-    return functionalTraces; 
+    return functionalTraces;
 }
 
 vector<shared_ptr<element>> __makeHierarchyLoop(
-        vector<vector<string>>& traces, 
-        unsigned long& index, 
-        unordered_map<string, loopNode *>& loopTrees, 
+        vector<vector<string>>& traces,
+        unsigned long& index,
+        unordered_map<string, loopNode *>& loopTrees,
         loopNode *currloop,
         int iterationCnt) {
     vector<shared_ptr<element>> iterations, curriter;
     shared_ptr<element> eptr;
-    bool isEntry = false, 
+    bool isEntry = false,
          isExit = false;
-    string bbname, 
+    string bbname,
            funcname = traces[index][0];
     loopNode *child = nullptr;
 
-    // here we are getting the entry 
+    // here we are getting the entry
     vector<string> entryinfo = parse(currloop->entry, ':');
     MPI_ASSERT(entryinfo.size() == 3);
     MPI_EQUAL(entryinfo[0], funcname);
@@ -337,39 +370,40 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
 
     while (!isExit && index < traces.size()) {
         MPI_ASSERT(index < traces.size());
-        bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        // bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        bbname = makeBBName(traces, index);
         MPI_EQUAL(traces[index][0], funcname);
-        MPI_ASSERT(traces[index].size() == 3 
+        MPI_ASSERT(traces[index].size() == 3
                 || traces[index].size() == 4);
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
 
-        /* 
-         * case 1: if we are in the inner loop, 
+        /*
+         * case 1: if we are in the inner loop,
          * recursively call the function
          */
         if((child = isNewLoop(bbname, currloop)) != nullptr) {
             /* DEBUG0("printing bbname: %s\n", bbname.c_str()); */
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
-                    traces, 
-                    index, 
-                    loopTrees, 
+                    traces,
+                    index,
+                    loopTrees,
                     child);
             curriter.insert(
-                    curriter.end(), 
-                    loops.begin(), 
+                    curriter.end(),
+                    loops.begin(),
                     loops.end());
             continue;
-        
-        /* 
-         * case 2: if we are not in the current loop, 
+
+        /*
+         * case 2: if we are not in the current loop,
          * we should return what we have so far
          */
         } else if(currloop->nodes.find(bbname) == currloop->nodes.end()) {
             eptr = make_shared<element>(
-                    entryindex, 
-                    funcname, 
-                    iterationCnt++); 
+                    entryindex,
+                    funcname,
+                    iterationCnt++);
             eptr->funcs.push_back(curriter);
             curriter.clear();
             fixIterations(iterations, eptr);
@@ -379,32 +413,32 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
         /*
          * case 3: we have gone through the back edge
          */
-        } else if(curriter.size() > 0 
+        } else if(curriter.size() > 0
                 && bbname == currloop->entry) {
             eptr = make_shared<element>(
-                    entryindex, 
-                    funcname, 
+                    entryindex,
+                    funcname,
                     iterationCnt++);
             eptr->funcs.push_back(curriter);
             curriter.clear();
             fixIterations(iterations, eptr);
             iterations.push_back(eptr);
         }
-        /* 
+        /*
          * else
          */
         if(traces[index].size() == 4) {
             eptr = make_shared<element>(
-                    isEntry, 
-                    isExit, 
-                    stoi(traces[index][2]), 
-                    traces[index][0], 
+                    isEntry,
+                    isExit,
+                    stoi(traces[index][2]),
+                    traces[index][0],
                     stoul(traces[index][3]));
         } else {
             eptr = make_shared<element>(
-                    isEntry, 
-                    isExit, 
-                    stoi(traces[index][2]), 
+                    isEntry,
+                    isExit,
+                    stoi(traces[index][2]),
                     traces[index][0]);
         }
 
@@ -415,25 +449,25 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
             break;
         }
 
-        while(!isExit 
-                && index < traces.size() 
+        while(!isExit
+                && index < traces.size()
                 && traces[index][1] == "entry") {
             eptr->funcs.push_back(
                     makeHierarchyLoop(
-                        traces, 
-                        index, 
-                        loopTrees)); 
+                        traces,
+                        index,
+                        loopTrees));
         }
-    } 
+    }
     MPI_ASSERT(!isExit);
 
     // we could be here because we have reached the end of the trace
     eptr = make_shared<element>(
-            entryindex, 
-            funcname, 
+            entryindex,
+            funcname,
             iterationCnt++);
     /* if(eptr->bb() == "neighbor_communication:neither:3:loop") { */
-    /*     int rank; */ 
+    /*     int rank; */
     /*     MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
     /*     if(rank == 4) { */
     /*         cerr << "found!!\n" << eptr->bb() << ":" << iterationCnt - 1 << endl; */
@@ -442,41 +476,42 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
     eptr->funcs.push_back(curriter);
     fixIterations(iterations, eptr);
     iterations.push_back(eptr);
-    
-    return iterations; 
+
+    return iterations;
 }
 
 /*
  * this function signature takes loops into account
  */
 vector<shared_ptr<element>> makeHierarchyMain(
-        vector<vector<string>>& traces, 
-        unsigned long &index, 
+        vector<vector<string>>& traces,
+        unsigned long &index,
         unordered_map<string, loopNode *>& loopTrees) {
     vector<shared_ptr<element>> functionalTraces;
-    bool isEntry = false, 
+    bool isEntry = false,
          isExit = false;
     string funcname = "main";
     MPI_ASSERT(loopTrees.find("main") != loopTrees.end());
-    loopNode *loopTree = loopTrees[funcname], 
+    loopNode *loopTree = loopTrees[funcname],
              *child = nullptr;
     string bbname;
     /*
-     * in case there are some nodes that is before main, 
+     * in case there are some nodes that is before main,
      * just ignore
      */
-    while(index < traces.size() 
+    while(index < traces.size()
             && funcname != traces[index][0]) {
         index++;
     }
-    while(!isExit 
+    while(!isExit
             && index < traces.size()) {
         MPI_EQUAL(traces[index][0], funcname);
-        MPI_ASSERT(traces[index].size() == 3 
+        MPI_ASSERT(traces[index].size() == 3
                 || traces[index].size() == 4);
-        bbname = traces[index][0] + ":" 
-            + traces[index][1] + ":" 
-            + traces[index][2];
+        // bbname = traces[index][0] + ":"
+        //     + traces[index][1] + ":"
+        //     + traces[index][2];
+        bbname = makeBBName(traces, index);
 
         /*
          * this returns the ptr of a child that has bbname in it
@@ -484,13 +519,13 @@ vector<shared_ptr<element>> makeHierarchyMain(
          */
         if((child = isNewLoop(bbname, loopTree)) != nullptr) {
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
-                    traces, 
-                    index, 
-                    loopTrees, 
+                    traces,
+                    index,
+                    loopTrees,
                     child);
             functionalTraces.insert(
-                    functionalTraces.end(), 
-                    loops.begin(), 
+                    functionalTraces.end(),
+                    loops.begin(),
                     loops.end());
             continue;
         }
@@ -499,41 +534,41 @@ vector<shared_ptr<element>> makeHierarchyMain(
         shared_ptr<element> eptr;
         if(traces[index].size() == 4) {
             eptr = make_shared<element>(
-                    isEntry, 
-                    isExit, 
-                    stoi(traces[index][2]), 
-                    traces[index][0], 
+                    isEntry,
+                    isExit,
+                    stoi(traces[index][2]),
+                    traces[index][0],
                     stoul(traces[index][3]));
         } else {
             eptr = make_shared<element>(
-                    isEntry, 
-                    isExit, 
-                    stoi(traces[index][2]), 
+                    isEntry,
+                    isExit,
+                    stoi(traces[index][2]),
                     traces[index][0]);
         }
         index++;
 
-        while(!isExit 
-                && index < traces.size() 
+        while(!isExit
+                && index < traces.size()
                 && traces[index][1] == "entry") {
             eptr->funcs.push_back(
                     makeHierarchyLoop(
-                        traces, 
-                        index, 
+                        traces,
+                        index,
                         loopTrees));
         }
         fixIterations(functionalTraces, eptr);
         functionalTraces.push_back(eptr);
     }
     return functionalTraces;
-    
+
 }
 
-/*  
- *  1. Every function starts from entry except for main 
+/*
+ *  1. Every function starts from entry except for main
  *  2. Let's not take anything in unless the main function has started
  *  3. Let's not take anything in after the main function has ended
- *  4. Even if the function name is the same, 
+ *  4. Even if the function name is the same,
  *      if we reach the new entry node, we recursively call the function
  */
 vector<shared_ptr<element>> makeHierarchy(
@@ -544,46 +579,47 @@ vector<shared_ptr<element>> makeHierarchy(
     funcname = traces[index][0];
     do {
         MPI_ASSERT(index < traces.size());
-        bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        // bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        bbname = makeBBName(traces, index);
         MPI_ASSERT(traces[index][0] == funcname);
-        MPI_ASSERT(traces[index].size() == 3 
+        MPI_ASSERT(traces[index].size() == 3
                 || traces[index].size() == 4);
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
         shared_ptr<element> eptr;
         if(traces[index].size() == 4) {
             eptr = make_shared<element>(
-                    isEntry, 
-                    isExit, 
-                    stoi(traces[index][2]), 
-                    traces[index][0], 
+                    isEntry,
+                    isExit,
+                    stoi(traces[index][2]),
+                    traces[index][0],
                     stoul(traces[index][3]));
         } else {
             eptr = make_shared<element>(
-                    isEntry, 
-                    isExit, 
-                    stoi(traces[index][2]), 
+                    isEntry,
+                    isExit,
+                    stoi(traces[index][2]),
                     traces[index][0]);
         }
         index++;
-        while(!isExit 
-                && index < traces.size() 
+        while(!isExit
+                && index < traces.size()
                 && traces[index][1] == "entry") {
             eptr->funcs.push_back(
-                    makeHierarchy(traces, index)); 
+                    makeHierarchy(traces, index));
         }
         fixIterations(functionalTraces, eptr);
         functionalTraces.push_back(eptr);
-    } while(!isExit 
+    } while(!isExit
             && index < traces.size());
 
-    return functionalTraces; 
+    return functionalTraces;
 }
 
 void addHierarchy(
-        vector<shared_ptr<element>>& functionalTraces, 
-        vector<vector<string>>& traces, 
-        unsigned long& index, 
+        vector<shared_ptr<element>>& functionalTraces,
+        vector<vector<string>>& traces,
+        unsigned long& index,
         unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -593,10 +629,10 @@ void addHierarchy(
     MPI_EQUAL(functionalTraces[0]->funcname, "main");
     MPI_EQUAL(functionalTraces.back()->funcname, "main");
     shared_ptr<element> curr = functionalTraces.back();
-    loopNode *currloop = nullptr, 
+    loopNode *currloop = nullptr,
              *tmploop = nullptr;
 
-    /* 
+    /*
      * we are first setting the cursor to the end of the functionalTraces here
      * we are pushing to a stack of the elements in the back too
      */
@@ -625,45 +661,46 @@ void addHierarchy(
         __stack.pop();
     }
 
-    /* 
+    /*
      * initializing to the correct currloop
      */
     currloop = loopTrees[curr->funcname];
-    while((tmploop = isNewLoop(curr->bb(), currloop)) 
+    while((tmploop = isNewLoop(curr->bb(), currloop))
             != nullptr) {
         currloop = tmploop;
     }
 
     while(index < traces.size()) {
-        /* 
-         * if we are at the entry of a new function 
+        /*
+         * if we are at the entry of a new function
          * (we assume that there's no loop to the entry here),
          * we need to make a hierarchy of the new function
          */
-        while(index < traces.size() 
+        while(index < traces.size()
                 && traces[index][1] == "entry") {
             curr->funcs.push_back(
                     makeHierarchyLoop(
-                        traces, 
-                        index, 
+                        traces,
+                        index,
                         loopTrees));
         }
         if(index >= traces.size()) {
             break;
         }
         MPI_ASSERT(traces[index].size() > 0);
-        string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
-        
-        /* 
-         * we need to think of two cases in case we are in the entry node of a current loop 
+        // string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        string bb = makeBBName(traces, index);
+
+        /*
+         * we need to think of two cases in case we are in the entry node of a current loop
          * 1. we are already in the loop
          * 2. we are newly in the loop
          * in either case, it is taken care of by __makeHierarchyLoop
-         * Q: why are we looking at parents here? 
+         * Q: why are we looking at parents here?
          */
         if(isLoopEntry(bb, parent, currloop)) {
-            /* 
-             * implement the case where we have to 
+            /*
+             * implement the case where we have to
              * go through the current loop
              */
             MPI_EQUAL(parent->funcname, curr->funcname);
@@ -673,14 +710,14 @@ void addHierarchy(
              * the same level as the parent, not the children
              */
             int iterationCnt = parent->index + 1;
-            vector<shared_ptr<element>> iterations = 
+            vector<shared_ptr<element>> iterations =
                 __makeHierarchyLoop(
-                        traces, 
-                        index, 
-                        loopTrees, 
+                        traces,
+                        index,
+                        loopTrees,
                         currloop,
                         iterationCnt);
-            /* 
+            /*
              * inserting iterations to the appropriate place
              * and fixing the curr, parent, and functionalTraces
              */
@@ -691,37 +728,38 @@ void addHierarchy(
                     parent,
                     functionalTraces);
 
-            MPI_ASSERT(currloop->nodes.size() > 0 
+            MPI_ASSERT(currloop->nodes.size() > 0
                     && currloop->parent);
             currloop = currloop->parent;
         }
 
         if(index >= traces.size()) break;
 
-        bb = traces[index][0] 
-            + ":" + traces[index][1] 
-            + ":" + traces[index][2];
+        // bb = traces[index][0]
+        //     + ":" + traces[index][1]
+        //     + ":" + traces[index][2];
+        bb = makeBBName(traces, index);
         /*
          * we assert that current loop node has some nodes in it, or a dummy loop node
          */
-        MPI_ASSERT(currloop->nodes.size() > 0 
+        MPI_ASSERT(currloop->nodes.size() > 0
                 || loopTrees[curr->funcname] == currloop);
         /*
          * if we are going into a new loop here
          */
-        while((tmploop = isNewLoop(bb, currloop)) 
+        while((tmploop = isNewLoop(bb, currloop))
                 != nullptr) {
             /*
-             * here you will create a loop iterations through 
+             * here you will create a loop iterations through
              * __makeHierarchyLoop
-             * but this iterations are at the same level 
+             * but this iterations are at the same level
              * as the children of the parent
              */
-            vector<shared_ptr<element>> loops 
+            vector<shared_ptr<element>> loops
                 = __makeHierarchyLoop(
-                        traces, 
-                        index, 
-                        loopTrees, 
+                        traces,
+                        index,
+                        loopTrees,
                         tmploop);
             insertIterations(
                     loops,
@@ -729,25 +767,26 @@ void addHierarchy(
                     functionalTraces);
 
             if(index >= traces.size()) break;
-            bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+            // bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+            bb = makeBBName(traces, index);
         }
 
         if(index >= traces.size()) break;
         /*
-         * the node cannot be an entry, 
-         * because if it is, we should be at the beginning of 
+         * the node cannot be an entry,
+         * because if it is, we should be at the beginning of
          * this function
          */
         MPI_ASSERT(traces[index][1] != "entry");
-        /* 
+        /*
          * here we check if we are getting out of this loop
-         * while we are, we need to update the currloop 
+         * while we are, we need to update the currloop
          * as well as curr, parent, and stack
          */
-        while(currloop->nodes.size() > 0 
+        while(currloop->nodes.size() > 0
                 && currloop->nodes.find(bb) == currloop->nodes.end()) {
             /*
-             * because of the condition above, 
+             * because of the condition above,
              * we made sure that we are in the loop in curr
              * hence parent has to be a loop node
              */
@@ -755,9 +794,9 @@ void addHierarchy(
             MPI_ASSERT(parent->isLoop == true);
             currloop = currloop->parent;
             levelUpStack(
-                    __stack, 
-                    curr, 
-                    parent); 
+                    __stack,
+                    curr,
+                    parent);
             MPI_ASSERT(curr->isLoop);
         }
 
@@ -766,22 +805,22 @@ void addHierarchy(
          */
         if(traces[index].size() == 3) {
             newchild = make_shared<element>(
-                    traces[index][1] == "entry", 
-                    traces[index][1] == "exit", 
-                    stoi(traces[index][2]), 
+                    traces[index][1] == "entry",
+                    traces[index][1] == "exit",
+                    stoi(traces[index][2]),
                     traces[index][0]);
         } else {
             MPI_ASSERT(traces[index].size() == 4);
             newchild = make_shared<element>(
-                    traces[index][1] == "entry", 
-                    traces[index][1] == "exit", 
-                    stoi(traces[index][2]), 
-                    traces[index][0], 
+                    traces[index][1] == "entry",
+                    traces[index][1] == "exit",
+                    stoi(traces[index][2]),
+                    traces[index][0],
                     stoul(traces[index][3]));
         }
         MPI_EQUAL(traces[index][0], curr->funcname);
         index++;
-    
+
         if(parent != nullptr) {
             /*
              * we initialize the vector, in case we don't have any value in them
@@ -799,29 +838,30 @@ void addHierarchy(
                     newchild);
         } else {
             /*
-             * in case there's no parents, 
+             * in case there's no parents,
              * you push back directly to functionalTraces
              */
             fixIterations(functionalTraces, newchild);
             functionalTraces.push_back(newchild);
         }
-        
+
         /*
-         * if we are ending this batch, 
+         * if we are ending this batch,
          * it should be either a loop iteration, or a function
-         * just add a condition || and add the condition 
+         * just add a condition || and add the condition
          * of the end of the loop
          */
         if(index >= traces.size()) {
             break;
         }
-     
+
         /*
          * this is the next node to be taken care of
-         * we try to break with a code block before 
+         * we try to break with a code block before
          * in case we don't have one anymore
          */
-        bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        // bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        bb = makeBBName(traces, index);
         /* if(rank == 1 && bb == "hypre_PFMGSolve:neither:27") { */
         /*     cerr << "option 6" << endl; */
         /*     cerr << "index: " << index << endl; */
@@ -831,31 +871,31 @@ void addHierarchy(
         /* } */
 
         /*
-         * if the last node was an exit node, 
+         * if the last node was an exit node,
          * then we need to update the curr, parent, and stack
          */
         if(traces[index - 1][1] == "exit") {
             if(parent == nullptr) {
-                /* 
-                 * if we don't have a parent anymore, 
+                /*
+                 * if we don't have a parent anymore,
                  * and the last node was an exit node
-                 * then this node should be the main 
-                 * and we should not have anymore nodes 
+                 * then this node should be the main
+                 * and we should not have anymore nodes
                  * to be recorded
                  */
                 MPI_ASSERT(traces[index - 1][0] == "main");
                 break;
             } else {
                 levelUpStack(
-                        __stack, 
-                        curr, 
+                        __stack,
+                        curr,
                         parent);
             }
             /*
-             * need to update the looptrees as well 
+             * need to update the looptrees as well
              */
             currloop = loopTrees[curr->funcname];
-            while((tmploop = isNewLoop(curr->content(), currloop)) 
+            while((tmploop = isNewLoop(curr->content(), currloop))
                     != nullptr) {
                 currloop = tmploop;
             }
@@ -866,22 +906,22 @@ void addHierarchy(
             /*     printsurface(parent->funcs.back()); */
             /* } */
             if(currloop->entry == bb) {
-                /* 
-                 * the situation is... 
+                /*
+                 * the situation is...
                  * 1. the last node was an exit bb of the function
                  * 2. and now the current trace is an entry of the loop
-                 * if the parent is the virtual node of this loop, 
+                 * if the parent is the virtual node of this loop,
                  * you need to make another virtual node for this iterations
                  * if not, you stil need to make another virtual node
                  */
                 if(parent->isLoop == true) {
                     MPI_ASSERT(parent->bb() == currloop->entry + ":loop");
                     auto loopIterations = __makeHierarchyLoop(
-                            traces, 
-                            index, 
-                            loopTrees, 
+                            traces,
+                            index,
+                            loopTrees,
                             currloop,
-                            parent->index + 1);     
+                            parent->index + 1);
                     insertIterationsAndFixStack(
                             loopIterations,
                             __stack,
@@ -911,40 +951,40 @@ static size_t findSize(FILE *fp) {
 }
 
 deque<shared_ptr<lastaligned>> onlineAlignment(
-        deque<shared_ptr<lastaligned>>& q, 
-        bool& isAligned, 
-        size_t &lastInd, 
+        deque<shared_ptr<lastaligned>>& q,
+        bool& isAligned,
+        size_t &lastInd,
         unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     appendTraces(
-            loopTrees, 
-            replayTracesRaw, 
+            loopTrees,
+            replayTracesRaw,
             replayTraces);
-    
-    size_t i = 0, j = 0; 
-    size_t funcId = 0; 
-    if(!q.empty()) { 
-         i = q.back()->origIndex; 
-         j = q.back()->repIndex; 
-         funcId = q.back()->funcId; 
-         q.pop_back(); 
-    } 
+
+    size_t i = 0, j = 0;
+    size_t funcId = 0;
+    if(!q.empty()) {
+         i = q.back()->origIndex;
+         j = q.back()->repIndex;
+         funcId = q.back()->funcId;
+         q.pop_back();
+    }
     deque<shared_ptr<lastaligned>> rq;
-    isAligned = true; 
-    
+    isAligned = true;
+
     // there's no parent for original nor the reproduced, so kept empty
     rq = greedyalignmentOnline(
-            recordTraces, 
-            replayTraces, 
-            q, 
-            i, 
-            j, 
-            funcId, 
-            rank, 
-            isAligned, 
-            lastInd); 
-    MPI_ASSERT(lastInd != numeric_limits<size_t>::max()); 
+            recordTraces,
+            replayTraces,
+            q,
+            i,
+            j,
+            funcId,
+            rank,
+            isAligned,
+            lastInd);
+    MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
     /* MPI_ASSERT(lastInd > 0); */
     return rq;
 }
@@ -957,14 +997,14 @@ void appendReplayTrace(
     if(replayTraces.size() == 0) {
         MPI_ASSERT(index == 0);
         replayTraces = makeHierarchyMain(
-                replayTracesRaw, 
-                index, 
+                replayTracesRaw,
+                index,
                 loopTrees);
     } else {
         addHierarchy(
-                replayTraces, 
-                replayTracesRaw, 
-                index, 
+                replayTraces,
+                replayTracesRaw,
+                index,
                 loopTrees);
     }
 
@@ -981,14 +1021,14 @@ void appendTraces(
     if(traces.size() == 0) {
         MPI_ASSERT(index == 0);
         traces = makeHierarchyMain(
-                rawTraces, 
-                index, 
+                rawTraces,
+                index,
                 loopTrees);
     } else {
         addHierarchy(
-                traces, 
-                rawTraces, 
-                index, 
+                traces,
+                rawTraces,
+                index,
                 loopTrees);
     }
     return;
@@ -998,15 +1038,19 @@ void appendTraces(
         unordered_map<string, loopNode *>& loopTrees,
         TraceType traceType) {
     if(traceType == TraceType::RECORD) {
-        appendTraces(
-                loopTrees, 
-                recordTracesRaw, 
-                recordTraces);
+        static size_t lastProcessedSize = 0;
+
+        if(recordTracesRaw.size() > lastProcessedSize) {
+            appendTraces(loopTrees, recordTracesRaw, recordTraces);
+            lastProcessedSize = recordTracesRaw.size();
+        }
     } else if (traceType == TraceType::REPLAY) {
-        appendTraces(
-                loopTrees, 
-                replayTracesRaw, 
-                replayTraces);
+        static size_t lastProcessedSize = 0;
+
+        if(replayTracesRaw.size() > lastProcessedSize) {
+            appendTraces(loopTrees, replayTracesRaw, replayTraces);
+            lastProcessedSize = replayTracesRaw.size();
+        }
     }
 }
 
@@ -1016,12 +1060,12 @@ static string getLastNodes(vector<shared_ptr<element>>& traces) {
     shared_ptr<element> curr = traces.back();
     int funcId = 0;
     do {
-        ss << '/' << funcId << ':' << curr->bb(); 
+        ss << '/' << funcId << ':' << curr->bb();
         if(curr->loopIndex != -1) {
-            ss << ':' << curr->loopIndex; 
+            ss << ':' << curr->loopIndex;
         }
         if(curr->isLoop) {
-            ss << ':' << curr->index; 
+            ss << ':' << curr->index;
             MPI_ASSERT(curr->loopIndex == -1);
         }
         if(curr->funcs.size() == 0) {
@@ -1056,15 +1100,15 @@ string getVeryLastNode(TraceType traceType) {
 }
 
 string updateAndGetLastNodes(
-        unordered_map<string, loopNode *>& loopTrees, 
+        unordered_map<string, loopNode *>& loopTrees,
         TraceType traceType) {
     appendTraces(loopTrees, traceType);
     return getLastNodes(traceType);
 }
 
 static inline void create_map(
-        unordered_map<string, vector<size_t>>& bbMap, 
-        vector<shared_ptr<element>>& reproduced, 
+        unordered_map<string, vector<size_t>>& bbMap,
+        vector<shared_ptr<element>>& reproduced,
         size_t& j) {
     for(unsigned k = j; k < reproduced.size(); k++) {
         if(bbMap.find(reproduced[k]->bb()) == bbMap.end()) {
@@ -1076,14 +1120,14 @@ static inline void create_map(
 }
 
 /*
- * this function just checks that 
+ * this function just checks that
  * there are some basic blocks that aligns till the end
  * it does NOT verify that it might have the divergence afterwards
  */
 static inline bool matchbbmap(
-        unordered_map<string, vector<size_t>>& bbMap, 
-        vector<shared_ptr<element>>& original, 
-        size_t& i, 
+        unordered_map<string, vector<size_t>>& bbMap,
+        vector<shared_ptr<element>>& original,
+        size_t& i,
         size_t& j) {
     for(unsigned k = i; k < original.size(); k++) {
         if(bbMap.find(original[k]->bb()) != bbMap.end()) {
@@ -1094,7 +1138,7 @@ static inline bool matchbbmap(
                     return true;
                 }
             }
-        } 
+        }
     }
     return false;
 }
@@ -1111,23 +1155,23 @@ void getProperLastInd(size_t& lastInd, shared_ptr<element> curr) {
  * This function is the core of the alignment when they are in the same function
  * or in the same loop
  * when the misalignment is found, we first fill up the map of the traces of the
- * reproduced execution, and then we try to match the traces in the original 
- * exection. 
+ * reproduced execution, and then we try to match the traces in the original
+ * exection.
  * CAUTION: we do not have to think about the loop iterations here, because that's
  * already taken care of
  */
 static pair<size_t, size_t> __greedyalignmentOnline(
-        vector<shared_ptr<element>>& original, 
-        vector<shared_ptr<element>>& reproduced, 
-        vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, 
-        size_t& initI, 
-        size_t& initJ, 
-        const int& rank, 
-        bool& isAligned, 
+        vector<shared_ptr<element>>& original,
+        vector<shared_ptr<element>>& reproduced,
+        vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned,
+        size_t& initI,
+        size_t& initJ,
+        const int& rank,
+        bool& isAligned,
         size_t& lastInd,
         bool isLoop = false) {
     /*
-     * we set the i and j to be at the initial values so that we don't have to find 
+     * we set the i and j to be at the initial values so that we don't have to find
      * the same points of divergence redundantly.
      */
     size_t i = initI, j = initJ;
@@ -1141,12 +1185,12 @@ static pair<size_t, size_t> __greedyalignmentOnline(
         /* cerr << "reproduced\n"; */
         /* printsurface(reproduced); */
     /* } */
-    while(i < original.size() 
+    while(i < original.size()
             && j < reproduced.size()) {
         if(original[i]->bb() == reproduced[j]->bb()) {
             /*
              * in case the nodes are the same, we push them to the aligned vector
-             * and increment the i and j to move onto the next nodes for checking 
+             * and increment the i and j to move onto the next nodes for checking
              * alignments
              */
             aligned.push_back(
@@ -1154,14 +1198,14 @@ static pair<size_t, size_t> __greedyalignmentOnline(
             i++; j++;
         } else {
             /*
-             * in case the nodes are not the same, we first fill up the map of the 
-             * reproduced traces (in case they are not filled up already), 
+             * in case the nodes are not the same, we first fill up the map of the
+             * reproduced traces (in case they are not filled up already),
              * and then we try to match the traces in the original execution
              */
             string pod;
             if(original[i - 1]->isLoop == true) {
-                pod = original[i - 1]->bb() 
-                    + ':' 
+                pod = original[i - 1]->bb()
+                    + ':'
                     + to_string(original[i - 1]->index);
                 /*
                 if(pods.find(pod) == pods.end()) {
@@ -1178,7 +1222,7 @@ static pair<size_t, size_t> __greedyalignmentOnline(
                 */
                 pods.insert(pod);
             }
-            
+
             size_t oldj = j, oldi = i;
 
             /*
@@ -1190,14 +1234,14 @@ static pair<size_t, size_t> __greedyalignmentOnline(
             if(!matchbbmap(bbMap, original, i, j)) {
                 /*
                  * here we never aligned until the end
-                 * so we set the lastInd to the last index of the original execution 
+                 * so we set the lastInd to the last index of the original execution
                  */
                 getProperLastInd(lastInd, original[oldi]);
-            
+
                 /* if(rank == 3) { */
                     /* cerr << "returning lastInd: " << lastInd << endl; */
                 /* } */
-                
+
                 MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
                 isAligned = false;
                 return make_pair(oldi, oldj);
@@ -1216,9 +1260,9 @@ static pair<size_t, size_t> __greedyalignmentOnline(
     isAligned = true;
 
     /*
-     * if we have some nodes in original, 
+     * if we have some nodes in original,
      * either because reproduced nodes have not finished
-     * or because we are in the loop, 
+     * or because we are in the loop,
      * and original simply have more amount of nodes in the
      * iteration, we need to return the last aligned point
      */
@@ -1231,10 +1275,10 @@ static pair<size_t, size_t> __greedyalignmentOnline(
         return make_pair(i - 1, j - 1);
 
     /*
-     * Or, if this alignment is done on loop iteration, 
+     * Or, if this alignment is done on loop iteration,
      * we could have more reproduced nodes,
-     * in this case, we assure that this is aligned on a loop iteration 
-     * since this is the end of the alignment, 
+     * in this case, we assure that this is aligned on a loop iteration
+     * since this is the end of the alignment,
      * we should make the return value to be the max
      */
     } else if (j < reproduced.size()) {
@@ -1248,7 +1292,7 @@ static pair<size_t, size_t> __greedyalignmentOnline(
         return make_pair(
                 numeric_limits<size_t>::max(), numeric_limits<size_t>::max());
 
-    /* 
+    /*
      * when both original and reproduced vectors are aligned at the end
      * we return the max value for both i and j
      */
@@ -1267,22 +1311,22 @@ static pair<size_t, size_t> __greedyalignmentOnline(
 }
 
 static bool issuccessful(pair<size_t, size_t> p) {
-    return p.first == numeric_limits<size_t>::max() 
+    return p.first == numeric_limits<size_t>::max()
         && p.second == numeric_limits<size_t>::max();
 }
 
 // this function is just to make sure
 static bool isLastAligned(
-        vector<shared_ptr<element>>& original, 
-        vector<shared_ptr<element>>& reproduced, 
-        size_t i, 
+        vector<shared_ptr<element>>& original,
+        vector<shared_ptr<element>>& reproduced,
+        size_t i,
         size_t j) {
     unordered_map<string, vector<size_t>> bbMap;
     create_map(bbMap, reproduced, j);
     return matchbbmap(
-            bbMap, 
-            original, 
-            i, 
+            bbMap,
+            original,
+            i,
             j);
 }
 
@@ -1292,25 +1336,25 @@ static bool isLastAligned(
  * it returns the last aligned point of both original and reproduced by dequeue, so that one can exactly know where it is
  * this function is also recursive, in case it needs to delve into the functions inside or a loop inside
  * below is the high level steps, it take
- * 1. it first checks for the queues passed down as an argument, and see if there's any misalignment there 
+ * 1. it first checks for the queues passed down as an argument, and see if there's any misalignment there
  * 2. CASE 1: if there is one, we return the queue partially as it was passed,
  *      partially where it left off
- * 3. CASE 2: if there is no misalignment, we check for the last misalignment that happened 
+ * 3. CASE 2: if there is no misalignment, we check for the last misalignment that happened
  *      at the same basic block, but at a different function call
- * 4. CASE 3: if there's no misalignment in CASE 2, we check for the last misalignment 
+ * 4. CASE 3: if there's no misalignment in CASE 2, we check for the last misalignment
  *      at this function.
- * 5. after the last point of alignment is found, we return the dequeue as a stack of 
+ * 5. after the last point of alignment is found, we return the dequeue as a stack of
  *      where we left off (for ALL cases)
  */
 deque<shared_ptr<lastaligned>> greedyalignmentOnline(
-        vector<shared_ptr<element>>& original, 
-        vector<shared_ptr<element>>& reproduced, 
-        deque<shared_ptr<lastaligned>>& q, 
-        size_t &i, 
-        size_t &j, 
-        const size_t& funcId, 
-        const int &rank, 
-        bool& isAligned, 
+        vector<shared_ptr<element>>& original,
+        vector<shared_ptr<element>>& reproduced,
+        deque<shared_ptr<lastaligned>>& q,
+        size_t &i,
+        size_t &j,
+        const size_t& funcId,
+        const int &rank,
+        bool& isAligned,
         size_t& lastInd,
         shared_ptr<element> originalParent,
         shared_ptr<element> reproducedParent) {
@@ -1328,7 +1372,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
      */
     if(!q.empty()) {
         shared_ptr<lastaligned> la = q.back();
-        if(la->origIndex == numeric_limits<size_t>::max() 
+        if(la->origIndex == numeric_limits<size_t>::max()
                 && la->repIndex == numeric_limits<size_t>::max()) {
             // so we check if the next one has been completed
             q.clear();
@@ -1340,7 +1384,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
             }
             size_t tmpLastInd = 0;
             MPI_EQUAL(
-                    original[i]->funcs[funcId][0]->funcname, 
+                    original[i]->funcs[funcId][0]->funcname,
                     reproduced[j]->funcs[funcId][0]->funcname);
             /*
              * We are calling greedyalignment online here recursively
@@ -1348,14 +1392,14 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
              * this is CASE 1
              */
             rq = greedyalignmentOnline(
-                    original[i]->funcs[funcId], 
-                    reproduced[j]->funcs[funcId], 
-                    q, 
-                    la->origIndex, 
-                    la->repIndex, 
-                    tmpfuncId, 
-                    rank, 
-                    isAligned, 
+                    original[i]->funcs[funcId],
+                    reproduced[j]->funcs[funcId],
+                    q,
+                    la->origIndex,
+                    la->repIndex,
+                    tmpfuncId,
+                    rank,
+                    isAligned,
                     tmpLastInd,
                     original[i],
                     reproduced[j]);
@@ -1365,28 +1409,28 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         firstTime = true;
     }
 
-    /* 
+    /*
      * If the recursive call of greedyalignmentOnline returns with rq that is not empty
      * that means there was an unresolved misalignment, since we only have one return call
-     * for every control flow graphs, these conditions suffice as not going further down 
+     * for every control flow graphs, these conditions suffice as not going further down
      * in this function
      */
-    if(!rq.empty() 
+    if(!rq.empty()
             && !(rq.back()->isSuccess())) {
         /* DEBUG0("at %s, we did not proceed this time 1, \ */
                 /* funcId: %lu, i: %lu, j: %lu\n", \ */
                 /* original[i]->bb().c_str(), funcId, i, j); */
         MPI_ASSERT(
                 isLastAligned(
-                    original, 
-                    reproduced, 
-                    i, 
+                    original,
+                    reproduced,
+                    i,
                     j));
         /* getProperLastInd(lastInd, original[i]); */
         rq.push_back(
                 make_shared<lastaligned>(
-                    funcId, 
-                    i, 
+                    funcId,
+                    i,
                     j));
         return rq;
     }
@@ -1395,19 +1439,19 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
     MPI_ASSERT(q.empty());
 
     // in case functions were at the same element, we do the alignment the level below too
-    
+
     size_t k = -1;
     /*
      * this is CASE 2, where we need to look into the same basic blocks, but in the following
      * function calls, we basically do the same as the code block above,
-     * except in this case, we no longer have to worry about the stack that's passed down from 
+     * except in this case, we no longer have to worry about the stack that's passed down from
      * parent functions.
      */
     for(k = funcId + 1; k < reproduced[j]->funcs.size(); k++) {
         /*
          * popping unnecessary data from rq, as we have gotten through the last call on
          * greedyalignmentOnline
-         * TODO: this can be written more clearly, 
+         * TODO: this can be written more clearly,
          * like why are you filling in the garbage in the first place?
          */
         while(!rq.empty()) {
@@ -1422,21 +1466,21 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
             MPI_ASSERT(original[i]->isLoop == false);
             pods.insert(original[i]->bb());
             /*
-            printf("different function called from %s: %s vs. %s\n", 
-                    original[i]->bb().c_str(), 
-                    original[i]->funcs[k][0]->funcname.c_str(), 
+            printf("different function called from %s: %s vs. %s\n",
+                    original[i]->bb().c_str(),
+                    original[i]->funcs[k][0]->funcname.c_str(),
                     reproduced[j]->funcs[k][0]->funcname.c_str());
             */
         } else {
             rq = greedyalignmentOnline(
-                    original[i]->funcs[k], 
-                    reproduced[j]->funcs[k], 
-                    q, 
-                    tmpI, 
-                    tmpJ, 
-                    k, 
-                    rank, 
-                    isAligned, 
+                    original[i]->funcs[k],
+                    reproduced[j]->funcs[k],
+                    q,
+                    tmpI,
+                    tmpJ,
+                    k,
+                    rank,
+                    isAligned,
                     tmpLastInd,
                     original[i],
                     reproduced[j]);
@@ -1462,11 +1506,11 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
     /*
      * let's do the greedy alignment from where we left off in this function, below is CASE 3.
      */
-    vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned = 
+    vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned =
         vector<pair<shared_ptr<element>, shared_ptr<element>>>();
 
-    /* 
-     * in case we are doing this for the first time, we should start at i and j 
+    /*
+     * in case we are doing this for the first time, we should start at i and j
      * however, if not, then you should start at the i + 1 and j + 1
      */
     pair<size_t, size_t> p;
@@ -1477,17 +1521,17 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
             && reproducedParent->isLoop);
     if(firstTime == true) {
         MPI_ASSERT(original[i]->funcname == reproduced[j]->funcname);
-        MPI_ASSERT((originalParent == nullptr 
+        MPI_ASSERT((originalParent == nullptr
                     && reproducedParent == nullptr)
                 || (originalParent->isLoop == reproducedParent->isLoop));
         p = __greedyalignmentOnline(
-                original, 
-                reproduced, 
-                aligned, 
-                i, 
-                j, 
-                rank, 
-                isAligned, 
+                original,
+                reproduced,
+                aligned,
+                i,
+                j,
+                rank,
+                isAligned,
                 tmpLastInd,
                 isLoop);
         /* MPI_ASSERT(tmpLastInd > 0); */
@@ -1496,7 +1540,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         /* DEBUG0("tmpi: %lu, tmpj: %lu, original.size(): %lu, reproduced.size(): %lu\n", tmpi, tmpj, original.size(), reproduced.size()); */
         /*
          * tmpi could be equal to original.size() if the parent is a loop node
-         * tmpj could be equal to reproduced.size() if the parent is a loop node or at the end 
+         * tmpj could be equal to reproduced.size() if the parent is a loop node or at the end
          * of the trace
          */
         if(tmpJ == reproduced.size()) {
@@ -1510,7 +1554,7 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 // this happens when the parents are loop node
                 MPI_ASSERT(originalParent != nullptr
                         && reproducedParent != nullptr
-                        && originalParent->isLoop 
+                        && originalParent->isLoop
                         && reproducedParent->isLoop);
                 // we keep the point of last alignment as is
                 p = make_pair(i, j);
@@ -1528,17 +1572,17 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
                 /* getProperLastInd(lastInd, original[i]); */
             } else {
                 MPI_ASSERT(original[tmpI]->funcname == reproduced[tmpJ]->funcname);
-                MPI_ASSERT((originalParent == nullptr 
+                MPI_ASSERT((originalParent == nullptr
                             && reproducedParent == nullptr)
                         || originalParent->isLoop == reproducedParent->isLoop);
                 p = __greedyalignmentOnline(
-                        original, 
-                        reproduced, 
-                        aligned, 
-                        tmpI, 
-                        tmpJ, 
-                        rank, 
-                        isAligned, 
+                        original,
+                        reproduced,
+                        aligned,
+                        tmpI,
+                        tmpJ,
+                        rank,
+                        isAligned,
                         tmpLastInd,
                         isLoop);
             }
@@ -1553,18 +1597,18 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
     size_t newfuncId;
     for(unsigned ind0 = 0; ind0 < aligned.size(); ind0++) {
         MPI_ASSERT(aligned[ind0].first->bb() == aligned[ind0].second->bb());
-        MPI_ASSERT(aligned[ind0].first->funcs.size() 
-                == aligned[ind0].second->funcs.size() 
+        MPI_ASSERT(aligned[ind0].first->funcs.size()
+                == aligned[ind0].second->funcs.size()
                     || ind0 == aligned.size() - 1);
-        MPI_ASSERT(aligned[ind0].first->funcs.size() 
+        MPI_ASSERT(aligned[ind0].first->funcs.size()
                 >= aligned[ind0].second->funcs.size());
         newfuncId = aligned[ind0].second->funcs.size() - 1;
         tmpLastInd = 0;
         for(unsigned ind1 = 0; ind1 < aligned[ind0].second->funcs.size(); ind1++) {
-            size_t tmpi = 0, 
-                   tmpj = 0, 
+            size_t tmpi = 0,
+                   tmpj = 0,
                    tmpfuncId = 0;
-            if(aligned[ind0].first->funcs[ind1][0]->funcname 
+            if(aligned[ind0].first->funcs[ind1][0]->funcname
                     != aligned[ind0].second->funcs[ind1][0]->funcname) {
                 /* printf("different function called from %s: %s vs. %s\n", \ */
                         /* aligned[ind0].first->bb().c_str(), \ */
@@ -1573,14 +1617,14 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
             } else {
                 /* MPI_ASSERT(aligned[ind0].first->funcs[ind1][0]->funcname == aligned[ind0].second->funcs[ind1][0]->funcname); */
                 qs = greedyalignmentOnline(
-                        aligned[ind0].first->funcs[ind1], 
-                        aligned[ind0].second->funcs[ind1], 
-                        q, 
-                        tmpi, 
-                        tmpj, 
-                        tmpfuncId, 
-                        rank, 
-                        tmpIsAligned, 
+                        aligned[ind0].first->funcs[ind1],
+                        aligned[ind0].second->funcs[ind1],
+                        q,
+                        tmpi,
+                        tmpj,
+                        tmpfuncId,
+                        rank,
+                        tmpIsAligned,
                         tmpLastInd,
                         aligned[ind0].first,
                         aligned[ind0].second);
@@ -1598,21 +1642,21 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         }
     }
     /*
-     * if tmp said the alignment was not done at last, 
+     * if tmp said the alignment was not done at last,
      * then we should expect the alignment did not finish at p either
-     * if that is the case, push them back to the queue 
+     * if that is the case, push them back to the queue
      */
 
     rq = qs;
     // funcId is where you left off
-    /* DEBUG0("pushing newfuncId: %lu, p.first:%lu, p.second:%lu\n", */ 
-    /*         newfuncId, */ 
-    /*         p.first, */ 
+    /* DEBUG0("pushing newfuncId: %lu, p.first:%lu, p.second:%lu\n", */
+    /*         newfuncId, */
+    /*         p.first, */
     /*         p.second); */
     rq.push_back(
             make_shared<lastaligned>(
-                newfuncId, 
-                p.first, 
+                newfuncId,
+                p.first,
                 p.second));
     return rq;
 }
@@ -1621,9 +1665,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
  * it returns true iff the traces are aligned at the end
  */
 static bool __greedyAlignmentOffline(
-        vector<shared_ptr<element>>& original, 
-        vector<shared_ptr<element>>& reproduced, 
-        vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned, 
+        vector<shared_ptr<element>>& original,
+        vector<shared_ptr<element>>& reproduced,
+        vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned,
         const int& rank) {
     size_t i = 0, j = 0;
     unordered_map<string, vector<size_t>> bbMap;
@@ -1645,9 +1689,9 @@ static bool __greedyAlignmentOffline(
             MPI_EQUAL(original[i]->funcs.size(), (size_t)1);
             MPI_EQUAL(reproduced[j]->funcs.size(), (size_t)1);
             __greedyAlignmentOffline(
-                    original[i]->funcs[0], 
-                    reproduced[j]->funcs[0], 
-                    aligned, 
+                    original[i]->funcs[0],
+                    reproduced[j]->funcs[0],
+                    aligned,
                     rank);
             i++; j++;
         } else {
@@ -1690,7 +1734,7 @@ static bool __greedyAlignmentOffline(
         }
         */
         return false;
-    } 
+    }
 
     /* DEBUG0("divergence: %u\n", div); */
     /* fprintf(stderr, "divergence: %u\n", div); */
@@ -1698,17 +1742,17 @@ static bool __greedyAlignmentOffline(
 }
 
 bool greedyAlignmentWholeOffline(
-        vector<shared_ptr<element>>& original, 
-        vector<shared_ptr<element>>& reproduced, 
-        const int& rank) { 
+        vector<shared_ptr<element>>& original,
+        vector<shared_ptr<element>>& reproduced,
+        const int& rank) {
     vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned;
     /* fprintf(stderr, "greedy alignment on %s at %d original.size: %lu, reproduced.size: %lu\n", \ */
             /* original[0]->bb.c_str(), rank, original.size(), reproduced.size()); */
     bool rv = __greedyAlignmentOffline(
-            original, 
-            reproduced, 
-            aligned, 
-            rank); 
+            original,
+            reproduced,
+            aligned,
+            rank);
     for(auto p : aligned) {
         /* cout << p.first->bb << " " << p.second->bb << endl; */
         MPI_EQUAL(p.first->bb() ,p.second->bb());
@@ -1721,15 +1765,15 @@ bool greedyAlignmentWholeOffline(
                 pods.insert(p.first->bb());
             } else {
                 rv = greedyAlignmentWholeOffline(
-                        p.first->funcs[i], 
-                        p.second->funcs[i], 
+                        p.first->funcs[i],
+                        p.second->funcs[i],
                         rank);
             }
         }
         if(p.first->funcs.size() != p.second->funcs.size()) {
-            DEBUG("at %s, p.first->funcs.size(): %lu, p.second->funcs.size(): %lu\n", 
-                    p.first->bb().c_str(), 
-                    p.first->funcs.size(), 
+            DEBUG("at %s, p.first->funcs.size(): %lu, p.second->funcs.size(): %lu\n",
+                    p.first->bb().c_str(),
+                    p.first->funcs.size(),
                     p.second->funcs.size());
         }
     }
@@ -1740,15 +1784,15 @@ bool greedyAlignmentWholeOffline() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     return greedyAlignmentWholeOffline(
-            recordTraces, 
-            replayTraces, 
+            recordTraces,
+            replayTraces,
             rank);
 }
 
 // returns an empty vector in case of error
 vector<string> getMsgs(
-        vector<string> &orders, 
-        const size_t lastInd, 
+        vector<string> &orders,
+        const size_t lastInd,
         unsigned& orderIndex,
         string* recSendNodes) {
     MPI_ASSERT(lastInd != numeric_limits<size_t>::max());
@@ -1760,7 +1804,7 @@ vector<string> getMsgs(
         if(orderIndex >= orders.size()) {
             int rank;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            DEBUG("order_index went beyong the size of orders, rank: %d, lastInd: %lu\n", 
+            DEBUG("order_index went beyong the size of orders, rank: %d, lastInd: %lu\n",
                     rank, lastInd);
             MPI_ASSERT(false);
         }
@@ -1771,12 +1815,12 @@ vector<string> getMsgs(
          * we should write to recSendNodes
          */
         if(mpiCallsWithSendNodesAtLast.find(msgs[0]) != mpiCallsWithSendNodesAtLast.end()
-                && 
-                (msgs[0] != "MPI_Test" 
+                &&
+                (msgs[0] != "MPI_Test"
                  || msgs[3] == "SUCCESS")) {
             tmpRecSendNodes = msgs.back();
             msgs.pop_back();
-        } 
+        }
         ind = stoul(msgs.back());
         /* if(lastInd > ind) { */
         /*     int rank; */
@@ -1800,7 +1844,7 @@ size_t getIndex(shared_ptr<element>& eptr) {
     while(eptr->isLoop) {
         eptr = eptr->funcs.back().front();
     }
-    return eptr->index; 
+    return eptr->index;
 }
 
 /*
@@ -1820,7 +1864,7 @@ vector<shared_ptr<element>> getCurrNodesByIndex(unsigned long index) {
                 vec.push_back(currLevel[i]);
                 pushed = true;
             }
-        } 
+        }
         if(pushed == false) {
             currIndex = getIndex(currLevel.back());
             MPI_ASSERT(currIndex <= index);
@@ -1836,7 +1880,7 @@ vector<shared_ptr<element>> getCurrNodesByIndex(unsigned long index) {
         if(vec.back()->funcs.size() == 0) {
             break;
         }
-        /* 
+        /*
          * you need to get the correct currLevel
          */
         pushed = false;
@@ -1861,7 +1905,7 @@ vector<shared_ptr<element>> getCurrNodesByIndex(unsigned long index) {
 
 /*
  * this is not working for some reason
- * it's looking into main and it's coming back to main, 
+ * it's looking into main and it's coming back to main,
  * which makes no sense
  */
 size_t getIndexFromDeque(deque<shared_ptr<lastaligned>>& q) {
@@ -1869,14 +1913,14 @@ size_t getIndexFromDeque(deque<shared_ptr<lastaligned>>& q) {
     auto currTrace = recordTraces;
     cerr << "recordTraces.size(): " << recordTraces.size() << endl;
     for(auto i = q.size() - 1; 0 <= i; i--) {
-        auto origIndex = q[i]->origIndex; 
+        auto origIndex = q[i]->origIndex;
         auto funcId = q[i]->funcId;
         MPI_ASSERT(origIndex != numeric_limits<size_t>::max());
         cerr << *currTrace[origIndex] << endl;
         MPI_ASSERT(origIndex < currTrace.size());
         if(funcId != numeric_limits<size_t>::max()) {
             funcId = 0;
-            currTrace = currTrace[origIndex]->funcs[funcId]; 
+            currTrace = currTrace[origIndex]->funcs[funcId];
             cerr << "currTrace.size(): " << currTrace.size() << endl;
         } else {
             eptr = currTrace[origIndex];
@@ -1888,3 +1932,4 @@ size_t getIndexFromDeque(deque<shared_ptr<lastaligned>>& q) {
     }
     return eptr->index;
 }
+

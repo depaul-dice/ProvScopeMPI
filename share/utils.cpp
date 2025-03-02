@@ -44,18 +44,43 @@ void close_debugfile() {
 
 #endif // DEBUG_MODE
 
-vector<string> parse(string line, char delimit) {
-    vector<string> res;
-    string tmp = "";
-    for (unsigned i = 0; i < line.size(); i++) {
-        if (line[i] == delimit) {
-            res.push_back(tmp);
-            tmp = "";
-        } else {
-            tmp += line[i];
+// vector<string> parse(string line, char delimit) {
+//     vector<string> res;
+//     string tmp = "";
+//     for (unsigned i = 0; i < line.size(); i++) {
+//         if (line[i] == delimit) {
+//             res.push_back(tmp);
+//             tmp = "";
+//         } else {
+//             tmp += line[i];
+//         }
+//     }
+//     res.push_back(tmp);
+//     return res;
+// }
+
+
+vector<string> parse(const string& line, char delimit) {
+    size_t count = 0;
+    for(size_t i = 0; i < line.size(); ++i) {
+        if(line[i] == delimit) {
+            ++count;
         }
     }
-    res.push_back(tmp);
+
+    vector<string> res;
+    res.reserve(count + 1);
+
+    size_t start = 0;
+    for(size_t i = 0; i < line.size(); ++i) {
+        if(line[i] == delimit) {
+            res.emplace_back(line.substr(start, i - start));
+            start = i + 1;
+        }
+    }
+
+    res.emplace_back(line.substr(start));
+
     return res;
 }
 
@@ -69,16 +94,16 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
             if(tokens[2] == request) {
                 if(tokens[3] == "SUCCESS") {
                     return stoi(tokens[4]);
-                } 
+                }
             }
         } else if (tokens[0] == "MPI_Testall") {
             // have not implemented this yet
             MPI_ASSERT(false);
         } else if (tokens[0] == "MPI_Testany") {
-            // have not implemented this yet 
+            // have not implemented this yet
             MPI_ASSERT(false);
         } else if (tokens[0] == "MPI_Testsome") {
-            // either MPI_Testsome|rank|outcount|request|src|... 
+            // either MPI_Testsome|rank|outcount|request|src|...
             // or MPI_Testsome|rank|outcount
             int outcount = stoi(tokens[2]);
             if(outcount == 0) continue;
@@ -115,7 +140,7 @@ int lookahead(vector<string>& orders, unsigned start, string& request) {
             }
         } else {
             // do nothing
-        } 
+        }
 
         // if not, just continue
     }
@@ -205,57 +230,57 @@ string splitNinsert(const string& str, const string& delimit, unordered_set<stri
 }
 
 void mpi_equal(
-        string a, 
-        char *b, 
-        int line, 
+        string a,
+        char *b,
+        int line,
         const char* func,
         const char* A,
         const char* B) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        cerr << "line: " << line 
-            << ", function: " << func 
-            << "rank: " << rank << 
-            ", " << A << ':' << a 
+        cerr << "line: " << line
+            << ", function: " << func
+            << "rank: " << rank <<
+            ", " << A << ':' << a
             << " != " << B << ':' << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
 void mpi_equal(
-        char *a, 
-        string b, 
-        int line, 
+        char *a,
+        string b,
+        int line,
         const char* func,
         const char* A,
         const char* B) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        cerr << "line: " << line 
-            << ", function: " << func 
-            << "rank: " << rank 
-            << ", " << A << ':' << a 
+        cerr << "line: " << line
+            << ", function: " << func
+            << "rank: " << rank
+            << ", " << A << ':' << a
             << " != " << B << ':' << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
 void mpi_equal(
-        string a, 
-        string b, 
-        int line, 
+        string a,
+        string b,
+        int line,
         const char* func,
         const char* A,
         const char* B) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        cerr << "line: " << line 
-            << ", function: " << func 
-            << ",rank: " << rank 
-            << ", " << A << ':' << a 
+        cerr << "line: " << line
+            << ", function: " << func
+            << ",rank: " << rank
+            << ", " << A << ':' << a
             << " != " << B << ':' << b << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
@@ -283,8 +308,8 @@ void __attribute__((visibility("default"))) printStackTrace() {
 }
 
 void segfaultHandler(
-        int sig, 
-        siginfo_t *info, 
+        int sig,
+        siginfo_t *info,
         void *ucontext) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

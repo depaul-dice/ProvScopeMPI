@@ -67,12 +67,12 @@ void close_debugfile();
 
 const char msgDelimiter = '|';
 
-std::vector<std::string> parse(
-        std::string line, char delimit);
+std::vector<std::string> parse(const std::string& line, char delimit);
+
 // returns the rank where you got the message from
 int lookahead(
-        std::vector<std::string>& orders, 
-        unsigned start, 
+        std::vector<std::string>& orders,
+        unsigned start,
         std::string& request);
 
 void printtails(
@@ -114,7 +114,7 @@ std::ostream& operator<<(
     return os;
 }
 
-template <typename T> 
+template <typename T>
 std::ostream& operator<<(
         std::ostream& os, const std::vector<std::shared_ptr<T>>& vec) {
     os << "[";
@@ -186,53 +186,53 @@ Logger& Logger::operator << (const T& message) {
 }
 
 std::string replaceall(
-        std::string& str, 
-        const std::string& from, 
+        std::string& str,
+        const std::string& from,
         const std::string& to);
 
 std::string splitNinsert(
-        const std::string& str, 
-        const std::string& delimit, 
+        const std::string& str,
+        const std::string& delimit,
         std::unordered_set<std::string>& container);
 
 template <typename T>
 void mpi_equal(
-        T a, 
-        T b, 
-        int line, 
+        T a,
+        T b,
+        int line,
         const char* func,
         const char* A,
         const char* B) {
     if(a != b) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        std::cerr << "line: " << line 
-            << ", function: " << func 
-            << ", rank: " << rank 
-            << ", " << A << ':' << a << " != " 
+        std::cerr << "line: " << line
+            << ", function: " << func
+            << ", rank: " << rank
+            << ", " << A << ':' << a << " != "
             << B << ':' << b << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
 void mpi_equal(
-        std::string a, 
-        char* b, 
-        int line, 
+        std::string a,
+        char* b,
+        int line,
         const char* func,
         const char* A,
         const char* B);
 void mpi_equal(
-        char* a, 
-        std::string b, 
-        int line, 
+        char* a,
+        std::string b,
+        int line,
         const char* func,
         const char* A,
         const char* B);
 void mpi_equal(
-        std::string a, 
-        std::string b, 
-        int line, 
+        std::string a,
+        std::string b,
+        int line,
         const char* func,
         const char* A,
         const char* B);
@@ -243,11 +243,11 @@ void exceptionAssert(
 void printStackTrace();
 
 void segfaultHandler(
-        int sig, 
-        siginfo_t *info, 
+        int sig,
+        siginfo_t *info,
         void *ucontext);
 
 void setupSignalHandler();
 
 #endif // TOOLS_H
-       
+

@@ -1,4 +1,3 @@
-
 #include "mpiRecordReplay.h"
 /* #define PROVRECORD */
 
@@ -8,7 +7,7 @@ Logger logger;
 
 #ifndef PROVRECORD
 
-#include <chrono> 
+#include <chrono>
 
 extern vector<shared_ptr<element>> recordTraces;
 extern vector<vector<string>> replayTracesRaw;
@@ -20,13 +19,13 @@ extern vector<vector<string>> replayTracesRaw;
  */
 extern unordered_set<string> pods;
 
-/* 
+/*
  * key is the function name
  */
 static unordered_map<string, loopNode *> __loopTrees;
 
-/* 
- * The name passed down as an argument will be in the format 
+/*
+ * The name passed down as an argument will be in the format
  * FunctionName:Type:Count:(node count)
  * Type is a type of a node (e.g. entry node, exit node, neither)
  * Count is a unique identifier
@@ -36,19 +35,32 @@ extern "C" void printBBname(const char *name) {
     int rank, flag1, flag2;
     MPI_Initialized(&flag1);
     MPI_Finalized(&flag2);
-    vector<string> tokens;
+
     if(flag1 && !flag2) {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        string str(name);
-        tokens = parse(str, ':');
+
+        static vector<string> tokens;
+        tokens.clear();
+        tokens.reserve(4);
+
+        const char* start = name;
+        const char* end = start;
+
+        while (*end) {
+            if (*end == ':') {
+                tokens.emplace_back(start, end - start);
+                start = end + 1;
+            }
+            end++;
+        }
+        tokens.emplace_back(start, end - start);
+
         replayTracesRaw.push_back(tokens);
-        // if it is a replay trace the trace length will be 3, but for record 4
-        /* MPI_ASSERT(replayTracesRaw.size() > 0); */
     }
 }
 
 int MPI_Init(
-    int *argc, 
+    int *argc,
     char ***argv
 ) {
     int ret = PMPI_Init(argc, argv);
@@ -103,12 +115,12 @@ int MPI_Init(
     unsigned long index = 0;
     auto tik = chrono::high_resolution_clock::now();
     recordTraces = makeHierarchyMain(
-            rawTraces, 
-            index, 
-            __loopTrees); 
+            rawTraces,
+            index,
+            __loopTrees);
     auto tok = chrono::high_resolution_clock::now();
     if(rank == 0) {
-        printf("making Hierarchy took %ld ms\n", 
+        printf("making Hierarchy took %ld ms\n",
                 chrono::duration_cast<chrono::milliseconds>(tok - tik).count());
     }
 
@@ -123,7 +135,7 @@ int MPI_Finalize() {
     appendTraces(__loopTrees, TraceType::REPLAY);
     auto tok = chrono::high_resolution_clock::now();
     auto unrollTime = chrono::duration_cast<chrono::microseconds>(tok - tik).count();
-    greedyAlignmentWholeOffline(); 
+    greedyAlignmentWholeOffline();
 
     /*
      * deleting the looptrees
@@ -133,7 +145,7 @@ int MPI_Finalize() {
     }
 
     /*
-     * print the pods to a file 
+     * print the pods to a file
      * (to avoid writing everything at console at once)
      */
     string podfile = "pods" + to_string(rank) + ".txt";
@@ -161,16 +173,16 @@ extern "C" void printBBname(const char *name) {
         char filename[100];
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_ASSERT(traceFile != nullptr);
-        fprintf(traceFile, 
-                "%s:%lu\n", 
-                name, 
+        fprintf(traceFile,
+                "%s:%lu\n",
+                name,
                 nodecnt++);
     }
     return;
 }
 
 int MPI_Init(
-    int *argc, 
+    int *argc,
     char ***argv
 ) {
     int ret = PMPI_Init(argc, argv);
