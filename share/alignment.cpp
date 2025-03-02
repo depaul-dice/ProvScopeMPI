@@ -189,21 +189,48 @@ ostream& operator<<(ostream& os, const lastaligned& l) {
     return os;
 }
 
-// optimize 3: improve makeBBName function, reduce memory allocation
-string makeBBName(const vector<vector<string>>& traces, size_t idx) {
-    // precompute string length, allocate memory once
-    size_t totalLen = traces[idx][0].length() + traces[idx][1].length() +
-                      traces[idx][2].length() + 2;
+// 优化 makeBBName 函数，通过引用传递返回值，避免额外的字符串拷贝
+void makeBBNameInto(const vector<vector<string>>& traces, size_t index, string& result) {
+    result.clear();
+    result.reserve(64); // 预分配足够空间
+    result.append(traces[index][0]);
+    result.append(":");
+    result.append(traces[index][1]);
+    result.append(":");
+    result.append(traces[index][2]);
+}
 
+// 保留原始函数以保持兼容性
+string makeBBName(const vector<vector<string>>& traces, size_t index) {
     string result;
-    result.reserve(totalLen);  // preallocate enough space
-    result.append(traces[idx][0]);
-    result.push_back(':');
-    result.append(traces[idx][1]);
-    result.push_back(':');
-    result.append(traces[idx][2]);
-
+    result.reserve(64);
+    result.append(traces[index][0]);
+    result.append(":");
+    result.append(traces[index][1]);
+    result.append(":");
+    result.append(traces[index][2]);
     return result;
+}
+
+// 添加可选的快速判断字符串相等的工具方法
+bool bbNameEquals(const vector<vector<string>>& traces, size_t index, const string& value) {
+    // 首先检查长度，避免构建完整字符串
+    size_t expectedLength = traces[index][0].length() + 1 + traces[index][1].length() + 1 + traces[index][2].length();
+    if (value.length() != expectedLength) return false;
+
+    // 然后按部分比较
+    size_t pos = 0;
+    if (value.compare(pos, traces[index][0].length(), traces[index][0]) != 0) return false;
+    pos += traces[index][0].length();
+
+    if (value[pos++] != ':') return false;
+
+    if (value.compare(pos, traces[index][1].length(), traces[index][1]) != 0) return false;
+    pos += traces[index][1].length();
+
+    if (value[pos++] != ':') return false;
+
+    return value.compare(pos, traces[index][2].length(), traces[index][2]) == 0;
 }
 
 vector<ElementPtr> makeHierarchyMain(
@@ -281,75 +308,98 @@ static loopNode *isNewLoop(
 vector<ElementPtr> makeHierarchyLoop(
         vector<vector<string>>& traces,
         unsigned long& index,
-        unordered_map<string, loopNode *>& loopTrees)  {
+        unordered_map<string, loopNode *>& loopTrees) {
+    // 预分配容器大小，避免频繁重新分配
     vector<ElementPtr> functionalTraces;
-    ElementPtr eptr;
-    bool isEntry = false,
-         isExit = false;
-    string bbname, funcname = traces[index][0];
-    loopNode *currloop = nullptr,
-             *child = nullptr;
-    int iterationcnt = 1;
+    functionalTraces.reserve(32);  // 增加预分配空间，基于典型用例调整
 
-    // here we are getting the entry
+    ElementPtr eptr;
+    bool isEntry = false, isExit = false;
+    string bbname;
+    bbname.reserve(64);  // 预分配字符串空间
+
+    string funcname = traces[index][0];
+    loopNode *currloop = nullptr, *child = nullptr;
+
+    // 缓存traces的大小，避免在循环中重复调用size()
+    const size_t traces_size = traces.size();
+
+    // 预检查是否有entry，优化常见情况
     MPI_EQUAL(traces[index][1], "entry");
     currloop = loopTrees[funcname];
 
-    while (!isExit
-            && index < traces.size()) {
-        MPI_ASSERT(index < traces.size());
-        // bbname = traces[index][0]
-        //     + ":" + traces[index][1]
-        //     + ":" + traces[index][2];
-        bbname = makeBBName(traces, index);
+    // 常见条件的预计算
+    const bool has_extra_field = (traces[index].size() == 4);
+
+    while (!isExit && index < traces_size) {
+        MPI_ASSERT(index < traces_size);
+
+        // 使用优化后的函数重用字符串
+        makeBBNameInto(traces, index, bbname);
+
         MPI_EQUAL(traces[index][0], funcname);
-        MPI_ASSERT(traces[index].size() == 3
-                || traces[index].size() == 4);
+        MPI_ASSERT(traces[index].size() == 3 || traces[index].size() == 4);
+
+        // 提前获取条件，避免重复检查
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
 
-        /*
-         * case 1: if we are in the inner loop,
-         * recursively call the function
-         */
-        if((child = isNewLoop(bbname, currloop)) != nullptr) {
+        // 检查是否在内部循环
+        if ((child = isNewLoop(bbname, currloop)) != nullptr) {
+            // 预分配内存并使用move语义
             vector<ElementPtr> loops = __makeHierarchyLoop(
-                        traces,
-                        index,
-                        loopTrees,
-                        child);
-            functionalTraces.insert(
-                    functionalTraces.end(),
-                    loops.begin(),
-                    loops.end());
+                traces, index, loopTrees, child);
+
+            // 优化vector合并：预留空间并使用move语义
+            size_t current_size = functionalTraces.size();
+            size_t loops_size = loops.size();
+            functionalTraces.reserve(current_size + loops_size);
+
+            for (auto& loop : loops) {
+                functionalTraces.push_back(std::move(loop));
+            }
         } else {
-            if(traces[index].size() == 4) {
+            // 创建新元素，条件判断已提前获取
+            if (has_extra_field) {
                 eptr = createElement(
-                        isEntry,
-                        isExit,
-                        stoi(traces[index][2]),
-                        traces[index][0],
-                        stoul(traces[index][3]));
+                    isEntry, isExit,
+                    stoi(traces[index][2]),
+                    traces[index][0],
+                    stoul(traces[index][3]));
             } else {
                 eptr = createElement(
-                        isEntry,
-                        isExit,
-                        stoi(traces[index][2]),
-                        traces[index][0]);
+                    isEntry, isExit,
+                    stoi(traces[index][2]),
+                    traces[index][0]);
             }
             index++;
-            while(!isExit
-                    && index < traces.size()
-                    && traces[index][1] == "entry") {
 
-                eptr->funcs.push_back(
-                        makeHierarchyLoop(
-                            traces,
-                            index,
-                            loopTrees));
+            // 优化内部循环处理
+            if (!isExit && index < traces_size) {
+                // 预先检查有多少个entry需要处理
+                size_t entry_count = 0;
+                size_t check_index = index;
+
+                // 统计连续的entry数量
+                while (check_index < traces_size && traces[check_index][1] == "entry") {
+                    entry_count++;
+                    check_index++;
+                }
+
+                // 如果有entry要处理，预分配空间
+                if (entry_count > 0) {
+                    eptr->funcs.reserve(entry_count);
+                }
+
+                // 正常处理entry
+                while (!isExit && index < traces_size && traces[index][1] == "entry") {
+                    eptr->funcs.push_back(
+                        makeHierarchyLoop(traces, index, loopTrees));
+                }
             }
+
             fixIterations(functionalTraces, eptr);
-            functionalTraces.push_back(eptr);
+            functionalTraces.push_back(std::move(eptr)); // 使用移动语义
         }
     }
 
@@ -687,13 +737,20 @@ void addHierarchy(
         currloop = tmploop;
     }
 
-    while(index < traces.size()) {
+    // 缓存traces的大小，避免在循环中多次调用size()
+    const size_t traces_size = traces.size();
+
+    // 预先分配一个足够大的字符串，用于重复使用
+    string bb;
+    bb.reserve(64);
+
+    while(index < traces_size) {
         /*
          * if we are at the entry of a new function
          * (we assume that there's no loop to the entry here),
          * we need to make a hierarchy of the new function
          */
-        while(index < traces.size()
+        while(index < traces_size
                 && traces[index][1] == "entry") {
             curr->funcs.push_back(
                     makeHierarchyLoop(
@@ -701,12 +758,13 @@ void addHierarchy(
                         index,
                         loopTrees));
         }
-        if(index >= traces.size()) {
+        if(index >= traces_size) {
             break;
         }
         MPI_ASSERT(traces[index].size() > 0);
-        // string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
-        string bb = makeBBName(traces, index);
+
+        // 使用现有makeBBName函数
+        bb = makeBBName(traces, index);
 
         /*
          * we need to think of two cases in case we are in the entry node of a current loop
@@ -750,11 +808,8 @@ void addHierarchy(
             currloop = currloop->parent;
         }
 
-        if(index >= traces.size()) break;
+        if(index >= traces_size) break;
 
-        // bb = traces[index][0]
-        //     + ":" + traces[index][1]
-        //     + ":" + traces[index][2];
         bb = makeBBName(traces, index);
         /*
          * we assert that current loop node has some nodes in it, or a dummy loop node
@@ -783,12 +838,11 @@ void addHierarchy(
                     parent,
                     functionalTraces);
 
-            if(index >= traces.size()) break;
-            // bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+            if(index >= traces_size) break;
             bb = makeBBName(traces, index);
         }
 
-        if(index >= traces.size()) break;
+        if(index >= traces_size) break;
         /*
          * the node cannot be an entry,
          * because if it is, we should be at the beginning of
@@ -868,7 +922,7 @@ void addHierarchy(
          * just add a condition || and add the condition
          * of the end of the loop
          */
-        if(index >= traces.size()) {
+        if(index >= traces_size) {
             break;
         }
 
@@ -877,7 +931,6 @@ void addHierarchy(
          * we try to break with a code block before
          * in case we don't have one anymore
          */
-        // bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         bb = makeBBName(traces, index);
         /* if(rank == 1 && bb == "hypre_PFMGSolve:neither:27") { */
         /*     cerr << "option 6" << endl; */
@@ -1125,13 +1178,19 @@ string updateAndGetLastNodes(
 
 static inline void create_map(
         unordered_map<string, vector<size_t>>& bbMap,
-        vector<ElementPtr>& reproduced,
+        vector<ElementPtr>& original,
+        size_t& i,
         size_t& j) {
-    for(unsigned k = j; k < reproduced.size(); k++) {
-        if(bbMap.find(reproduced[k]->bb()) == bbMap.end()) {
-            bbMap[reproduced[k]->bb()] = vector<size_t>();
+    for(unsigned k = i; k < original.size(); k++) {
+        if(bbMap.find(original[k]->bb()) != bbMap.end()) {
+            for(auto l: bbMap[original[k]->bb()]) {
+                if(j <= l) {
+                    i = k;
+                    j = l;
+                    return;
+                }
+            }
         }
-        bbMap[reproduced[k]->bb()].push_back(k);
     }
     return;
 }
@@ -1246,7 +1305,7 @@ static pair<size_t, size_t> __greedyalignmentOnline(
              * filling up the bbMap for the reproduced execution here
              */
             if(bbMap.size() == 0) {
-                create_map(bbMap, reproduced, j);
+                create_map(bbMap, reproduced, i, j);
             }
             if(!matchbbmap(bbMap, original, i, j)) {
                 /*
@@ -1339,7 +1398,7 @@ static bool isLastAligned(
         size_t i,
         size_t j) {
     unordered_map<string, vector<size_t>> bbMap;
-    create_map(bbMap, reproduced, j);
+    create_map(bbMap, original, i, j);
     return matchbbmap(
             bbMap,
             original,
@@ -1722,7 +1781,7 @@ static bool __greedyAlignmentOffline(
             /* } */
             pods.insert(original[i - 1]->bb());
             if(bbMap.size() == 0) {
-                create_map(bbMap, reproduced, j);
+                create_map(bbMap, reproduced, i, j);
             }
 
             // matchbbmap will update i and j
