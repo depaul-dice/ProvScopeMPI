@@ -56,7 +56,7 @@ vector<string> parse(string line, char delimit) {
         }
     }
     res.push_back(tmp);
-    return res;
+    return move(res);
 }
 
 int lookahead(vector<string>& orders, unsigned start, string& request) {
