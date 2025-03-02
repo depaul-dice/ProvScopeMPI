@@ -37,6 +37,10 @@ extern vector<vector<string>> recordTracesRaw;
 extern vector<shared_ptr<element>> recordTraces;
 #define RECORDTRACE(...)
 #endif
+double writeTime = 0.0;
+double appendRecordTime = 0.0;
+double checkCallLocationsTime = 0.0;
+double updateAndGetLastNodesTime = 0.0;
 
 extern "C" void printBBname(const char *name) {
     int rank, flag1, flag2;
@@ -45,18 +49,24 @@ extern "C" void printBBname(const char *name) {
     if(flag1 && !flag2) {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_ASSERT(traceFile != nullptr);
+        auto tik = MPI_Wtime();
         fprintf(traceFile, 
                 "%s:%lu\n", 
                 name, 
                 nodecnt++);
+        auto tok = MPI_Wtime();
         string str(name);
         appendRecordTracesRaw(parse(str, ':'));
+        auto tok2 = MPI_Wtime();
+        writeTime += tok - tik;
+        appendRecordTime += tok2 - tok;
     }
     return;
 }
 
 void checkCallLocations(
         string mpiCall, string& lastNodes) {
+    double tik = MPI_Wtime();
     static unordered_map<string, unsigned long> lastCallLocations;
     if(__callLocations[mpiCall].find(lastNodes) 
             != __callLocations[mpiCall].end()
@@ -76,6 +86,8 @@ void checkCallLocations(
         __callLocations[mpiCall][lastNodes] = nodecnt - 1;
     }
     lastCallLocations[mpiCall] = nodecnt - 1;
+    double tok = MPI_Wtime();
+    checkCallLocationsTime += tok - tik;
 }
 
 int MPI_Init(
@@ -160,7 +172,18 @@ int MPI_Finalize(void) {
     }
     int ret = PMPI_Finalize();
     /* DEBUG("MPI_Finalize done, rank:%d\n", rank); */
-    fprintf(stderr, "rank: %d, numSends: %u\n", rank, numSends);
+    //fprintf(stderr, "rank: %d, numSends: %u\n", rank, numSends);
+    fprintf(stderr, "rank: %d, writeTime: %f, \
+            appendRecordTime: %f, \
+            checkCallLocationsTime: %f, \
+            updateAndGetLastNodesTime: %f, \
+            numSends: %u\n",
+            rank, 
+            writeTime, 
+            appendRecordTime, 
+            checkCallLocationsTime,
+            updateAndGetLastNodesTime,
+            numSends);
     return ret;
 }
 
@@ -185,8 +208,11 @@ int MPI_Recv(
             nullptr,
             recordFile,
             nodecnt);
+    double tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    double tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     checkCallLocations("MPI_Recv", lastNodes);
     return ret;
 }
@@ -200,8 +226,11 @@ int MPI_Send(
     MPI_Comm comm
 ) {
     //DEBUG("MPI_Send:to %d, at %d\n", dest, rank);
+    double tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    double tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     int ret = __MPI_Send(
             buf, 
             count, 
@@ -242,8 +271,11 @@ int MPI_Irecv(
     /*
      * updating the call locations
      */
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     checkCallLocations("MPI_Irecv", lastNodes);
     return ret;
 }
@@ -257,8 +289,11 @@ int MPI_Isend(
     MPI_Comm comm, 
     MPI_Request *request
 ) {
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     /*
      * below is for debugging, delete afterwards
      */
@@ -344,9 +379,14 @@ int MPI_Cancel(
             recordFile, 
             nodecnt);
     __requests.erase(request);
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
     checkCallLocations("MPI_Cancel", lastNodes);
+    auto tok2 = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
+    checkCallLocationsTime += tok2 - tok;
     return ret;
 }
 
@@ -367,9 +407,12 @@ int MPI_Test(
     if(*flag) {
         __requests.erase(request);
     }
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
     checkCallLocations("MPI_Test", lastNodes);
+    updateAndGetLastNodesTime += tok - tik;
     return ret;
 }
 
@@ -396,8 +439,11 @@ int MPI_Testall(
             MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
         }
     }
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     checkCallLocations("MPI_Testall", lastNodes);
 
     return ret;
@@ -427,8 +473,10 @@ int MPI_Testsome(
                     __requests.find(&array_of_requests[ind]) != __requests.end());
         }
     }
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
     checkCallLocations("MPI_Testsome", lastNodes);
     return ret;
 }
@@ -445,8 +493,11 @@ int MPI_Wait(
             nullptr,
             recordFile, 
             nodecnt);
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     checkCallLocations("MPI_Wait", lastNodes);
     return ret;
 }
@@ -483,11 +534,12 @@ int MPI_Waitany(
                 stat.MPI_SOURCE, 
                 nodecnt);
     }
-    /*
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     checkCallLocations("MPI_Waitany", lastNodes);
-    */
 
     return ret;
 }
@@ -521,8 +573,11 @@ int MPI_Waitall(
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     checkCallLocations("MPI_Waitall", lastNodes);
     return ret;
 }
@@ -555,8 +610,11 @@ int MPI_Probe (
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     checkCallLocations("MPI_Probe", lastNodes);
     return ret;
 }
@@ -589,8 +647,11 @@ int MPI_Iprobe (
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    auto tik = MPI_Wtime();
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
+    auto tok = MPI_Wtime();
+    updateAndGetLastNodesTime += tok - tik;
     checkCallLocations("MPI_Iprobe", lastNodes);
     return ret;
 }

@@ -977,14 +977,16 @@ void appendTraces(
         vector<shared_ptr<element>>& traces) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    static unsigned long index = 0;
+    //static unsigned long index = 0;
     if(traces.size() == 0) {
-        MPI_ASSERT(index == 0);
+        //MPI_ASSERT(index == 0);
+        unsigned long index = 0;
         traces = makeHierarchyMain(
                 rawTraces, 
                 index, 
                 loopTrees);
     } else {
+        unsigned long index = 0;
         addHierarchy(
                 traces, 
                 rawTraces, 
