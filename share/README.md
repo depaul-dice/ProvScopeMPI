@@ -28,3 +28,6 @@ time mpirun -np 4 ./ex3.mod.reproduce -n 5 -solver 1 -v 2 2
 
 cat pod*
 ```
+
+perf record -g mpirun -np 4 ./ex3.mod.record -n 5 -solver 1 -v 1 1
+perf report

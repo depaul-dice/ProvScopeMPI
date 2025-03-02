@@ -1,8 +1,7 @@
-
-/* 
+/*
  * Assumptions:
  * 1. The MPI program is written in C
- * 2. We don't mix the blocking calls with non-blocking calls 
+ * 2. We don't mix the blocking calls with non-blocking calls
  * <- subject to relaxation
  */
 
@@ -52,40 +51,72 @@ MessagePool messagePool;
 
 chrono::microseconds timeUnroll;
 
-/* 
- * The name passed down as an argument will be in the format 
+// use static unordered_map to avoid repeated memory allocation
+static std::unordered_map<std::string, size_t> alignmentCache;
+
+/*
+ * The name passed down as an argument will be in the format
  * FunctionName:Type:Count:(node count)
  * Type is a type of a node (e.g. entry node, exit node, neither)
  * Count is a unique identifier
  * node count is the counter for nodes to be passed
  */
 extern "C" void printBBname(const char *name) {
-    int rank, flag1, flag2;
+    static int rank = -1;
+    int flag1, flag2;
+
+    // check if MPI is initialized
+    // check if MPI is finalized
     MPI_Initialized(&flag1);
     MPI_Finalized(&flag2);
-    vector<string> tokens;
+
     if(flag1 && !flag2) {
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        string str(name);
-        tokens = parse(str, ':');
-        replayTracesRaw.push_back(tokens);
-        // if it is a replay trace the trace length will be 3, but for record 4
-        /* MPI_ASSERT(replayTracesRaw.size() > 0); */
+        // only get rank once
+        if (rank == -1) {
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        }
+
+        // use static vector to avoid repeated memory allocation
+        static vector<string> tokens;
+        tokens.clear();
+        tokens.reserve(8);
+
+        // parse the name string
+        tokens = parse(name, ':');
+
+        // use move semantics to avoid unnecessary copying
+        replayTracesRaw.push_back(std::move(tokens));
     }
 }
 
-unsigned long easyOnlineAlignment(
-        const string& mpiCall,
-        const string& lastNodes) {
-    if(__callLocations[mpiCall].find(lastNodes) == __callLocations[mpiCall].end()) {
-        return numeric_limits<unsigned long>::max(); 
-    } else {
-        return __callLocations[mpiCall][lastNodes];
+// use static unordered_map to avoid repeated memory allocation
+size_t easyOnlineAlignment(
+        const std::string& mpiCall,
+        const std::string& lastNodes) {
+    // build cache key, using + is faster than using string
+    std::string cacheKey = mpiCall + ":" + lastNodes;
+
+    // find cache
+    auto it = alignmentCache.find(cacheKey);
+    if (it != alignmentCache.end()) {
+        return it->second;
     }
+
+    // cache miss, execute original logic
+    auto result = numeric_limits<unsigned long>::max();
+
+    if (__callLocations.find(mpiCall) != __callLocations.end() &&
+        __callLocations[mpiCall].find(lastNodes) != __callLocations[mpiCall].end()) {
+        result = __callLocations[mpiCall][lastNodes];
+    }
+
+    // cache result for future requests
+    alignmentCache[cacheKey] = result;
+    return result;
 }
 
 int MPI_Init(
-    int *argc, 
+    int *argc,
     char ***argv
 ) {
     int ret = PMPI_Init(argc, argv);
@@ -102,7 +133,7 @@ int MPI_Init(
         fprintf(stderr, "Error: cannot open file rank%d.txt\n", rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    char* line = nullptr; 
+    char* line = nullptr;
     size_t len = 0;
     ssize_t read;
     while((read = getline(&line, &len, fp)) != -1) {
@@ -119,7 +150,7 @@ int MPI_Init(
         free(line);
         line = nullptr;
     }
-    fclose(fp);    
+    fclose(fp);
 
     /*
      * opening the file that records the traces
@@ -164,9 +195,9 @@ int MPI_Init(
      */
     unsigned long index = 0;
     recordTraces = makeHierarchyMain(
-            rawTraces, 
-            index, 
-            __loopTrees); 
+            rawTraces,
+            index,
+            __loopTrees);
 
     /*
      * reading the json file
@@ -200,7 +231,7 @@ int MPI_Finalize() {
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     std::cout << "Time to unroll: " << timeUnroll.count() << "microseconds" << std::endl;
 
-    greedyAlignmentWholeOffline(); 
+    greedyAlignmentWholeOffline();
 
     /*
      * deleting the looptrees
@@ -213,7 +244,7 @@ int MPI_Finalize() {
      */
 
     /*
-     * print the pods to a file 
+     * print the pods to a file
      * (to avoid writing everything at console at once)
      */
     string podfile = "pods" + to_string(rank) + ".txt";
@@ -223,26 +254,36 @@ int MPI_Finalize() {
     }
     fclose(fp);
 
+    // output performance statistics
+    if (rank == 0) {
+        fprintf(stderr, "Total time spent in updateAndGetLastNodes: %lld microseconds\n",
+                static_cast<long long>(timeUnroll.count()));
+        fprintf(stderr, "Alignment cache size: %lu\n", alignmentCache.size());
+    }
+
+    // clear cache structure
+    alignmentCache.clear();
+
     int rv = PMPI_Finalize();
     return rv;
 }
 
 /*
- * in this we will just manipulate the message source 
+ * in this we will just manipulate the message source
  * when calling MPI_Recv
  */
 int MPI_Recv(
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Status *status
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* 
+    /*
      * DEBUG0("MPI_Recv:%s:%d\n", orders[__orderIndex].c_str(), __orderIndex); */
     auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
@@ -250,7 +291,7 @@ int MPI_Recv(
     auto tok = chrono::high_resolution_clock::now();
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Recv", 
+            "MPI_Recv",
             lastNodes);
 
     vector<string> msgs;
@@ -260,20 +301,20 @@ int MPI_Recv(
          * don't control anything
          */
         ret = __MPI_Recv(
-                buf, 
-                count, 
-                datatype, 
-                source, 
-                tag, 
-                comm, 
+                buf,
+                count,
+                datatype,
+                source,
+                tag,
+                comm,
                 status,
                 messagePool);
         return ret;
-    } 
+    }
     string recSendNodes = "";
     msgs = getMsgs(
-            orders, 
-            alignedIndex, 
+            orders,
+            alignedIndex,
             __orderIndex,
             &recSendNodes);
     int src = stoi(msgs[2]);
@@ -286,15 +327,15 @@ int MPI_Recv(
         source = src;
     }
     MPI_EQUAL(source, src);
-    
+
     string repSendNodes = "";
     ret = __MPI_Recv(
-            buf, 
-            count, 
-            datatype, 
-            source, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            source,
+            tag,
+            comm,
             status,
             messagePool,
             &repSendNodes);
@@ -309,25 +350,25 @@ int MPI_Recv(
  * by piggybacking the current node
  */
 int MPI_Send(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
     MPI_Comm comm
 ) {
     auto tik = chrono::high_resolution_clock::now();
     string currNodes = updateAndGetLastNodes(
-            __loopTrees, 
+            __loopTrees,
             TraceType::REPLAY);
     auto tok = chrono::high_resolution_clock::now();
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     int ret = __MPI_Send(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
+            buf,
+            count,
+            datatype,
+            dest,
+            tag,
             comm,
             messagePool,
             currNodes);
@@ -335,12 +376,12 @@ int MPI_Send(
 }
 
 int MPI_Irecv(
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     int rank;
@@ -355,7 +396,7 @@ int MPI_Irecv(
     auto tok = chrono::high_resolution_clock::now();
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Irecv", 
+            "MPI_Irecv",
             lastNodes);
     int ret;
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
@@ -363,23 +404,23 @@ int MPI_Irecv(
         // don't control anything, but keep track of the request
         __unalignedRequests.insert(request);
         ret = __MPI_Irecv(
-                buf, 
-                count, 
-                datatype, 
-                source, 
-                tag, 
-                comm, 
+                buf,
+                count,
+                datatype,
+                source,
+                tag,
+                comm,
                 request,
                 messagePool);
         return ret;
     }
-    
+
     /*
-     * we don't have recv send nodes 
+     * we don't have recv send nodes
      * because this is when the request is created
      */
     vector<string> msgs = getMsgs(
-            orders, 
+            orders,
             alignedIndex,
             __orderIndex);
 
@@ -388,38 +429,38 @@ int MPI_Irecv(
     __requests[msgs[3]] = request;
     if(source == MPI_ANY_SOURCE) {
         source = lookahead(
-                orders, 
-                __orderIndex, 
+                orders,
+                __orderIndex,
                 msgs[3]);
-    } 
+    }
     /*
      * -1 means was not able to find the right source,
      * -2 means it was cancelled
      */
-    /* DEBUG("request: %p, source: %d\n", */ 
+    /* DEBUG("request: %p, source: %d\n", */
     /*         request, source); */
     MPI_ASSERT(source != -1);
     ret = __MPI_Irecv(
-            buf, 
-            count, 
-            datatype, 
-            source, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            source,
+            tag,
+            comm,
             request,
             messagePool);
-    /* DEBUG("MPI_Irecv returning, rank: %d, request: %p\n", 
+    /* DEBUG("MPI_Irecv returning, rank: %d, request: %p\n",
      * rank, request); */
     return ret;
 }
 
 int MPI_Isend(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     int rank;
@@ -431,18 +472,18 @@ int MPI_Isend(
     auto tok = chrono::high_resolution_clock::now();
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     int ret = __MPI_Isend(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            dest,
+            tag,
+            comm,
             request,
             messagePool,
             lastNodes);
-        
+
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Isend", 
+            "MPI_Isend",
             lastNodes);
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Isend\n", rank); */
@@ -455,8 +496,8 @@ int MPI_Isend(
     // I just need to keep track of the request
     /* DEBUG("lastInd: %zu at rank: %d\n", lastInd, rank); */
     vector<string> msgs = getMsgs(
-            orders, 
-            alignedIndex, 
+            orders,
+            alignedIndex,
             __orderIndex);
     MPI_EQUAL(msgs[0], "MPI_Isend");
     MPI_EQUAL(stoi(msgs[1]), rank);
@@ -468,12 +509,12 @@ int MPI_Isend(
 }
 
 int MPI_Irsend(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     FUNCGUARD();
@@ -485,19 +526,19 @@ int MPI_Irsend(
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
     int ret = PMPI_Irsend(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            dest,
+            tag,
+            comm,
             request);
     bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
+            __q,
+            isAligned,
+            lastInd,
             __loopTrees);
     if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Irsend\n", rank); */
@@ -510,8 +551,8 @@ int MPI_Irsend(
     }
     // I just need to keep track of the request
     vector<string> msgs = getMsgs(
-            orders, 
-            lastInd, 
+            orders,
+            lastInd,
             __orderIndex);
     /* DEBUG("MPI_Irsend: %s -> %p\n", msgs[3].c_str(), request); */
     MPI_ASSERT(msgs[0] == "MPI_Irsend");
@@ -538,7 +579,7 @@ int MPI_Cancel(
     auto tok = chrono::high_resolution_clock::now();
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Cancel", 
+            "MPI_Cancel",
             lastNodes);
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Cancel\n", rank); */
@@ -548,8 +589,8 @@ int MPI_Cancel(
     // I just need to keep track that it is cancelled
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getMsgs(
-            orders, 
-            alignedIndex, 
+            orders,
+            alignedIndex,
             __orderIndex);
     MPI_EQUAL(ret, MPI_SUCCESS);
     MPI_EQUAL(msgs[0], "MPI_Cancel");
@@ -563,76 +604,78 @@ int MPI_Cancel(
     return ret;
 }
 
+// optimize MPI_Test function, reduce string processing and calculation overhead
 int MPI_Test(
-    MPI_Request *request, 
-    int *flag, 
+    MPI_Request *request,
+    int *flag,
     MPI_Status *status
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    /* DEBUG("MPI_Test, rank: %d\n", rank); */
-    //DEBUG0(":%d:%p", rank, request);
+
+    // measure the execution time of updateAndGetLastNodes, for performance analysis
     auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
     auto tok = chrono::high_resolution_clock::now();
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
 
+    // use optimized alignment function
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Test", 
+            "MPI_Test",
             lastNodes);
+
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
-        /* DEBUG("at rank %d, the alignment was not successful at MPI_Test\n", rank); */
         // don't control anything
         return __MPI_Test(
-                request, 
-                flag, 
+                request,
+                flag,
                 status,
                 messagePool);
     }
-    /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
-    string recSendNodes = "";
+
+    // get message, preallocating recSendNodes string may be useful
+    string recSendNodes;
     vector<string> msgs = getMsgs(
-            orders, 
-            alignedIndex, 
+            orders,
+            alignedIndex,
             __orderIndex,
             &recSendNodes);
-    MPI_ASSERT(msgs[0] == "MPI_Test");
-    MPI_ASSERT(stoi(msgs[1]) == rank);
+
+    // use MPI_EQUAL macro for assertion check
+    MPI_EQUAL(msgs[0], "MPI_Test");
+    MPI_EQUAL(stoi(msgs[1]), rank);
     MPI_ASSERT(__requests.find(msgs[2]) != __requests.end());
     MPI_ASSERT(__requests[msgs[2]] == request);
+
     int ret = MPI_SUCCESS;
     if(msgs[3] == "SUCCESS") {
-        /*
-         * call wait and make sure it succeeds
-         */
+        // call wait and ensure it succeeds
         int src = stoi(msgs[4]);
         ret = __MPI_Wait(
                 request,
                 status,
                 messagePool);
+
         if(__isends.find(request) != __isends.end()) {
             __isends.erase(request);
         } else {
             MPI_EQUAL(status->MPI_SOURCE, src);
         }
-        /* __requests.erase(msgs[2]); */
+
         *flag = 1;
     } else {
-        /* 
-         * don't call anything
-         */
+        // don't call anything
         *flag = 0;
     }
-    /* DEBUG("MPI_Test returning, rank: %d\n", rank); */
-    
+
     return ret;
 }
 
 int MPI_Testall (
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *flag, 
+    int count,
+    MPI_Request array_of_requests[],
+    int *flag,
     MPI_Status array_of_statuses[]
 ) {
     int rank;
@@ -645,20 +688,20 @@ int MPI_Testall (
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
 
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Testall", 
+            "MPI_Testall",
             lastNodes);
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
         // don't control anything
         return __MPI_Testall(
-                count, 
-                array_of_requests, 
-                flag, 
+                count,
+                array_of_requests,
+                flag,
                 array_of_statuses,
                 messagePool);
     }
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getMsgs(
-            orders, 
+            orders,
             alignedIndex,
             __orderIndex);
     MPI_EQUAL(msgs[0], "MPI_Testall");
@@ -670,8 +713,8 @@ int MPI_Testall (
         MPI_Status stats[count];
         string repSendNodes [count];
         ret = __MPI_Waitall(
-                count, 
-                array_of_requests, 
+                count,
+                array_of_requests,
                 stats,
                 messagePool,
                 repSendNodes);
@@ -687,11 +730,11 @@ int MPI_Testall (
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(
-                        &array_of_statuses[i], 
-                        &stats[i], 
+                        &array_of_statuses[i],
+                        &stats[i],
                         sizeof(MPI_Status));
             }
-        
+
             MPI_ASSERT(__requests.find(msgs[4 + 3 * i]) != __requests.end());
             MPI_EQUAL(__requests[msgs[4 + 3 * i]], &array_of_requests[i]);
         }
@@ -704,10 +747,10 @@ int MPI_Testall (
 }
 
 int MPI_Testsome(
-    int incount, 
-    MPI_Request array_of_requests[], 
-    int *outcount, 
-    int array_of_indices[], 
+    int incount,
+    MPI_Request array_of_requests[],
+    int *outcount,
+    int array_of_indices[],
     MPI_Status array_of_statuses[]
 ) {
     // record which of the requests were filled in this
@@ -721,23 +764,23 @@ int MPI_Testsome(
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
 
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Testsome", 
+            "MPI_Testsome",
             lastNodes);
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Testsome\n", myrank); */
         // don't control anything
         return __MPI_Testsome(
-                incount, 
-                array_of_requests, 
-                outcount, 
-                array_of_indices, 
+                incount,
+                array_of_requests,
+                outcount,
+                array_of_indices,
                 array_of_statuses,
                 messagePool);
     }
 
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getMsgs(
-            orders, 
+            orders,
             alignedIndex,
             __orderIndex);
     /* fprintf(stderr, "msgs[0]: %s\n", msgs[0].c_str()); */
@@ -758,11 +801,11 @@ int MPI_Testsome(
             req = (MPI_Request *)__requests[msgs[3 + 3 * i]];
             src = stoi(msgs[3 + 3 * i + 1]);
             ind = req - array_of_requests;
-            MPI_ASSERT(0 <= ind 
+            MPI_ASSERT(0 <= ind
                     && ind < incount);
             string repSendNodes = "";
             ret = __MPI_Wait(
-                    req, 
+                    req,
                     &stat,
                     messagePool,
                     &repSendNodes);
@@ -774,14 +817,14 @@ int MPI_Testsome(
             } else {
                 MPI_EQUAL(stat.MPI_SOURCE, src);
                 auto recSendNodes = msgs[3 + 3 * i + 2];
-                /* fprintf(stderr, "at %s, sendNodes: %s\n", */ 
+                /* fprintf(stderr, "at %s, sendNodes: %s\n", */
                 /*         __func__, recSendNodes.c_str()); */
                 MPI_ASSERT(recSendNodes == repSendNodes);
             }
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(
-                        &array_of_statuses[i], 
-                        &stat, 
+                        &array_of_statuses[i],
+                        &stat,
                         sizeof(MPI_Status));
             }
         }
@@ -792,68 +835,69 @@ int MPI_Testsome(
 
 }
 
+// optimize MPI_Wait function, similar to MPI_Test
 int MPI_Wait(
-    MPI_Request *request, 
+    MPI_Request *request,
     MPI_Status *status
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     auto tik = chrono::high_resolution_clock::now();
     string lastNodes = updateAndGetLastNodes(
             __loopTrees, TraceType::REPLAY);
     auto tok = chrono::high_resolution_clock::now();
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
+
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Wait", 
+            "MPI_Wait",
             lastNodes);
+
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
-        /* DEBUG("at rank %d, the alignment was not successful at MPI_Wait\n", rank); */
         // don't control anything
         return __MPI_Wait(
-                request, 
+                request,
                 status,
                 messagePool);
     }
-    // I just need to keep track that it is cancelled
-    /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
-    string recSendNodes = "";
+
+    // get message
+    string recSendNodes;
     vector<string> msgs = getMsgs(
-            orders, 
+            orders,
             alignedIndex,
             __orderIndex,
             &recSendNodes);
+
     MPI_EQUAL(msgs[0], "MPI_Wait");
     MPI_EQUAL(stoi(msgs[1]), rank);
     MPI_ASSERT(__requests.find(msgs[2]) != __requests.end());
     int src = stoi(msgs[4]);
-    // let's first call wait and see if the message is from the source 
+
+    // call wait and check if the message is from the correct source
     MPI_Status localStat;
-    string repSendNodes = "";
+    string repSendNodes;
     int ret = __MPI_Wait(
-            request, 
+            request,
             &localStat,
             messagePool,
             &repSendNodes);
+
     if(status != MPI_STATUS_IGNORE) {
         memcpy(
-                status, 
-                &localStat, 
+                status,
+                &localStat,
                 sizeof(MPI_Status));
     }
+
     MPI_EQUAL(ret, MPI_SUCCESS);
-    /*
-     * if the request is for the receive,
-     * let's check the sendnodes
-     */
+
+    // if the request is a receive request, check sendnodes
     if(__isends.find(request) == __isends.end()) {
         MPI_EQUAL(recSendNodes, repSendNodes);
     }
 
-    /*
-     * if we have the message earlier, 
-     * or if the message is not from the right source, 
-     * let's alternate the source
-     */
+    // check if the source is correct
     MPI_EQUAL(status->MPI_SOURCE, src);
     MPI_EQUAL(__requests[msgs[2]], request);
     __requests.erase(msgs[2]);
@@ -862,9 +906,9 @@ int MPI_Wait(
 }
 
 int MPI_Waitany(
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *index, 
+    int count,
+    MPI_Request array_of_requests[],
+    int *index,
     MPI_Status *status
 ) {
     FUNCGUARD();
@@ -878,23 +922,23 @@ int MPI_Waitany(
     bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
+            __q,
+            isAligned,
+            lastInd,
             __loopTrees);
     if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitany\n", rank); */
         // don't control anything
         return PMPI_Waitany(
-                count, 
-                array_of_requests, 
-                index, 
+                count,
+                array_of_requests,
+                index,
                 status);
     }
     /* vector<string> msgs = parse(orders[orderIndex++], ':'); */
     vector<string> msgs = getMsgs(
-            orders, 
-            lastInd, 
+            orders,
+            lastInd,
             __orderIndex);
     MPI_ASSERT(msgs[0] == "MPI_Waitany");
     MPI_ASSERT(stoi(msgs[1]) == rank);
@@ -916,8 +960,8 @@ int MPI_Waitany(
 }
 
 int MPI_Waitall(
-    int count, 
-    MPI_Request array_of_requests[], 
+    int count,
+    MPI_Request array_of_requests[],
     MPI_Status array_of_statuses[]
 ) {
     int rank;
@@ -930,7 +974,7 @@ int MPI_Waitall(
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
 
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Waitall", 
+            "MPI_Waitall",
             lastNodes);
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Waitall\n", rank); */
@@ -938,23 +982,23 @@ int MPI_Waitall(
          * don't control anything
          */
         return __MPI_Waitall(
-                count, 
-                array_of_requests, 
+                count,
+                array_of_requests,
                 array_of_statuses,
                 messagePool);
-    } 
+    }
     vector<string> msgs = getMsgs(
-            orders, 
-            alignedIndex, 
+            orders,
+            alignedIndex,
             __orderIndex);
     if(msgs[0] != "MPI_Waitall") {
         string lastNodes = updateAndGetLastNodes(
-                __loopTrees, 
+                __loopTrees,
                 TraceType::REPLAY);
-        DEBUG("rank: %d\nmsgs[0]: %s\norderIndex: %d\nlastNodes: %s\nlastInd: %lu\nreplayTracesRaw.size(): %lu\n", 
-                rank, 
-                msgs[0].c_str(), 
-                __orderIndex, 
+        DEBUG("rank: %d\nmsgs[0]: %s\norderIndex: %d\nlastNodes: %s\nlastInd: %lu\nreplayTracesRaw.size(): %lu\n",
+                rank,
+                msgs[0].c_str(),
+                __orderIndex,
                 lastNodes.c_str(),
                 alignedIndex,
                 replayTracesRaw.size());
@@ -973,8 +1017,8 @@ int MPI_Waitall(
     string repSendNodes[count];
 
     int ret = __MPI_Waitall(
-            count, 
-            array_of_requests, 
+            count,
+            array_of_requests,
             stats,
             messagePool,
             repSendNodes);
@@ -983,8 +1027,8 @@ int MPI_Waitall(
         // first taking care of statuses
         if(array_of_statuses != MPI_STATUSES_IGNORE) {
             memcpy(
-                    &array_of_statuses[i], 
-                    &stats[i], 
+                    &array_of_statuses[i],
+                    &stats[i],
                     sizeof(MPI_Status));
         }
 
@@ -996,7 +1040,7 @@ int MPI_Waitall(
         } else {
             MPI_EQUAL(array_of_statuses[i].MPI_SOURCE, stoi(msgs[3 + 3 * i + 1]));
             auto recSendNodes = msgs[3 + 3 * i + 2];
-            /* fprintf(stderr, "at %s, sendNodes: %s\n", */ 
+            /* fprintf(stderr, "at %s, sendNodes: %s\n", */
                     /* __func__, recSendNodes.c_str()); */
             MPI_EQUAL(recSendNodes, repSendNodes[i]);
         }
@@ -1006,9 +1050,9 @@ int MPI_Waitall(
 }
 
 int MPI_Probe (
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Status *status
 ) {
     FUNCGUARD();
@@ -1018,24 +1062,24 @@ int MPI_Probe (
     bool isAligned = true;
     size_t lastInd = 0;
     __q = onlineAlignment(
-            __q, 
-            isAligned, 
-            lastInd, 
+            __q,
+            isAligned,
+            lastInd,
             __loopTrees);
     if(!isAligned) {
         /* DEBUG("at rank %d, the alignment was not successful at MPI_Probe\n", rank); */
         // don't control anything
         return __MPI_Probe(
-                source, 
-                tag, 
-                comm, 
+                source,
+                tag,
+                comm,
                 status,
                 messagePool);
-    } 
- 
+    }
+
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getMsgs(
-            orders, 
+            orders,
             lastInd,
             __orderIndex);
     MPI_ASSERT(msgs[0] == "MPI_Probe");
@@ -1047,9 +1091,9 @@ int MPI_Probe (
         source = stoi(msgs[4]);
     }
     int ret = __MPI_Probe(
-            source, 
-            tag, 
-            comm, 
+            source,
+            tag,
+            comm,
             &stat,
             messagePool);
     if(source != MPI_ANY_SOURCE) {
@@ -1066,10 +1110,10 @@ int MPI_Probe (
 }
 
 int MPI_Iprobe (
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
-    int *flag, 
+    int source,
+    int tag,
+    MPI_Comm comm,
+    int *flag,
     MPI_Status *status
 ) {
     int rank;
@@ -1081,32 +1125,32 @@ int MPI_Iprobe (
     timeUnroll += chrono::duration_cast<chrono::microseconds>(tok - tik);
 
     auto alignedIndex = easyOnlineAlignment(
-            "MPI_Iprobe", 
+            "MPI_Iprobe",
             lastNodes);
     if(alignedIndex == numeric_limits<unsigned long>::max()) {
         DEBUG("at rank %d, the alignment was not successful at MPI_Iprobe\n", rank);
         // don't control anything
         return __MPI_Iprobe(
-                source, 
-                tag, 
-                comm, 
-                flag, 
+                source,
+                tag,
+                comm,
+                flag,
                 status,
                 messagePool);
-    } 
+    }
     vector<string> msgs = getMsgs(
-            orders, 
+            orders,
             alignedIndex,
             __orderIndex);
     /* DEBUG0("MPI_Iprobe:%s\n", orders[__order_index].c_str()); */
     if(msgs[0] != "MPI_Iprobe") {
         string lastNodes = updateAndGetLastNodes(
-                __loopTrees, 
+                __loopTrees,
                 TraceType::REPLAY);
-        DEBUG("rank: %d\nmsgs[0]: %s\n__order_index: %d\nlastNodes: %s\n", 
-                rank, 
-                msgs[0].c_str(), 
-                __orderIndex, 
+        DEBUG("rank: %d\nmsgs[0]: %s\n__order_index: %d\nlastNodes: %s\n",
+                rank,
+                msgs[0].c_str(),
+                __orderIndex,
                 lastNodes.c_str());
     }
     MPI_EQUAL(msgs[0], "MPI_Iprobe");
@@ -1121,9 +1165,9 @@ int MPI_Iprobe (
             source = stoi(msgs[5]);
         }
         ret = __MPI_Probe(
-                source, 
-                tag, 
-                comm, 
+                source,
+                tag,
+                comm,
                 &stat,
                 messagePool);
         MPI_ASSERT(ret == MPI_SUCCESS);
@@ -1144,12 +1188,12 @@ int MPI_Iprobe (
 }
 
 int MPI_Send_init (
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     FUNCGUARD();
@@ -1158,35 +1202,35 @@ int MPI_Send_init (
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getMsgs(
-            orders, 
+            orders,
             0,
             __orderIndex);
     MPI_ASSERT(msgs[0] == "MPI_Send_init");
     MPI_ASSERT(stoi(msgs[1]) == rank);
     MPI_ASSERT(stoi(msgs[2]) == dest);
     // below is commented on purpose, do not uncomment
-    /* MPI_ASSERT(__requests.find(msgs[3]) == __requests.end()); */ 
+    /* MPI_ASSERT(__requests.find(msgs[3]) == __requests.end()); */
     __requests[msgs[3]] = request;
     __isends.insert(request);
     int ret = PMPI_Send_init(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            dest,
+            tag,
+            comm,
             request);
     MPI_ASSERT(ret == MPI_SUCCESS);
     return ret;
 }
 
 int MPI_Recv_init (
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     FUNCGUARD();
@@ -1195,7 +1239,7 @@ int MPI_Recv_init (
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     /* vector<string> msgs = parse(orders[__order_index++], ':'); */
     vector<string> msgs = getMsgs(
-            orders, 
+            orders,
             __orderIndex,
             __orderIndex);
     MPI_ASSERT(msgs[0] == "MPI_Recv_init");
@@ -1206,25 +1250,25 @@ int MPI_Recv_init (
     __requests[msgs[3]] = request;
     if(source == MPI_ANY_SOURCE) {
         source = lookahead(
-                orders, 
-                __orderIndex, 
+                orders,
+                __orderIndex,
                 msgs[3]);
         MPI_ASSERT(source != -1);
     }
     int ret = PMPI_Recv_init(
-            buf, 
-            count, 
-            datatype, 
-            source, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            source,
+            tag,
+            comm,
             request);
     MPI_ASSERT(ret == MPI_SUCCESS);
     return ret;
 }
 
 int MPI_Startall (
-    int count, 
+    int count,
     MPI_Request array_of_requests[]
 ) {
     FUNCGUARD();

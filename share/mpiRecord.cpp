@@ -44,13 +44,12 @@ extern "C" void printBBname(const char *name) {
     MPI_Finalized(&flag2);
     if(flag1 && !flag2) {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        recordTracesRaw.push_back(parse(name, ':'));
         MPI_ASSERT(traceFile != nullptr);
-        fprintf(traceFile, 
-                "%s:%lu\n", 
-                name, 
+        fprintf(traceFile,
+                "%s:%lu\n",
+                name,
                 nodecnt++);
-        string str(name);
-        appendRecordTracesRaw(parse(str, ':'));
     }
     return;
 }
@@ -58,17 +57,17 @@ extern "C" void printBBname(const char *name) {
 void checkCallLocations(
         string mpiCall, string& lastNodes) {
     static unordered_map<string, unsigned long> lastCallLocations;
-    if(__callLocations[mpiCall].find(lastNodes) 
+    if(__callLocations[mpiCall].find(lastNodes)
             != __callLocations[mpiCall].end()
             && __callLocations[mpiCall][lastNodes] != nodecnt - 1) {
         //if(lastCallLocations[mpiCall] + 1 != nodecnt - 1) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        fprintf(stderr, "rank: %d, mpiCall: %s, lastNodes: %s\nlastCallLocations:%lu, nodecnt:%lu\n", 
+        fprintf(stderr, "rank: %d, mpiCall: %s, lastNodes: %s\nlastCallLocations:%lu, nodecnt:%lu\n",
             rank,
             mpiCall.c_str(),
             lastNodes.c_str(),
-            lastCallLocations[mpiCall], 
+            lastCallLocations[mpiCall],
             nodecnt - 1);
         MPI_Abort(MPI_COMM_WORLD, 1);
         //}
@@ -79,7 +78,7 @@ void checkCallLocations(
 }
 
 int MPI_Init(
-    int *argc, 
+    int *argc,
     char ***argv
 ) {
     int ret = PMPI_Init(argc, argv);
@@ -90,7 +89,7 @@ int MPI_Init(
     /*
      * open the message exchange record file
      */
-    string filename = ".record" + to_string(rank) + ".txt";  
+    string filename = ".record" + to_string(rank) + ".txt";
     recordFile = fopen(filename.c_str(), "w");
     if(recordFile == nullptr) {
         fprintf(stderr, "failed to open record file\n");
@@ -109,13 +108,13 @@ int MPI_Init(
 
     /*
      * parse the loop tree file
-     */ 
+     */
     string loopTreeFileName = "loops.dot";
     loopTrees = parseDotFile(loopTreeFileName);
     for(auto lt: loopTrees) {
         lt.second->fixExclusives();
     }
-    
+
     __callLocations["MPI_Recv"] = map<string, unsigned long>();
     __callLocations["MPI_Irecv"] = map<string, unsigned long>();
     __callLocations["MPI_Isend"] = map<string, unsigned long>();
@@ -165,21 +164,21 @@ int MPI_Finalize(void) {
 }
 
 int MPI_Recv(
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Status *status) {
-    
+
     int ret =  __MPI_Recv(
-            buf, 
-            count, 
-            datatype, 
-            source, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            source,
+            tag,
+            comm,
             status,
             messagePool,
             nullptr,
@@ -192,22 +191,22 @@ int MPI_Recv(
 }
 
 int MPI_Send(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
     MPI_Comm comm
 ) {
     //DEBUG("MPI_Send:to %d, at %d\n", dest, rank);
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
     int ret = __MPI_Send(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
+            buf,
+            count,
+            datatype,
+            dest,
+            tag,
             comm,
             messagePool,
             lastNodes);
@@ -217,23 +216,23 @@ int MPI_Send(
 }
 
 int MPI_Irecv(
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
-    /* DEBUG("MPI_Irecv: %p, source: %d\n", */ 
+    /* DEBUG("MPI_Irecv: %p, source: %d\n", */
     /*         request, source); */
     int ret = __MPI_Irecv(
-            buf, 
-            count, 
-            datatype, 
-            source, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            source,
+            tag,
+            comm,
             request,
             messagePool,
             recordFile,
@@ -249,12 +248,12 @@ int MPI_Irecv(
 }
 
 int MPI_Isend(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     string lastNodes = updateAndGetLastNodes(
@@ -272,12 +271,12 @@ int MPI_Isend(
     /* } */
 
     int ret = __MPI_Isend(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            dest,
+            tag,
+            comm,
             request,
             messagePool,
             lastNodes,
@@ -292,20 +291,20 @@ int MPI_Isend(
     return ret;
 }
 
-/* 
- * This is an MPI_Isend that needs the receiver to be ready 
- * by the time it is called. Otherwise, it creates an undefined behavior 
+/*
+ * This is an MPI_Isend that needs the receiver to be ready
+ * by the time it is called. Otherwise, it creates an undefined behavior
  * (e.g. lost messages, program crash, data corruption, etc.).
- * We will simply abort when this function is called as of now 
+ * We will simply abort when this function is called as of now
  * (and implement as necessary).
  */
 int MPI_Irsend(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     FUNCGUARD();
@@ -313,22 +312,22 @@ int MPI_Irsend(
     MPI_Comm_rank(
             MPI_COMM_WORLD, &rank);
     int ret = PMPI_Irsend(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            dest,
+            tag,
+            comm,
             request);
     // I just need to keep track of the request
-    fprintf(recordFile, "MPI_Irsend|%d|%d|%p|%lu\n", 
-            rank, 
-            dest, 
-            request, 
+    fprintf(recordFile, "MPI_Irsend|%d|%d|%p|%lu\n",
+            rank,
+            dest,
+            request,
             nodecnt);
-    RECORDTRACE("MPI_Irsend|%d|%d|%p\n", 
-            rank, 
-            dest, 
+    RECORDTRACE("MPI_Irsend|%d|%d|%p\n",
+            rank,
+            dest,
             request);
     __requests[request] = "MPI_Irsend";
     return ret;
@@ -339,9 +338,9 @@ int MPI_Cancel(
 ) {
     MPI_ASSERT(__requests.find(request) != __requests.end());
     int ret = __MPI_Cancel(
-            request, 
-            messagePool, 
-            recordFile, 
+            request,
+            messagePool,
+            recordFile,
             nodecnt);
     __requests.erase(request);
     string lastNodes = updateAndGetLastNodes(
@@ -351,18 +350,18 @@ int MPI_Cancel(
 }
 
 int MPI_Test(
-    MPI_Request *request, 
-    int *flag, 
+    MPI_Request *request,
+    int *flag,
     MPI_Status *status
 ) {
     MPI_ASSERT(
             __requests.find(request) != __requests.end());
     int ret = __MPI_Test(
-            request, 
-            flag, 
-            status, 
-            messagePool, 
-            recordFile, 
+            request,
+            flag,
+            status,
+            messagePool,
+            recordFile,
             nodecnt);
     if(*flag) {
         __requests.erase(request);
@@ -375,20 +374,20 @@ int MPI_Test(
 
 // flag == true iff all requests are completed
 int MPI_Testall(
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *flag, 
+    int count,
+    MPI_Request array_of_requests[],
+    int *flag,
     MPI_Status array_of_statuses[]
 ) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret = __MPI_Testall(
-            count, 
-            array_of_requests, 
-            flag, 
-            array_of_statuses, 
-            messagePool, 
-            recordFile, 
+            count,
+            array_of_requests,
+            flag,
+            array_of_statuses,
+            messagePool,
+            recordFile,
             nodecnt);
 
     if(*flag) {
@@ -404,20 +403,20 @@ int MPI_Testall(
 }
 
 int MPI_Testsome(
-    int incount, 
-    MPI_Request array_of_requests[], 
-    int *outcount, 
-    int array_of_indices[], 
+    int incount,
+    MPI_Request array_of_requests[],
+    int *outcount,
+    int array_of_indices[],
     MPI_Status array_of_statuses[]
 ) {
     int ret = __MPI_Testsome(
-            incount, 
-            array_of_requests, 
-            outcount, 
-            array_of_indices, 
-            array_of_statuses, 
-            messagePool, 
-            recordFile, 
+            incount,
+            array_of_requests,
+            outcount,
+            array_of_indices,
+            array_of_statuses,
+            messagePool,
+            recordFile,
             nodecnt);
 
     if(*outcount > 0) {
@@ -434,16 +433,16 @@ int MPI_Testsome(
 }
 
 int MPI_Wait(
-    MPI_Request *request, 
+    MPI_Request *request,
     MPI_Status *status
 ) {
     MPI_ASSERT(__requests.find(request) != __requests.end());
     int ret = __MPI_Wait(
-            request, 
-            status, 
-            messagePool, 
+            request,
+            status,
+            messagePool,
             nullptr,
-            recordFile, 
+            recordFile,
             nodecnt);
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
@@ -452,9 +451,9 @@ int MPI_Wait(
 }
 
 int MPI_Waitany(
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *index, 
+    int count,
+    MPI_Request array_of_requests[],
+    int *index,
     MPI_Status *status
 ) {
     FUNCGUARD();
@@ -462,25 +461,25 @@ int MPI_Waitany(
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Status stat;
     int ret = PMPI_Waitany(
-            count, 
-            array_of_requests, 
-            index, 
+            count,
+            array_of_requests,
+            index,
             &stat);
-    
+
     if(status != MPI_STATUS_IGNORE) {
         *status = stat;
     }
 
     if(*index == MPI_UNDEFINED) {
-        fprintf(recordFile, "MPI_Waitany|%d|FAIL|%lu\n", 
+        fprintf(recordFile, "MPI_Waitany|%d|FAIL|%lu\n",
                 rank, nodecnt);
     } else {
         MPI_ASSERT(__requests.find(&array_of_requests[*index]) != __requests.end());
         /* string req = __requests[&array_of_requests[*index]]; */
-        fprintf(recordFile, "MPI_Waitany|%d|SUCCESS|%p|%d|%lu\n", 
-                rank, 
-                &array_of_requests[*index], 
-                stat.MPI_SOURCE, 
+        fprintf(recordFile, "MPI_Waitany|%d|SUCCESS|%p|%d|%lu\n",
+                rank,
+                &array_of_requests[*index],
+                stat.MPI_SOURCE,
                 nodecnt);
     }
     /*
@@ -494,29 +493,29 @@ int MPI_Waitany(
 
 // if it is successful, then record all of the requests and the source
 int MPI_Waitall(
-    int count, 
-    MPI_Request array_of_requests[], 
+    int count,
+    MPI_Request array_of_requests[],
     MPI_Status array_of_statuses[]
 ) {
     for(int i = 0; i < count; i++) {
         MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
-    } 
+    }
     int ret = 0;
     try {
         ret = __MPI_Waitall(
-                count, 
-                array_of_requests, 
-                array_of_statuses, 
-                messagePool, 
+                count,
+                array_of_requests,
+                array_of_statuses,
+                messagePool,
                 nullptr,
-                recordFile, 
+                recordFile,
                 nodecnt);
     } catch(const exception &e) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         string localLastNodes = updateAndGetLastNodes(
                 loopTrees, TraceType::RECORD);
-        fprintf(stderr, "exception caught at %s\nrank: %d\n", 
+        fprintf(stderr, "exception caught at %s\nrank: %d\n",
                 __func__,
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -530,27 +529,27 @@ int MPI_Waitall(
 // not sure if these are actually necessary
 // we can check for MPI_Comm too later
 int MPI_Probe (
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Status *status
 ) {
     int ret;
     try {
         ret = __MPI_Probe(
-            source, 
-            tag, 
-            comm, 
-            status, 
-            messagePool, 
-            recordFile, 
+            source,
+            tag,
+            comm,
+            status,
+            messagePool,
+            recordFile,
             nodecnt);
     } catch (const exception &e) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         string localLastNodes = updateAndGetLastNodes(
                 loopTrees, TraceType::RECORD);
-        fprintf(stderr, "exception caught at %s\nrank: %d\n", 
+        fprintf(stderr, "exception caught at %s\nrank: %d\n",
                 __func__,
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -562,29 +561,29 @@ int MPI_Probe (
 }
 
 int MPI_Iprobe (
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
-    int *flag, 
+    int source,
+    int tag,
+    MPI_Comm comm,
+    int *flag,
     MPI_Status *status
 ) {
     int ret;
     try {
         ret = __MPI_Iprobe(
-                source, 
-                tag, 
-                comm, 
-                flag, 
-                status, 
-                messagePool, 
-                recordFile, 
+                source,
+                tag,
+                comm,
+                flag,
+                status,
+                messagePool,
+                recordFile,
                 nodecnt);
     } catch (const exception &e) {
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         string localLastNodes = updateAndGetLastNodes(
                 loopTrees, TraceType::RECORD);
-        fprintf(stderr, "exception caught at %s\nrank: %d\n", 
+        fprintf(stderr, "exception caught at %s\nrank: %d\n",
                 __func__,
                 rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -596,46 +595,46 @@ int MPI_Iprobe (
 }
 
 int MPI_Send_init (
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     FUNCGUARD();
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret = PMPI_Send_init(
-            buf, 
-            count, 
-            datatype, 
-            dest, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            dest,
+            tag,
+            comm,
             request);
     MPI_ASSERT(__requests.find(request) == __requests.end());
     MPI_ASSERT(ret == MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Send_init|%d|%d|%p\n", 
-            rank, 
-            dest, 
+    fprintf(recordFile, "MPI_Send_init|%d|%d|%p\n",
+            rank,
+            dest,
             request);
-    RECORDTRACE("MPI_Send_init|%d|%d|%p\n", 
-            rank, 
-            dest, 
+    RECORDTRACE("MPI_Send_init|%d|%d|%p\n",
+            rank,
+            dest,
             request);
     __requests[request] = "MPI_Send_init";
     return ret;
 }
 
 int MPI_Recv_init (
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     FUNCGUARD();
@@ -643,29 +642,29 @@ int MPI_Recv_init (
     //DEBUG0("MPI_Recv_init:%d:%p\n", source, request);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int ret = PMPI_Recv_init(
-            buf, 
-            count, 
-            datatype, 
-            source, 
-            tag, 
-            comm, 
+            buf,
+            count,
+            datatype,
+            source,
+            tag,
+            comm,
             request);
     MPI_ASSERT(__requests.find(request) == __requests.end());
     MPI_ASSERT(ret == MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Recv_init|%d|%d|%p\n", 
-            rank, 
-            source, 
+    fprintf(recordFile, "MPI_Recv_init|%d|%d|%p\n",
+            rank,
+            source,
             request);
-    RECORDTRACE("MPI_Recv_init|%d|%d|%p\n", 
-            rank, 
-            source, 
+    RECORDTRACE("MPI_Recv_init|%d|%d|%p\n",
+            rank,
+            source,
             request);
     __requests[request] = "MPI_Recv_init";
     return ret;
 }
 
 int MPI_Startall (
-    int count, 
+    int count,
     MPI_Request array_of_requests[]
 ) {
     FUNCGUARD();
@@ -675,7 +674,7 @@ int MPI_Startall (
     int ret = PMPI_Startall(
             count, array_of_requests);
     MPI_ASSERT(ret == MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Startall|%d|%d", 
+    fprintf(recordFile, "MPI_Startall|%d|%d",
             rank, count);
     for(int i = 0; i < count; i++) {
         MPI_ASSERT(__requests.find(&array_of_requests[i]) != __requests.end());
@@ -694,10 +693,10 @@ int MPI_Request_free (
     MPI_ASSERT(__requests.find(request) != __requests.end());
     int ret = PMPI_Request_free(request);
     MPI_EQUAL(ret, MPI_SUCCESS);
-    fprintf(recordFile, "MPI_Request_free|%d|%p\n", 
+    fprintf(recordFile, "MPI_Request_free|%d|%p\n",
             rank, request);
     __requests.erase(request);
-    messagePool.deleteMessage(request); 
+    messagePool.deleteMessage(request);
     string lastNodes = updateAndGetLastNodes(
             loopTrees, TraceType::RECORD);
     checkCallLocations("MPI_Request_free", lastNodes);

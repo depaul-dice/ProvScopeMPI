@@ -1,5 +1,4 @@
-
-/* 
+/*
  * Assumptions:
  * 1. The MPI program is written in C
  * 2. We don't mix the blocking calls with non-blocking calls <- subject to relaxation
@@ -41,20 +40,34 @@ static unordered_set<MPI_Request *> __isends;
 
 
 extern "C" void printBBname(const char *name) {
-    int rank, flag1, flag2;
+    static int rank = -1;
+    int flag1, flag2;
+
+    // check if MPI is initialized and finalized
     MPI_Initialized(&flag1);
     MPI_Finalized(&flag2);
+
     if(flag1 && !flag2) {
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        string str(name);
-        /* fprintf(stderr, "%d:%s\n", rank, str.c_str()); */
-        replayTracesRaw.push_back(parse(str, ':'));
-        /* MPI_ASSERT(replayTracesRaw.size() > 0); */
+        // only get rank once
+        if (rank == -1) {
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        }
+
+        // use static vector to avoid repeated memory allocation
+        static vector<string> tokens;
+        tokens.clear();
+        tokens.reserve(8);  // preallocate enough space
+
+        // parse the name string
+        tokens = parse(name, ':');
+
+        // use move semantics to avoid unnecessary copying
+        replayTracesRaw.push_back(std::move(tokens));
     }
 }
 
 int MPI_Init(
-    int *argc, 
+    int *argc,
     char ***argv
 ) {
     int ret = PMPI_Init(argc, argv);
@@ -67,7 +80,7 @@ int MPI_Init(
         fprintf(stderr, "Error: cannot open file rank%d.txt\n", rank);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    char* line = nullptr; 
+    char* line = nullptr;
     size_t len = 0;
     ssize_t read;
     while((read = getline(&line, &len, fp)) != -1) {
@@ -76,7 +89,7 @@ int MPI_Init(
         }
         orders.push_back(line);
     }
-    fclose(fp);    
+    fclose(fp);
 
     string tracefile = ".record" + to_string(rank) + ".tr";
     vector<vector<string>> rawTraces;
@@ -105,7 +118,7 @@ int MPI_Init(
     /* if(rank == 0) { */
     /*     print(recordTraces, 0); */
     /* } */
-    
+
     return ret;
 }
 
@@ -120,12 +133,12 @@ int MPI_Finalize(
 
 // in this we will just manipulate the message source when calling MPI_Recv
 int MPI_Recv(
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Status *status
 ) {
     int rank;
@@ -148,12 +161,12 @@ int MPI_Recv(
 }
 
 int MPI_Irecv(
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     int rank;
@@ -161,7 +174,7 @@ int MPI_Irecv(
     // I need to look into the source first
     /* int ret = original_MPI_Irecv(buf, count, datatype, source, tag, comm, request); */
     // I just need to keep track of the request
-    
+
     vector<string> msgs = parse(orders[__order_index++], ':');
     DEBUG0("MPI_Irecv: %s -> %p: %s\t", msgs[3].c_str(), request, orders[__order_index - 1].c_str());
     MPI_ASSERTNALIGN(msgs[0] == "MPI_Irecv");
@@ -182,12 +195,12 @@ int MPI_Irecv(
 }
 
 int MPI_Isend(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     int rank;
@@ -206,12 +219,12 @@ int MPI_Isend(
 }
 
 int MPI_Irsend(
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     FUNCGUARD();
@@ -254,8 +267,8 @@ int MPI_Cancel(
 }
 
 int MPI_Test(
-    MPI_Request *request, 
-    int *flag, 
+    MPI_Request *request,
+    int *flag,
     MPI_Status *status
 ) {
     DEBUG0("MPI_Test");
@@ -284,14 +297,14 @@ int MPI_Test(
         DEBUG0(":FAIL\n");
         *flag = 0;
     }
-    
+
     return ret;
 }
 
 int MPI_Testall (
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *flag, 
+    int count,
+    MPI_Request array_of_requests[],
+    int *flag,
     MPI_Status array_of_statuses[]
 ) {
     /* DEBUG0("MPI_Testall\n"); */
@@ -331,7 +344,7 @@ int MPI_Testall (
             if(array_of_statuses != MPI_STATUSES_IGNORE) {
                 memcpy(&array_of_statuses[i], &stats[i], sizeof(MPI_Status));
             }
-        
+
             MPI_ASSERTNALIGN(__requests.find(msgs[4 + 2 * i]) != __requests.end());
             MPI_ASSERTNALIGN(__requests[msgs[4 + 2 * i]] == &array_of_requests[i]);
             /* __requests.erase(msgs[4 + 2 * i]); */
@@ -345,10 +358,10 @@ int MPI_Testall (
 }
 
 int MPI_Testsome(
-    int incount, 
-    MPI_Request array_of_requests[], 
-    int *outcount, 
-    int array_of_indices[], 
+    int incount,
+    MPI_Request array_of_requests[],
+    int *outcount,
+    int array_of_indices[],
     MPI_Status array_of_statuses[]
 ) {
     // record which of the requests were filled in this
@@ -406,7 +419,7 @@ int MPI_Testsome(
 }
 
 int MPI_Wait(
-    MPI_Request *request, 
+    MPI_Request *request,
     MPI_Status *status
 ) {
     DEBUG0("MPI_Wait\n");
@@ -418,7 +431,7 @@ int MPI_Wait(
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
     MPI_ASSERTNALIGN(__requests.find(msgs[2]) != __requests.end());
     int src = stoi(msgs[4]);
-    // let's first call wait and see if the message is from the source 
+    // let's first call wait and see if the message is from the source
     int ret = PMPI_Wait(request, status);
     MPI_ASSERT(ret == MPI_SUCCESS);
     // if we have the message earlier, or if the message is not from the right source, let's alternate the source
@@ -430,9 +443,9 @@ int MPI_Wait(
 }
 
 int MPI_Waitany(
-    int count, 
-    MPI_Request array_of_requests[], 
-    int *index, 
+    int count,
+    MPI_Request array_of_requests[],
+    int *index,
     MPI_Status *status
 ) {
     DEBUG0("MPI_Waitany");
@@ -466,8 +479,8 @@ int MPI_Waitany(
 }
 
 int MPI_Waitall(
-    int count, 
-    MPI_Request array_of_requests[], 
+    int count,
+    MPI_Request array_of_requests[],
     MPI_Status array_of_statuses[]
 ) {
     /* for(int i = 0; i < count; i++) { */
@@ -504,9 +517,9 @@ int MPI_Waitall(
 }
 
 int MPI_Probe (
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Status *status
 ) {
     DEBUG0("MPI_Probe\n");
@@ -536,10 +549,10 @@ int MPI_Probe (
 }
 
 int MPI_Iprobe (
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
-    int *flag, 
+    int source,
+    int tag,
+    MPI_Comm comm,
+    int *flag,
     MPI_Status *status
 ) {
     /* DEBUG0("MPI_Iprobe\n"); */
@@ -577,12 +590,12 @@ int MPI_Iprobe (
 }
 
 int MPI_Send_init (
-    const void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int dest, 
-    int tag, 
-    MPI_Comm comm, 
+    const void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int dest,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     DEBUG0("MPI_Send_init\n");
@@ -593,7 +606,7 @@ int MPI_Send_init (
     MPI_ASSERTNALIGN(stoi(msgs[1]) == rank);
     MPI_ASSERTNALIGN(stoi(msgs[2]) == dest);
     // below is commented on purpose, do not uncomment
-    /* MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end()); */ 
+    /* MPI_ASSERTNALIGN(__requests.find(msgs[3]) == __requests.end()); */
     __requests[msgs[3]] = request;
     __isends.insert(request);
     int ret = PMPI_Send_init(buf, count, datatype, dest, tag, comm, request);
@@ -602,12 +615,12 @@ int MPI_Send_init (
 }
 
 int MPI_Recv_init (
-    void *buf, 
-    int count, 
-    MPI_Datatype datatype, 
-    int source, 
-    int tag, 
-    MPI_Comm comm, 
+    void *buf,
+    int count,
+    MPI_Datatype datatype,
+    int source,
+    int tag,
+    MPI_Comm comm,
     MPI_Request *request
 ) {
     DEBUG0("MPI_Recv_init\n");
@@ -630,7 +643,7 @@ int MPI_Recv_init (
 }
 
 int MPI_Startall (
-    int count, 
+    int count,
     MPI_Request array_of_requests[]
 ) {
     DEBUG0("MPI_Startall\n");
