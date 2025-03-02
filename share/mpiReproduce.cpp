@@ -20,6 +20,7 @@ unordered_map<string, unordered_map<string, unsigned long>> __callLocations;
 /* static unsigned __recordtrace_index = 0; */
 extern vector<shared_ptr<element>> recordTraces;
 extern vector<vector<string>> replayTracesRaw;
+extern vector<const char *> replayTracesRawTmp;
 /*
  * below is for the debugging purpose, delete when done
  */
