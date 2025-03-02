@@ -1,14 +1,14 @@
-
+#include "alignment.h"
 #include "alignmentUtils.h"
 
 using namespace std;
 
 void insertIterationsAndFixStack(
-        vector<shared_ptr<element>> &iterations,
-        stack<shared_ptr<element>> &stack,
-        shared_ptr<element> &curr,
-        shared_ptr<element> &parent,
-        vector<shared_ptr<element>> &functionalTraces) {
+        vector<ElementPtr> &iterations,
+        stack<ElementPtr> &stack,
+        ElementPtr &curr,
+        ElementPtr &parent,
+        vector<ElementPtr> &functionalTraces) {
     curr = parent;
     if(!stack.empty()) {
         stack.top()->funcs.back().insert(
@@ -28,9 +28,9 @@ void insertIterationsAndFixStack(
 }
 
 void insertIterations(
-        vector<shared_ptr<element>> &iterations,
-        shared_ptr<element> &parent,
-        vector<shared_ptr<element>> &functionalTraces) {
+        vector<ElementPtr> &iterations,
+        ElementPtr &parent,
+        vector<ElementPtr> &functionalTraces) {
     if(parent != nullptr) {
         parent->funcs.back().insert(
                 parent->funcs.back().end(),
@@ -46,9 +46,9 @@ void insertIterations(
 }
 
 void levelUpStack(
-        stack<shared_ptr<element>> &stack,
-        shared_ptr<element> &curr,
-        shared_ptr<element> &parent) {
+        stack<ElementPtr> &stack,
+        ElementPtr &curr,
+        ElementPtr &parent) {
     curr = parent;
     if(!stack.empty()) {
         parent = stack.top();
@@ -60,26 +60,67 @@ void levelUpStack(
 }
 
 void fixIterations(
-        vector<shared_ptr<element>>& functionalTraces,
-        shared_ptr<element> newChild) {
-    if(functionalTraces.empty()) {
+        vector<ElementPtr>& functionalTraces,
+        ElementPtr newChild) {
+    // 严格检查输入参数
+    if(functionalTraces.empty() || !newChild || !newChild.get()) {
         return;
     }
 
-    // preallocate the required capacity
+    // 预分配所需的容量
     if(functionalTraces.capacity() < functionalTraces.size() + 1) {
         functionalTraces.reserve(functionalTraces.size() * 2);
     }
 
-    shared_ptr<element> lastChild = functionalTraces.back();
-    if(lastChild->bb() == newChild->bb()
+    ElementPtr lastChild = functionalTraces.back();
+    if(!lastChild || !lastChild.get()) {
+        return; // 防止空指针访问
+    }
+
+    // 安全地构造字符串
+    string lastChildBB;
+    string newChildBB;
+
+    try {
+        if(lastChild->funcname.empty() || newChild->funcname.empty()) {
+            return; // 函数名为空，不继续处理
+        }
+
+        // 手动构造BB字符串，避免调用可能不安全的bb()方法
+        if(lastChild->isEntry) {
+            lastChildBB = lastChild->funcname + ":entry:" + to_string(lastChild->id);
+        } else if(lastChild->isExit) {
+            lastChildBB = lastChild->funcname + ":exit:" + to_string(lastChild->id);
+        } else {
+            lastChildBB = lastChild->funcname + ":neither:" + to_string(lastChild->id);
+        }
+
+        if(newChild->isEntry) {
+            newChildBB = newChild->funcname + ":entry:" + to_string(newChild->id);
+        } else if(newChild->isExit) {
+            newChildBB = newChild->funcname + ":exit:" + to_string(newChild->id);
+        } else {
+            newChildBB = newChild->funcname + ":neither:" + to_string(newChild->id);
+        }
+    } catch(...) {
+        fprintf(stderr, "ERROR: Exception in fixIterations while constructing BB strings\n");
+        return;
+    }
+
+    // 比较并设置循环索引
+    if(lastChildBB == newChildBB
             && lastChild->isLoop == false
             && newChild->isLoop == false) {
-        if(lastChild->loopIndex == -1) {
-            lastChild->loopIndex = 1;
-            newChild->loopIndex = 2;
-        } else {
-            newChild->loopIndex = lastChild->loopIndex + 1;
+        try {
+            if(lastChild->loopIndex == -1) {
+                lastChild->loopIndex = 1;
+                newChild->loopIndex = 2;
+            } else {
+                newChild->loopIndex = lastChild->loopIndex + 1;
+            }
+        } catch(...) {
+            fprintf(stderr, "ERROR: Exception in fixIterations while setting loop indices\n");
+            return;
         }
     }
 }
@@ -89,7 +130,7 @@ void fixIterations(
  */
 bool isLoopEntry(
         string bbname,
-        shared_ptr<element> parent,
+        ElementPtr parent,
         loopNode *currloop) {
     string parentbb;
     if(parent == nullptr) return false;
@@ -108,7 +149,7 @@ bool isLoopEntry(
 }
 
 void print(
-        vector<shared_ptr<element>>& functionalTraces,
+        vector<ElementPtr>& functionalTraces,
         unsigned depth) {
     for(auto& eptr : functionalTraces) {
         for(unsigned i = 0; i < depth; i++) {
@@ -133,14 +174,14 @@ void print(
 }
 
 void printsurface(
-        vector<shared_ptr<element>>& functionalTraces) {
+        vector<ElementPtr>& functionalTraces) {
     for(auto& eptr : functionalTraces) {
         fprintf(stderr, "%s\n", eptr->bb().c_str());
     }
 }
 
 void printSurfaceFunc(
-        vector<shared_ptr<element>>& functionalTraces,
+        vector<ElementPtr>& functionalTraces,
         unsigned depth,
         string funcName) {
     for(auto& eptr : functionalTraces) {

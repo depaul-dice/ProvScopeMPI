@@ -6,13 +6,13 @@ using namespace std;
  * recordTracesRaw should not be visible to mpireproduce.cpp
  */
 vector<vector<string>> recordTracesRaw;
-vector<shared_ptr<element>> recordTraces;
+vector<ElementPtr> recordTraces;
 
 /*
  * this is necessary for bbprinter
  */
 vector<vector<string>> replayTracesRaw;
-vector<shared_ptr<element>> replayTraces;
+vector<ElementPtr> replayTraces;
 
 static  unordered_map<string, unordered_set<string>> divs;
 
@@ -26,6 +26,8 @@ const unordered_set<string> mpiCallsWithSendNodesAtLast = {
     "MPI_Test",
     "MPI_Wait"
 };
+
+ElementPool elementPool(20000);
 
 void optimizeVectorAllocation() {
     recordTracesRaw.reserve(20000);
@@ -47,7 +49,7 @@ namespace {
 /*
  * this is simply the declaration of the function for a reference
  */
-vector<shared_ptr<element>> __makeHierarchyLoop(
+vector<ElementPtr> __makeHierarchyLoop(
         vector<vector<string>>& traces,
         unsigned long& index,
         unordered_map<string, loopNode *>& loopTrees,
@@ -60,7 +62,7 @@ element::element(
         int id,
         string& funcname,
         bool isLoop) :
-    funcs(vector<vector<shared_ptr<element>>>() ),
+    funcs(vector<vector<ElementPtr>>() ),
     funcname(funcname),
     index(numeric_limits<unsigned long>::max()),
     id(id),
@@ -76,7 +78,7 @@ element::element(
         string& funcname,
         unsigned long index,
         bool isLoop) :
-    funcs(vector<vector<shared_ptr<element>>>()),
+    funcs(vector<vector<ElementPtr>>() ),
     funcname(funcname),
     index(index),
     id(id),
@@ -93,7 +95,7 @@ element::element(
         string& funcname,
         unsigned long index,
         bool isLoop) :
-    funcs(vector<vector<shared_ptr<element>>>()),
+    funcs(vector<vector<ElementPtr>>() ),
     funcname(funcname),
     index(index),
     id(id),
@@ -103,20 +105,26 @@ element::element(
 }
 
 string element::bb() const {
-    string str = funcname + ":";
-    if(isEntry && isExit) {
-        str += "both:" + to_string(id);
-    } else if(isEntry) {
-        str += "entry:" + to_string(id);
-    } else if(isExit) {
-        str += "exit:" + to_string(id);
-    } else {
-        str += "neither:" + to_string(id);
+    try {
+        string str = funcname + ":";
+        if(isEntry && isExit) {
+            str += "both:" + to_string(id);
+        } else if(isEntry) {
+            str += "entry:" + to_string(id);
+        } else if(isExit) {
+            str += "exit:" + to_string(id);
+        } else {
+            str += "neither:" + to_string(id);
+        }
+        if(isLoop) {
+            str += ":loop";
+        }
+        return str;
+    } catch(...) {
+        // 如果有异常，返回空字符串
+        fprintf(stderr, "ERROR: Exception in element::bb()\n");
+        return string();
     }
-    if(isLoop) {
-        str += ":loop";
-    }
-    return str;
 }
 
 /*
@@ -198,13 +206,12 @@ string makeBBName(const vector<vector<string>>& traces, size_t idx) {
     return result;
 }
 
-vector<shared_ptr<element>> makeHierarchyMain(
+vector<ElementPtr> makeHierarchyMain(
         vector<vector<string>>& traces, unsigned long& index) {
-    vector<shared_ptr<element>> functionalTraces;
-    bool isEntry,
-         isExit;
-    string funcname = "main",
-           bbname;
+    vector<ElementPtr> functionalTraces;
+    bool isEntry, isExit;
+    string funcname = "main", bbname;
+
     while(index < traces.size()
             && funcname != traces[index][0]) {
         index++;
@@ -220,21 +227,20 @@ vector<shared_ptr<element>> makeHierarchyMain(
         MPI_EQUAL(traces[index][0], funcname);
         MPI_ASSERT(traces[index].size() == 3
                 || traces[index].size() == 4);
-        // bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         bbname = makeBBName(traces, index);
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
-        /* DEBUG0("bbname: %s\n", bbname.c_str()); */
-        shared_ptr<element> eptr;
+
+        ElementPtr eptr;
         if(traces[index].size() == 4) {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     isEntry,
                     isExit,
                     stoi(traces[index][2]),
                     traces[index][0],
                     stoul(traces[index][3]));
         } else {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     isEntry,
                     isExit,
                     stoi(traces[index][2]),
@@ -272,12 +278,12 @@ static loopNode *isNewLoop(
     return nullptr;
 }
 
-vector<shared_ptr<element>> makeHierarchyLoop(
+vector<ElementPtr> makeHierarchyLoop(
         vector<vector<string>>& traces,
         unsigned long& index,
         unordered_map<string, loopNode *>& loopTrees)  {
-    vector<shared_ptr<element>> functionalTraces;
-    shared_ptr<element> eptr;
+    vector<ElementPtr> functionalTraces;
+    ElementPtr eptr;
     bool isEntry = false,
          isExit = false;
     string bbname, funcname = traces[index][0];
@@ -307,7 +313,7 @@ vector<shared_ptr<element>> makeHierarchyLoop(
          * recursively call the function
          */
         if((child = isNewLoop(bbname, currloop)) != nullptr) {
-            vector<shared_ptr<element>> loops = __makeHierarchyLoop(
+            vector<ElementPtr> loops = __makeHierarchyLoop(
                         traces,
                         index,
                         loopTrees,
@@ -318,14 +324,14 @@ vector<shared_ptr<element>> makeHierarchyLoop(
                     loops.end());
         } else {
             if(traces[index].size() == 4) {
-                eptr = make_shared<element>(
+                eptr = createElement(
                         isEntry,
                         isExit,
                         stoi(traces[index][2]),
                         traces[index][0],
                         stoul(traces[index][3]));
             } else {
-                eptr = make_shared<element>(
+                eptr = createElement(
                         isEntry,
                         isExit,
                         stoi(traces[index][2]),
@@ -350,14 +356,14 @@ vector<shared_ptr<element>> makeHierarchyLoop(
     return functionalTraces;
 }
 
-vector<shared_ptr<element>> __makeHierarchyLoop(
+vector<ElementPtr> __makeHierarchyLoop(
         vector<vector<string>>& traces,
         unsigned long& index,
         unordered_map<string, loopNode *>& loopTrees,
         loopNode *currloop,
         int iterationCnt) {
-    vector<shared_ptr<element>> iterations, curriter;
-    shared_ptr<element> eptr;
+    vector<ElementPtr> iterations, curriter;
+    ElementPtr eptr;
     bool isEntry = false,
          isExit = false;
     string bbname,
@@ -386,7 +392,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
          */
         if((child = isNewLoop(bbname, currloop)) != nullptr) {
             /* DEBUG0("printing bbname: %s\n", bbname.c_str()); */
-            vector<shared_ptr<element>> loops = __makeHierarchyLoop(
+            vector<ElementPtr> loops = __makeHierarchyLoop(
                     traces,
                     index,
                     loopTrees,
@@ -402,7 +408,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
          * we should return what we have so far
          */
         } else if(currloop->nodes.find(bbname) == currloop->nodes.end()) {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     entryindex,
                     funcname,
                     iterationCnt++);
@@ -417,7 +423,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
          */
         } else if(curriter.size() > 0
                 && bbname == currloop->entry) {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     entryindex,
                     funcname,
                     iterationCnt++);
@@ -430,14 +436,14 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
          * else
          */
         if(traces[index].size() == 4) {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     isEntry,
                     isExit,
                     stoi(traces[index][2]),
                     traces[index][0],
                     stoul(traces[index][3]));
         } else {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     isEntry,
                     isExit,
                     stoi(traces[index][2]),
@@ -464,7 +470,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
     MPI_ASSERT(!isExit);
 
     // we could be here because we have reached the end of the trace
-    eptr = make_shared<element>(
+    eptr = createElement(
             entryindex,
             funcname,
             iterationCnt++);
@@ -485,11 +491,11 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
 /*
  * this function signature takes loops into account
  */
-vector<shared_ptr<element>> makeHierarchyMain(
+vector<ElementPtr> makeHierarchyMain(
         vector<vector<string>>& traces,
         unsigned long &index,
         unordered_map<string, loopNode *>& loopTrees) {
-    vector<shared_ptr<element>> functionalTraces;
+    vector<ElementPtr> functionalTraces;
     bool isEntry = false,
          isExit = false;
     string funcname = "main";
@@ -520,7 +526,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
          * if none, then it returns nullptr
          */
         if((child = isNewLoop(bbname, loopTree)) != nullptr) {
-            vector<shared_ptr<element>> loops = __makeHierarchyLoop(
+            vector<ElementPtr> loops = __makeHierarchyLoop(
                     traces,
                     index,
                     loopTrees,
@@ -533,16 +539,16 @@ vector<shared_ptr<element>> makeHierarchyMain(
         }
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
-        shared_ptr<element> eptr;
+        ElementPtr eptr;
         if(traces[index].size() == 4) {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     isEntry,
                     isExit,
                     stoi(traces[index][2]),
                     traces[index][0],
                     stoul(traces[index][3]));
         } else {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     isEntry,
                     isExit,
                     stoi(traces[index][2]),
@@ -573,45 +579,45 @@ vector<shared_ptr<element>> makeHierarchyMain(
  *  4. Even if the function name is the same,
  *      if we reach the new entry node, we recursively call the function
  */
-vector<shared_ptr<element>> makeHierarchy(
+vector<ElementPtr> makeHierarchy(
         vector<vector<string>>& traces, unsigned long& index) {
-    vector<shared_ptr<element>> functionalTraces;
+    vector<ElementPtr> functionalTraces;
     functionalTraces.reserve(100);
     bool isEntry, isExit;
     string bbname, funcname;
     funcname = traces[index][0];
     do {
         MPI_ASSERT(index < traces.size());
-        // bbname = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
         bbname = makeBBName(traces, index);
         MPI_ASSERT(traces[index][0] == funcname);
         MPI_ASSERT(traces[index].size() == 3
                 || traces[index].size() == 4);
         isEntry = (traces[index][1] == "entry");
         isExit = (traces[index][1] == "exit");
-        shared_ptr<element> eptr;
+        ElementPtr eptr;
+
         if(traces[index].size() == 4) {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     isEntry,
                     isExit,
                     stoi(traces[index][2]),
                     traces[index][0],
                     stoul(traces[index][3]));
         } else {
-            eptr = make_shared<element>(
+            eptr = createElement(
                     isEntry,
                     isExit,
                     stoi(traces[index][2]),
                     traces[index][0]);
         }
         index++;
+
         while(!isExit
                 && index < traces.size()
                 && traces[index][1] == "entry") {
-           vector<shared_ptr<element>> childTraces = makeHierarchy(traces, index);
-            // preallocate enough space
+            vector<ElementPtr> childTraces = makeHierarchy(traces, index);
             if(eptr->funcs.empty()) {
-                eptr->funcs.push_back(vector<shared_ptr<element>>());
+                eptr->funcs.push_back(vector<ElementPtr>());
                 eptr->funcs.back().reserve(childTraces.size());
             }
             eptr->funcs.back().insert(
@@ -628,18 +634,18 @@ vector<shared_ptr<element>> makeHierarchy(
 }
 
 void addHierarchy(
-        vector<shared_ptr<element>>& functionalTraces,
+        vector<ElementPtr>& functionalTraces,
         vector<vector<string>>& traces,
         unsigned long& index,
         unordered_map<string, loopNode *>& loopTrees) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    stack<shared_ptr<element>> __stack;
+    stack<ElementPtr> __stack;
     MPI_ASSERT(!functionalTraces.empty());
     MPI_EQUAL(functionalTraces[0]->funcname, "main");
     MPI_EQUAL(functionalTraces.back()->funcname, "main");
-    shared_ptr<element> curr = functionalTraces.back();
+    ElementPtr curr = functionalTraces.back();
     loopNode *currloop = nullptr,
              *tmploop = nullptr;
 
@@ -661,7 +667,7 @@ void addHierarchy(
      * we are setting the parent to the right value
      * we take out the parent values from the stack too
      */
-    shared_ptr<element> parent, newchild;
+    ElementPtr parent, newchild;
     MPI_ASSERT(!__stack.empty());
     curr = __stack.top();
     __stack.pop();
@@ -721,7 +727,7 @@ void addHierarchy(
              * the same level as the parent, not the children
              */
             int iterationCnt = parent->index + 1;
-            vector<shared_ptr<element>> iterations =
+            vector<ElementPtr> iterations =
                 __makeHierarchyLoop(
                         traces,
                         index,
@@ -766,7 +772,7 @@ void addHierarchy(
              * but this iterations are at the same level
              * as the children of the parent
              */
-            vector<shared_ptr<element>> loops
+            vector<ElementPtr> loops
                 = __makeHierarchyLoop(
                         traces,
                         index,
@@ -815,14 +821,14 @@ void addHierarchy(
          * we create a new element here
          */
         if(traces[index].size() == 3) {
-            newchild = make_shared<element>(
+            newchild = createElement(
                     traces[index][1] == "entry",
                     traces[index][1] == "exit",
                     stoi(traces[index][2]),
                     traces[index][0]);
         } else {
             MPI_ASSERT(traces[index].size() == 4);
-            newchild = make_shared<element>(
+            newchild = createElement(
                     traces[index][1] == "entry",
                     traces[index][1] == "exit",
                     stoi(traces[index][2]),
@@ -839,7 +845,7 @@ void addHierarchy(
              */
             if(parent->funcs.size() == 0) {
                 parent->funcs.push_back(
-                        vector<shared_ptr<element>>());
+                        vector<ElementPtr>());
             }
             /*
              * making sure that the loop index is correct
@@ -1025,7 +1031,7 @@ void appendReplayTrace(
 void appendTraces(
         unordered_map<string, loopNode *>& loopTrees,
         vector<vector<string>>& rawTraces,
-        vector<shared_ptr<element>>& traces) {
+        vector<ElementPtr>& traces) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     static unsigned long index = 0;
@@ -1065,10 +1071,10 @@ void appendTraces(
     }
 }
 
-static string getLastNodes(vector<shared_ptr<element>>& traces) {
+static string getLastNodes(vector<ElementPtr>& traces) {
     MPI_ASSERT(traces.size() > 0);
     stringstream ss;
-    shared_ptr<element> curr = traces.back();
+    ElementPtr curr = traces.back();
     int funcId = 0;
     do {
         ss << '/' << funcId << ':' << curr->bb();
@@ -1119,7 +1125,7 @@ string updateAndGetLastNodes(
 
 static inline void create_map(
         unordered_map<string, vector<size_t>>& bbMap,
-        vector<shared_ptr<element>>& reproduced,
+        vector<ElementPtr>& reproduced,
         size_t& j) {
     for(unsigned k = j; k < reproduced.size(); k++) {
         if(bbMap.find(reproduced[k]->bb()) == bbMap.end()) {
@@ -1137,7 +1143,7 @@ static inline void create_map(
  */
 static inline bool matchbbmap(
         unordered_map<string, vector<size_t>>& bbMap,
-        vector<shared_ptr<element>>& original,
+        vector<ElementPtr>& original,
         size_t& i,
         size_t& j) {
     for(unsigned k = i; k < original.size(); k++) {
@@ -1154,7 +1160,7 @@ static inline bool matchbbmap(
     return false;
 }
 
-void getProperLastInd(size_t& lastInd, shared_ptr<element> curr) {
+void getProperLastInd(size_t& lastInd, ElementPtr curr) {
     while(curr->isLoop == true) {
         MPI_ASSERT(curr->funcs.size() == 1);
         curr = curr->funcs.back().front();
@@ -1172,9 +1178,9 @@ void getProperLastInd(size_t& lastInd, shared_ptr<element> curr) {
  * already taken care of
  */
 static pair<size_t, size_t> __greedyalignmentOnline(
-        vector<shared_ptr<element>>& original,
-        vector<shared_ptr<element>>& reproduced,
-        vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned,
+        vector<ElementPtr>& original,
+        vector<ElementPtr>& reproduced,
+        vector<pair<ElementPtr, ElementPtr>>& aligned,
         size_t& initI,
         size_t& initJ,
         const int& rank,
@@ -1328,8 +1334,8 @@ static bool issuccessful(pair<size_t, size_t> p) {
 
 // this function is just to make sure
 static bool isLastAligned(
-        vector<shared_ptr<element>>& original,
-        vector<shared_ptr<element>>& reproduced,
+        vector<ElementPtr>& original,
+        vector<ElementPtr>& reproduced,
         size_t i,
         size_t j) {
     unordered_map<string, vector<size_t>> bbMap;
@@ -1358,8 +1364,8 @@ static bool isLastAligned(
  *      where we left off (for ALL cases)
  */
 deque<shared_ptr<lastaligned>> greedyalignmentOnline(
-        vector<shared_ptr<element>>& original,
-        vector<shared_ptr<element>>& reproduced,
+        vector<ElementPtr>& original,
+        vector<ElementPtr>& reproduced,
         deque<shared_ptr<lastaligned>>& q,
         size_t &i,
         size_t &j,
@@ -1367,8 +1373,8 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
         const int &rank,
         bool& isAligned,
         size_t& lastInd,
-        shared_ptr<element> originalParent,
-        shared_ptr<element> reproducedParent) {
+        ElementPtr originalParent,
+        ElementPtr reproducedParent) {
     MPI_EQUAL(original[i]->funcname, reproduced[j]->funcname);
     // if the queue is not empty, let's do the alignment level below first
     deque<shared_ptr<lastaligned>> rq;
@@ -1517,8 +1523,8 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
     /*
      * let's do the greedy alignment from where we left off in this function, below is CASE 3.
      */
-    vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned =
-        vector<pair<shared_ptr<element>, shared_ptr<element>>>();
+    vector<pair<ElementPtr, ElementPtr>> aligned =
+        vector<pair<ElementPtr, ElementPtr>>();
 
     /*
      * in case we are doing this for the first time, we should start at i and j
@@ -1676,9 +1682,9 @@ deque<shared_ptr<lastaligned>> greedyalignmentOnline(
  * it returns true iff the traces are aligned at the end
  */
 static bool __greedyAlignmentOffline(
-        vector<shared_ptr<element>>& original,
-        vector<shared_ptr<element>>& reproduced,
-        vector<pair<shared_ptr<element>, shared_ptr<element>>>& aligned,
+        vector<ElementPtr>& original,
+        vector<ElementPtr>& reproduced,
+        vector<pair<ElementPtr, ElementPtr>>& aligned,
         const int& rank) {
     size_t i = 0, j = 0;
     unordered_map<string, vector<size_t>> bbMap;
@@ -1753,10 +1759,10 @@ static bool __greedyAlignmentOffline(
 }
 
 bool greedyAlignmentWholeOffline(
-        vector<shared_ptr<element>>& original,
-        vector<shared_ptr<element>>& reproduced,
+        vector<ElementPtr>& original,
+        vector<ElementPtr>& reproduced,
         const int& rank) {
-    vector<pair<shared_ptr<element>, shared_ptr<element>>> aligned;
+    vector<pair<ElementPtr, ElementPtr>> aligned;
     /* fprintf(stderr, "greedy alignment on %s at %d original.size: %lu, reproduced.size: %lu\n", \ */
             /* original[0]->bb.c_str(), rank, original.size(), reproduced.size()); */
     bool rv = __greedyAlignmentOffline(
@@ -1851,67 +1857,69 @@ void appendRecordTracesRaw(vector<string> rawRecordTrace) {
     recordTracesRaw.push_back(rawRecordTrace);
 }
 
-size_t getIndex(shared_ptr<element>& eptr) {
-    while(eptr->isLoop) {
-        eptr = eptr->funcs.back().front();
+size_t getIndex(ElementPtr& eptr) {
+    stack<ElementPtr> st;
+    vector<ElementPtr> *curr;
+    curr = &recordTraces;
+
+    for(size_t i = 0; i < curr->size(); i++) {
+        if((*curr)[i] == eptr) {
+            return i;
+        }
     }
-    return eptr->index;
+
+    for(size_t i = 0; i < curr->size(); i++) {
+        st.push((*curr)[i]);
+        while(!st.empty()) {
+            ElementPtr e = st.top();
+            st.pop();
+            if(e == eptr) {
+                return i;
+            }
+
+            for(auto& f : e->funcs) {
+                for(auto& g : f) {
+                    st.push(g);
+                }
+            }
+        }
+    }
+
+    return numeric_limits<size_t>::max();
 }
 
 /*
  * this is for debugging and we are pushing the bbs with the index
  */
-vector<shared_ptr<element>> getCurrNodesByIndex(unsigned long index) {
-    vector<shared_ptr<element>> vec;
-    vector<shared_ptr<element>>& currLevel = recordTraces;
-    unsigned long currIndex = 0, nextIndex = 0;
-    bool pushed = false;
-    while(true) {
-        pushed = false;
-        for(unsigned i = 0; i < currLevel.size() - 1; i++) {
-            currIndex = getIndex(currLevel[i]);
-            nextIndex = getIndex(currLevel[i + 1]);
-            if(currIndex <= index && index < nextIndex) {
-                vec.push_back(currLevel[i]);
-                pushed = true;
-            }
-        }
-        if(pushed == false) {
-            currIndex = getIndex(currLevel.back());
-            MPI_ASSERT(currIndex <= index);
-            vec.push_back(currLevel.back());
-        }
-        /*
-         * here we found the exact point to stop
-         */
-        if(currIndex == index) {
-            break;
-        }
+vector<ElementPtr> getCurrNodesByIndex(unsigned long index) {
+    vector<ElementPtr> ret;
+    if(index == 0) {
+        return ret;
+    }
 
-        if(vec.back()->funcs.size() == 0) {
-            break;
-        }
-        /*
-         * you need to get the correct currLevel
-         */
-        pushed = false;
-        for(unsigned j = 0; j < vec.back()->funcs.size() - 1; j++) {
-            currIndex = getIndex(vec.back()->funcs[j].front());
-            nextIndex = getIndex(vec.back()->funcs[j + 1].front());
-            if(currIndex <= index && index < nextIndex) {
-                currLevel = vec.back()->funcs[j];
-                pushed = true;
-                break;
-            }
-        }
-        if(pushed == false) {
-            currIndex = getIndex(vec.back()->funcs.back().front());
-            MPI_ASSERT(currIndex <= index);
-            currLevel = vec.back()->funcs.back();
+    vector<ElementPtr> *curr;
+    vector<vector<string>> *raw;
+
+    curr = &recordTraces;
+    raw = &recordTracesRaw;
+
+    unsigned long i = 0;
+    while(i < index && i < raw->size()) {
+        i++;
+    }
+
+    if(i == 0 || i >= raw->size()) {
+        return ret;
+    }
+
+    string functionName = (*raw)[i-1][0];
+    for(auto& e : *curr) {
+        if(e->funcname == functionName) {
+            ret.push_back(e);
         }
     }
-    return vec;
 
+    return ret;
 }
 
 /*
@@ -1920,7 +1928,7 @@ vector<shared_ptr<element>> getCurrNodesByIndex(unsigned long index) {
  * which makes no sense
  */
 size_t getIndexFromDeque(deque<shared_ptr<lastaligned>>& q) {
-    shared_ptr<element> eptr = nullptr;
+    ElementPtr eptr = nullptr;
     auto currTrace = recordTraces;
     cerr << "recordTraces.size(): " << recordTraces.size() << endl;
     for(auto i = q.size() - 1; 0 <= i; i--) {

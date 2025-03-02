@@ -1,46 +1,51 @@
+#ifndef ALIGNMENT_UTILS_H
+#define ALIGNMENT_UTILS_H
 
-#pragma once
+#include <vector>
+#include <stack>
+#include <string>
+#include <limits>
 
-#include "alignment.h"
-
-class element;
+// 修改前向声明 - 只声明结构不使用实际类型
+struct loopNode;
+class ElementPtr;
 
 void insertIterationsAndFixStack(
-        std::vector<std::shared_ptr<element>> &iterations,
-        std::stack<std::shared_ptr<element>> &stack,
-        std::shared_ptr<element> &curr,
-        std::shared_ptr<element> &parent,
-        std::vector<std::shared_ptr<element>> &functionalTraces);
+        std::vector<ElementPtr>& iterations,
+        std::stack<ElementPtr>& stack,
+        ElementPtr& curr,
+        ElementPtr& parent,
+        std::vector<ElementPtr>& functionalTraces);
 
 void insertIterations(
-        std::vector<std::shared_ptr<element>> &iterations,
-        std::shared_ptr<element> &parent,
-        std::vector<std::shared_ptr<element>> &functionalTraces);
+        std::vector<ElementPtr>& iterations,
+        ElementPtr& parent,
+        std::vector<ElementPtr>& functionalTraces);
 
 void levelUpStack(
-        std::stack<std::shared_ptr<element>> &stack,
-        std::shared_ptr<element> &curr,
-        std::shared_ptr<element> &parent);
+        std::stack<ElementPtr>& stack,
+        ElementPtr& curr,
+        ElementPtr& parent);
 
 void fixIterations(
-        std::vector<std::shared_ptr<element>>& functionalTraces,
-        std::shared_ptr<element> newChild);
+        std::vector<ElementPtr>& functionalTraces,
+        ElementPtr newChild);
 
 bool isLoopEntry(
-        std::string bbname, 
-        std::shared_ptr<element> parent, 
-        loopNode *currloop);
+        std::string bbname,
+        ElementPtr parent,
+        struct loopNode *currloop);
 
 void print(
-        std::vector<std::shared_ptr<element>>& functionalTraces, 
+        std::vector<ElementPtr>& functionalTraces,
         unsigned depth);
- 
+
 void printsurface(
-        std::vector<std::shared_ptr<element>>& functionalTraces);
+        std::vector<ElementPtr>& functionalTraces);
 
 void printSurfaceFunc(
-        std::vector<std::shared_ptr<element>>& functionalTraces,
-        unsigned depth, 
+        std::vector<ElementPtr>& functionalTraces,
+        unsigned depth,
         std::string funcName = "");
 
- 
+#endif // ALIGNMENT_UTILS_H
