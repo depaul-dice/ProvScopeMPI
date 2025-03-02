@@ -62,29 +62,36 @@ void levelUpStack(
 void fixIterations(
         vector<shared_ptr<element>>& functionalTraces,
         shared_ptr<element> newChild) {
-    if(functionalTraces.size() == 0) {
+    if(functionalTraces.empty()) {
         return;
     }
-    if(functionalTraces.back()->bb() == newChild->bb() 
-            && functionalTraces.back()->isLoop == false
+
+    // preallocate the required capacity
+    if(functionalTraces.capacity() < functionalTraces.size() + 1) {
+        functionalTraces.reserve(functionalTraces.size() * 2);
+    }
+
+    shared_ptr<element> lastChild = functionalTraces.back();
+    if(lastChild->bb() == newChild->bb()
+            && lastChild->isLoop == false
             && newChild->isLoop == false) {
-        if(functionalTraces.back()->loopIndex == -1) {
-            functionalTraces.back()->loopIndex = 1;
+        if(lastChild->loopIndex == -1) {
+            lastChild->loopIndex = 1;
             newChild->loopIndex = 2;
         } else {
-            newChild->loopIndex = functionalTraces.back()->loopIndex + 1;
+            newChild->loopIndex = lastChild->loopIndex + 1;
         }
-    } 
+    }
 }
 
 /*
  * checks if the bbname is the entry of the loop with parent's node
  */
 bool isLoopEntry(
-        string bbname, 
-        shared_ptr<element> parent, 
+        string bbname,
+        shared_ptr<element> parent,
         loopNode *currloop) {
-    string parentbb;     
+    string parentbb;
     if(parent == nullptr) return false;
     if(parent->isEntry) {
         MPI_EQUAL(parent->isExit, false);
@@ -94,25 +101,25 @@ bool isLoopEntry(
     } else {
         parentbb = parent->funcname + ":neither:" + to_string(parent->id);
     }
-    return parent->isLoop 
-        && parentbb == bbname 
-        && currloop->nodes.size() > 0 
+    return parent->isLoop
+        && parentbb == bbname
+        && currloop->nodes.size() > 0
         && bbname == currloop->entry;
 }
 
 void print(
-        vector<shared_ptr<element>>& functionalTraces, 
+        vector<shared_ptr<element>>& functionalTraces,
         unsigned depth) {
     for(auto& eptr : functionalTraces) {
         for(unsigned i = 0; i < depth; i++) {
-            fprintf(stderr, "\t"); 
+            fprintf(stderr, "\t");
         }
         if(eptr->index != numeric_limits<unsigned long>::max()) {
             if(eptr->isLoop) {
-                fprintf(stderr, "%s:%lu\n", 
+                fprintf(stderr, "%s:%lu\n",
                         eptr->bb().c_str(), eptr->index);
             } else {
-                fprintf(stderr, "%s:%lu\n", 
+                fprintf(stderr, "%s:%lu\n",
                         eptr->bb().c_str(), eptr->index);
             }
         } else {
@@ -134,7 +141,7 @@ void printsurface(
 
 void printSurfaceFunc(
         vector<shared_ptr<element>>& functionalTraces,
-        unsigned depth, 
+        unsigned depth,
         string funcName) {
     for(auto& eptr : functionalTraces) {
         if(eptr->funcname == funcName

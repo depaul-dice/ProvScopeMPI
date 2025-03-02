@@ -60,28 +60,24 @@ void close_debugfile() {
 // }
 
 
-vector<string> parse(const string& line, char delimit) {
-    size_t count = 0;
-    for(size_t i = 0; i < line.size(); ++i) {
-        if(line[i] == delimit) {
-            ++count;
-        }
-    }
-
-    vector<string> res;
-    res.reserve(count + 1);
+std::vector<std::string> parse(const std::string& s, char delimiter) {
+    // preallocate a reasonable size, adjust according to actual usage
+    std::vector<std::string> result;
+    result.reserve(8);
 
     size_t start = 0;
-    for(size_t i = 0; i < line.size(); ++i) {
-        if(line[i] == delimit) {
-            res.emplace_back(line.substr(start, i - start));
-            start = i + 1;
-        }
+    size_t end = s.find(delimiter);
+
+    while (end != std::string::npos) {
+        result.push_back(s.substr(start, end - start));
+        start = end + 1;
+        end = s.find(delimiter, start);
     }
 
-    res.emplace_back(line.substr(start));
+    // 添加最后一段
+    result.push_back(s.substr(start));
 
-    return res;
+    return result;
 }
 
 int lookahead(vector<string>& orders, unsigned start, string& request) {

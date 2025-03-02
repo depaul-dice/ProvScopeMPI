@@ -28,10 +28,10 @@ const unordered_set<string> mpiCallsWithSendNodesAtLast = {
 };
 
 void optimizeVectorAllocation() {
-    recordTracesRaw.reserve(10000);
-    recordTraces.reserve(5000);
-    replayTracesRaw.reserve(10000);
-    replayTraces.reserve(5000);
+    recordTracesRaw.reserve(20000);
+    recordTraces.reserve(10000);
+    replayTracesRaw.reserve(20000);
+    replayTraces.reserve(10000);
 }
 
 namespace {
@@ -181,12 +181,14 @@ ostream& operator<<(ostream& os, const lastaligned& l) {
     return os;
 }
 
+// optimize 3: improve makeBBName function, reduce memory allocation
 string makeBBName(const vector<vector<string>>& traces, size_t idx) {
+    // precompute string length, allocate memory once
     size_t totalLen = traces[idx][0].length() + traces[idx][1].length() +
                       traces[idx][2].length() + 2;
 
     string result;
-    result.reserve(totalLen);
+    result.reserve(totalLen);  // preallocate enough space
     result.append(traces[idx][0]);
     result.push_back(':');
     result.append(traces[idx][1]);
@@ -574,6 +576,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
 vector<shared_ptr<element>> makeHierarchy(
         vector<vector<string>>& traces, unsigned long& index) {
     vector<shared_ptr<element>> functionalTraces;
+    functionalTraces.reserve(100);
     bool isEntry, isExit;
     string bbname, funcname;
     funcname = traces[index][0];
@@ -605,8 +608,16 @@ vector<shared_ptr<element>> makeHierarchy(
         while(!isExit
                 && index < traces.size()
                 && traces[index][1] == "entry") {
-            eptr->funcs.push_back(
-                    makeHierarchy(traces, index));
+           vector<shared_ptr<element>> childTraces = makeHierarchy(traces, index);
+            // preallocate enough space
+            if(eptr->funcs.empty()) {
+                eptr->funcs.push_back(vector<shared_ptr<element>>());
+                eptr->funcs.back().reserve(childTraces.size());
+            }
+            eptr->funcs.back().insert(
+                    eptr->funcs.back().end(),
+                    childTraces.begin(),
+                    childTraces.end());
         }
         fixIterations(functionalTraces, eptr);
         functionalTraces.push_back(eptr);
