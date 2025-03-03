@@ -502,7 +502,6 @@ vector<shared_ptr<element>> makeHierarchyMain(
         if((child = isNewLoop(bbnameTmp, loopTree)) != nullptr) {
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
                     traces, 
-                    tracesTmp,
                     index, 
                     loopTrees, 
                     child);
@@ -614,6 +613,7 @@ vector<shared_ptr<element>> makeHierarchy(
 void addHierarchy(
         vector<shared_ptr<element>>& functionalTraces, 
         vector<vector<string>>& traces, 
+        vector<const char *>& tracesTmp,
         unsigned long& index, 
         unordered_map<string, loopNode *>& loopTrees) {
     int rank;
@@ -997,6 +997,7 @@ void appendReplayTrace(
         addHierarchy(
                 replayTraces, 
                 replayTracesRaw, 
+                replayTracesRawTmp,
                 index, 
                 loopTrees);
     }
@@ -1024,6 +1025,7 @@ void appendTraces(
         addHierarchy(
                 traces, 
                 rawTraces, 
+                rawTracesTmp,
                 index, 
                 loopTrees);
     }
