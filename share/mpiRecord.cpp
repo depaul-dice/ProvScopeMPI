@@ -38,6 +38,9 @@ extern vector<const char *> recordTracesTmp;
 extern vector<shared_ptr<element>> recordTraces;
 
 #define RECORDTRACE(...)
+
+#else
+#define RECORDTRACE(...)
 #endif
 double writeTime = 0.0;
 double appendRecordTime = 0.0;
@@ -62,7 +65,7 @@ extern "C" void printBBname(const char *name) {
                 nodecnt++);
         auto tok = MPI_Wtime();
         // avoid reallocations
-        appendRecordTracesRaw(parse(name, ':'));
+        /* appendRecordTracesRaw(parse(name, ':')); */
         double tok2 = MPI_Wtime();
         appendRecordTracesRaw(name);
         double tok3 = MPI_Wtime();

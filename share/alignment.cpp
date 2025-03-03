@@ -80,9 +80,9 @@ element::element(
         string& funcname, 
         unsigned long index, 
         bool isLoop) :
+    index(index), 
     funcs(vector<vector<shared_ptr<element>>>()), 
     funcname(funcname), 
-    index(index), 
     id(id), 
     isEntry(false), 
     isExit(false), 
@@ -302,7 +302,7 @@ vector<shared_ptr<element>> makeHierarchyLoop(
                     loops.begin(), 
                     loops.end());
         } else {       
-            if(traces[index].size() == 4) {
+            if(currTrace.size() == 4) {
                 eptr = make_shared<element>(
                         isEntry, 
                         isExit, 
@@ -368,6 +368,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
     MPI_EQUAL(entryinfo[0], funcname);
     int entryindex = stoi(entryinfo[2]);
 
+    /* cerr << "option 1\n"; */
     /* MPI_ASSERT(traces.size() == tracesTmp.size()); */
     while (isExit == false
             /* && index < traces.size()) { */
@@ -387,12 +388,14 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
         isEntry = (currTrace[1] == "entry");
         /* isExit = (traces[index][1] == "exit"); */
         isExit = (currTrace[1] == "exit");
+        /* cerr << "option 2" << bbname << endl; */
 
         /* 
          * case 1: if we are in the inner loop, 
          * recursively call the function
          */
         if((child = isNewLoop(bbname, currloop)) != nullptr) {
+            /* cerr << "option 3\n"; */
             /* DEBUG0("printing bbname: %s\n", bbname.c_str()); */
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
                     traces, 
@@ -411,6 +414,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
          * we should return what we have so far
          */
         } else if(currloop->nodes.find(bbname) == currloop->nodes.end()) {
+            /* cerr << "option 4\n"; */
             eptr = make_shared<element>(
                     entryindex, 
                     funcname, 
@@ -426,6 +430,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
          */
         } else if(curriter.size() > 0 
                 && bbname == currloop->entry) {
+            /* cerr << "option 5\n"; */
             eptr = make_shared<element>(
                     entryindex, 
                     funcname, 
@@ -435,10 +440,11 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
             fixIterations(iterations, eptr);
             iterations.push_back(eptr);
         }
+        /* cerr << "option 6\n"; */
         /* 
          * else
          */
-        if(traces[index].size() == 4) {
+        if(currTrace.size() == 4) {
             eptr = make_shared<element>(
                     isEntry, 
                     isExit, 
@@ -458,6 +464,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
                     currTrace[0]);
                     
         }
+        /* cerr << "option 7\n"; */
 
         fixIterations(curriter, eptr);
         curriter.push_back(eptr);
@@ -468,6 +475,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
         if(index >= tracesTmp.size()) {
             break;
         }
+        /* cerr << " option 8\n"; */
 
         while(isExit == false 
                 /* && index < traces.size() */ 
@@ -524,7 +532,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
      * in case there are some nodes that is before main, 
      * just ignore
      */
-    MPI_EQUAL(traces.size(), tracesTmp.size());
+    /* MPI_EQUAL(traces.size(), tracesTmp.size()); */
     auto currTrace = parse(tracesTmp[index], ':');
     /* while(index < traces.size() */ 
     while(index < tracesTmp.size()
@@ -722,7 +730,7 @@ void addHierarchy(
     auto currTrace = parse(tracesTmp[index], ':');
 
     /* while(index < traces.size()) { */
-    MPI_ASSERT(traces.size() == tracesTmp.size());
+    /* MPI_ASSERT(traces.size() == tracesTmp.size()); */
     while(index < tracesTmp.size()) {
         /* 
          * if we are at the entry of a new function 
