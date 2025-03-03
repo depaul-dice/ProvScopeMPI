@@ -35,6 +35,7 @@ const unordered_set<string> mpiCallsWithSendNodesAtLast = {
  */
 vector<shared_ptr<element>> __makeHierarchyLoop(
         vector<vector<string>>& traces, 
+        vector<const char *>& tracesTmp,
         unsigned long& index, 
         unordered_map<string, loopNode *>& loopTrees, 
         loopNode *currloop,
@@ -243,6 +244,7 @@ static loopNode *isNewLoop(
 
 vector<shared_ptr<element>> makeHierarchyLoop(
         vector<vector<string>>& traces, 
+        vector<const char *>& tracesTmp,
         unsigned long& index, 
         unordered_map<string, loopNode *>& loopTrees)  {
     vector<shared_ptr<element>> functionalTraces;
@@ -250,6 +252,7 @@ vector<shared_ptr<element>> makeHierarchyLoop(
     bool isEntry = false, 
          isExit = false;
     string bbname, funcname = traces[index][0];
+    
     loopNode *currloop = nullptr, 
              *child = nullptr;
     int iterationcnt = 1;
@@ -277,6 +280,7 @@ vector<shared_ptr<element>> makeHierarchyLoop(
         if((child = isNewLoop(bbname, currloop)) != nullptr) {
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
                         traces, 
+                        tracesTmp,
                         index, 
                         loopTrees, 
                         child);
@@ -307,6 +311,7 @@ vector<shared_ptr<element>> makeHierarchyLoop(
                 eptr->funcs.push_back(
                         makeHierarchyLoop(
                             traces, 
+                            tracesTmp,
                             index, 
                             loopTrees)); 
             }
@@ -320,6 +325,7 @@ vector<shared_ptr<element>> makeHierarchyLoop(
 
 vector<shared_ptr<element>> __makeHierarchyLoop(
         vector<vector<string>>& traces, 
+        vector<const char *>& tracesTmp,
         unsigned long& index, 
         unordered_map<string, loopNode *>& loopTrees, 
         loopNode *currloop,
@@ -355,6 +361,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
             /* DEBUG0("printing bbname: %s\n", bbname.c_str()); */
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
                     traces, 
+                    tracesTmp,
                     index, 
                     loopTrees, 
                     child);
@@ -424,6 +431,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
             eptr->funcs.push_back(
                     makeHierarchyLoop(
                         traces, 
+                        tracesTmp,
                         index, 
                         loopTrees)); 
         }
@@ -502,6 +510,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
         if((child = isNewLoop(bbnameTmp, loopTree)) != nullptr) {
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
                     traces, 
+                    tracesTmp,
                     index, 
                     loopTrees, 
                     child);
@@ -548,6 +557,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
             eptr->funcs.push_back(
                     makeHierarchyLoop(
                         traces, 
+                        tracesTmp,
                         index, 
                         loopTrees));
         }
@@ -682,6 +692,7 @@ void addHierarchy(
             curr->funcs.push_back(
                     makeHierarchyLoop(
                         traces, 
+                        tracesTmp,
                         index, 
                         loopTrees));
         }
@@ -692,7 +703,7 @@ void addHierarchy(
         /* MPI_ASSERT(traces[index].size() > 0); */
         MPI_ASSERT(currTrace.size() > 0);
         /* string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; */ 
-        string bb = tracesTmp[index];
+        const char* bb = tracesTmp[index];
         
         /* 
          * we need to think of two cases in case we are in the entry node of a current loop 
@@ -716,6 +727,7 @@ void addHierarchy(
             vector<shared_ptr<element>> iterations = 
                 __makeHierarchyLoop(
                         traces, 
+                        tracesTmp,
                         index, 
                         loopTrees, 
                         currloop,
@@ -765,6 +777,7 @@ void addHierarchy(
             vector<shared_ptr<element>> loops 
                 = __makeHierarchyLoop(
                         traces, 
+                        tracesTmp,
                         index, 
                         loopTrees, 
                         tmploop);
@@ -946,6 +959,7 @@ void addHierarchy(
                     MPI_ASSERT(parent->bb() == currloop->entry + ":loop");
                     auto loopIterations = __makeHierarchyLoop(
                             traces, 
+                            tracesTmp,
                             index, 
                             loopTrees, 
                             currloop,
