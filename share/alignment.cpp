@@ -664,26 +664,35 @@ void addHierarchy(
             != nullptr) {
         currloop = tmploop;
     }
+    auto currTrace = parse(tracesTmp[index], ':');
 
-    while(index < traces.size()) {
+    /* while(index < traces.size()) { */
+    MPI_ASSERT(traces.size() == tracesTmp.size());
+    while(index < tracesTmp.size()) {
         /* 
          * if we are at the entry of a new function 
          * (we assume that there's no loop to the entry here),
          * we need to make a hierarchy of the new function
          */
-        while(index < traces.size() 
-                && traces[index][1] == "entry") {
+        /* while(index < traces.size() */ 
+                /* && traces[index][1] == "entry") { */
+        while(index < tracesTmp.size()
+                && parse(tracesTmp[index], ':')[1] == "entry") {
+            currTrace = parse(tracesTmp[index], ':');
             curr->funcs.push_back(
                     makeHierarchyLoop(
                         traces, 
                         index, 
                         loopTrees));
         }
-        if(index >= traces.size()) {
+        /* if(index >= traces.size()) { */
+        if(index >= tracesTmp.size()) {
             break;
         }
-        MPI_ASSERT(traces[index].size() > 0);
-        string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; 
+        /* MPI_ASSERT(traces[index].size() > 0); */
+        MPI_ASSERT(currTrace.size() > 0);
+        /* string bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; */ 
+        string bb = tracesTmp[index];
         
         /* 
          * we need to think of two cases in case we are in the entry node of a current loop 
@@ -727,11 +736,16 @@ void addHierarchy(
             currloop = currloop->parent;
         }
 
-        if(index >= traces.size()) break;
+        /* if(index >= traces.size()) break; */
+        if(index >= tracesTmp.size()) break;
 
-        bb = traces[index][0] 
-            + ":" + traces[index][1] 
-            + ":" + traces[index][2];
+        /* bb = traces[index][0] */ 
+        /*     + ":" + traces[index][1] */ 
+        /*     + ":" + traces[index][2]; */
+        currTrace = parse(tracesTmp[index], ':');
+        bb = tracesTmp[index];
+        /* MPI_ASSERT(bb == tracesTmp[index]); */
+
         /*
          * we assert that current loop node has some nodes in it, or a dummy loop node
          */
@@ -759,17 +773,22 @@ void addHierarchy(
                     parent,
                     functionalTraces);
 
-            if(index >= traces.size()) break;
-            bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+            /* if(index >= traces.size()) break; */
+            if(index >= tracesTmp.size()) break;
+            /* bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; */
+            /* MPI_ASSERT(bb == tracesTmp[index]); */
+            bb = tracesTmp[index];
         }
 
-        if(index >= traces.size()) break;
+        /* if(index >= traces.size()) break; */
+        if(index >= tracesTmp.size()) break;
         /*
          * the node cannot be an entry, 
          * because if it is, we should be at the beginning of 
          * this function
          */
-        MPI_ASSERT(traces[index][1] != "entry");
+        /* MPI_ASSERT(traces[index][1] != "entry"); */
+        MPI_ASSERT(parse(tracesTmp[index], ':')[1] != "entry");
         /* 
          * here we check if we are getting out of this loop
          * while we are, we need to update the currloop 
@@ -795,22 +814,35 @@ void addHierarchy(
         /*
          * we create a new element here
          */
-        if(traces[index].size() == 3) {
+        /* if(traces[index].size() == 3) { */
+        currTrace = parse(tracesTmp[index], ':');
+        if(currTrace.size() == 3) {
             newchild = make_shared<element>(
-                    traces[index][1] == "entry", 
-                    traces[index][1] == "exit", 
-                    stoi(traces[index][2]), 
-                    traces[index][0]);
+                    /* traces[index][1] == "entry", */ 
+                    currTrace[1] == "entry",
+                    /* traces[index][1] == "exit", */ 
+                    currTrace[1] == "exit",
+                    /* stoi(traces[index][2]), */ 
+                    stoi(currTrace[2]),
+                    /* traces[index][0]); */
+                    currTrace[0]);
         } else {
-            MPI_ASSERT(traces[index].size() == 4);
+            /* MPI_ASSERT(traces[index].size() == 4); */
+            MPI_ASSERT(currTrace.size() == 4);
             newchild = make_shared<element>(
-                    traces[index][1] == "entry", 
-                    traces[index][1] == "exit", 
-                    stoi(traces[index][2]), 
-                    traces[index][0], 
-                    stoul(traces[index][3]));
+                    /* traces[index][1] == "entry", */ 
+                    currTrace[1] == "entry",
+                    /* traces[index][1] == "exit", */ 
+                    currTrace[1] == "exit",
+                    /* stoi(traces[index][2]), */ 
+                    stoi(currTrace[2]),
+                    /* traces[index][0], */ 
+                    currTrace[0],
+                    /* stoul(traces[index][3])); */
+                    stoul(currTrace[3]));
         }
-        MPI_EQUAL(traces[index][0], curr->funcname);
+        /* MPI_EQUAL(traces[index][0], curr->funcname); */
+        MPI_EQUAL(currTrace[0], curr->funcname);
         index++;
     
         if(parent != nullptr) {
@@ -843,7 +875,8 @@ void addHierarchy(
          * just add a condition || and add the condition 
          * of the end of the loop
          */
-        if(index >= traces.size()) {
+        /* if(index >= traces.size()) { */
+        if(index >= tracesTmp.size()) {
             break;
         }
      
@@ -852,7 +885,8 @@ void addHierarchy(
          * we try to break with a code block before 
          * in case we don't have one anymore
          */
-        bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2];
+        /* bb = traces[index][0] + ":" + traces[index][1] + ":" + traces[index][2]; */
+        bb = tracesTmp[index];
         /* if(rank == 1 && bb == "hypre_PFMGSolve:neither:27") { */
         /*     cerr << "option 6" << endl; */
         /*     cerr << "index: " << index << endl; */
@@ -865,7 +899,9 @@ void addHierarchy(
          * if the last node was an exit node, 
          * then we need to update the curr, parent, and stack
          */
-        if(traces[index - 1][1] == "exit") {
+        auto prevTrace = parse(tracesTmp[index - 1], ':');
+        /* if(traces[index - 1][1] == "exit") { */
+        if(prevTrace[1] == "exit") {
             if(parent == nullptr) {
                 /* 
                  * if we don't have a parent anymore, 
@@ -874,7 +910,8 @@ void addHierarchy(
                  * and we should not have anymore nodes 
                  * to be recorded
                  */
-                MPI_ASSERT(traces[index - 1][0] == "main");
+                /* MPI_ASSERT(traces[index - 1][0] == "main"); */
+                MPI_ASSERT(prevTrace[0] == "main");
                 break;
             } else {
                 levelUpStack(
