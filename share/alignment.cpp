@@ -465,62 +465,87 @@ vector<shared_ptr<element>> makeHierarchyMain(
     loopNode *loopTree = loopTrees[mainname], 
              *child = nullptr;
     string bbname;
+    const char *bbnameTmp;
     /*
      * in case there are some nodes that is before main, 
      * just ignore
      */
-    while(index < traces.size() 
-            && mainname != traces[index][0]) {
+    MPI_EQUAL(traces.size(), tracesTmp.size());
+    auto currTrace = parse(tracesTmp[index], ':');
+    /* while(index < traces.size() */ 
+    while(index < tracesTmp.size()
+            /* && mainname != traces[index][0]) { */
+            && mainname != currTrace[0]) {
         index++;
     }
     while(!isExit 
-            && index < traces.size()) {
-        MPI_EQUAL(traces[index][0], mainname);
-        MPI_ASSERT(traces[index].size() == 3 
-                || traces[index].size() == 4);
+            /* && index < traces.size()) { */
+            && index < tracesTmp.size()) {
+        currTrace = parse(tracesTmp[index], ':');
+        /* MPI_EQUAL(traces[index][0], mainname); */
+        MPI_EQUAL(currTrace[0], mainname);
+        /* MPI_ASSERT(traces[index].size() == 3 */ 
+        /*         || traces[index].size() == 4); */
+        MPI_ASSERT(currTrace.size() == 3 
+                || currTrace.size() == 4);
         bbname = traces[index][0] + ":" 
             + traces[index][1] + ":" 
             + traces[index][2];
-        MPI_EQUAL(bbname, tracesTmp[index]);
+        bbnameTmp = tracesTmp[index];
+        /* MPI_EQUAL(bbname, tracesTmp[index]); */
 
         /*
          * this returns the ptr of a child that has bbname in it
          * if none, then it returns nullptr
          */
-        if((child = isNewLoop(bbname, loopTree)) != nullptr) {
+        /* if((child = isNewLoop(bbname, loopTree)) != nullptr) { */
+        if((child = isNewLoop(bbnameTmp, loopTree)) != nullptr) {
             vector<shared_ptr<element>> loops = __makeHierarchyLoop(
                     traces, 
+                    tracesTmp,
                     index, 
                     loopTrees, 
                     child);
+            currTrace =  parse(tracesTmp[index], ':');
             functionalTraces.insert(
                     functionalTraces.end(), 
                     loops.begin(), 
                     loops.end());
             continue;
         }
-        isEntry = (traces[index][1] == "entry");
-        isExit = (traces[index][1] == "exit");
+        /* isEntry = (traces[index][1] == "entry"); */
+        isEntry = (currTrace[1] == "entry");
+        /* isExit = (traces[index][1] == "exit"); */
+        isExit = (currTrace[1] == "exit");
         shared_ptr<element> eptr;
-        if(traces[index].size() == 4) {
+        /* if(traces[index].size() == 4) { */
+        if(currTrace.size() == 4) {
             eptr = make_shared<element>(
                     isEntry, 
                     isExit, 
-                    stoi(traces[index][2]), 
-                    traces[index][0], 
-                    stoul(traces[index][3]));
+                    /* stoi(traces[index][2]), */ 
+                    stoi(currTrace[2]),
+                    /* traces[index][0], */ 
+                    currTrace[0],
+                    /* stoul(traces[index][3])); */
+                    stoul(currTrace[3]));
         } else {
             eptr = make_shared<element>(
                     isEntry, 
                     isExit, 
-                    stoi(traces[index][2]), 
-                    traces[index][0]);
+                    /* stoi(traces[index][2]), */ 
+                    stoi(currTrace[2]),
+                    /* traces[index][0]); */
+                    currTrace[0]);
         }
         index++;
 
         while(!isExit 
-                && index < traces.size() 
-                && traces[index][1] == "entry") {
+                /* && index < traces.size() */ 
+                && index < tracesTmp.size()
+                /* && traces[index][1] == "entry") { */
+                && parse(tracesTmp[index], ':')[1] == "entry") {
+            currTrace = parse(tracesTmp[index], ':');
             eptr->funcs.push_back(
                     makeHierarchyLoop(
                         traces, 
