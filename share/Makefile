@@ -12,20 +12,20 @@ OBJS = $(SRCS:.cpp=.o)
 all: $(SHARED_LIB)
 
 libmpirecord.so: mpirecord.o tools.o 
-	$(CXX) -shared -fPIC -o $@ $^ $(LD_FLAGS)
+	$(CXX) -shared -fPIC -O3 -o $@ $^ $(LD_FLAGS)
 
 # libmpireplay.so: mpireplay.o tools.o alignment.o
 	# $(CXX) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS)
 
 libmpireproduce.so: mpireproduce.o tools.o alignment.o loops.o
-	$(CXX) -shared -fPIC -g -DDEBUG_MODE -o $@ $^ $(LD_FLAGS_LT)
+	$(CXX) -shared -fPIC -O3 -o $@ $^ $(LD_FLAGS_LT)
 
 # Explicit rule for loops.o
 loops.o: loops.cpp loops.h
-	$(CXX) -c -fPIC -g -DDEBUG_MODE -I/usr/include/graphviz -o $@ $<
+	$(CXX) -c -fPIC -I/usr/include/graphviz -O3 -o $@ $<
 
 %.o: %.cpp
-	$(CXX) -c -fPIC -g -DDEBUG_MODE -o $@ $<
+	$(CXX) -c -fPIC -O3 -o $@ $<
 
 clean:
 	rm -f *.o $(SHARED_LIB)

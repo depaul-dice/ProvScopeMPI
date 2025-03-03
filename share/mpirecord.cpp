@@ -13,6 +13,8 @@ static unsigned long nodecnt = 0;
     /* fprintf(recordtraceFile, __VA_ARGS__); \ */
 /* #else */
 #define RECORDTRACE(...)
+#else 
+#define RECORDTRACE(...)
 #endif
 
 
