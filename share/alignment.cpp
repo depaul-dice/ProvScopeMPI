@@ -251,27 +251,40 @@ vector<shared_ptr<element>> makeHierarchyLoop(
     shared_ptr<element> eptr;
     bool isEntry = false, 
          isExit = false;
-    string bbname, funcname = traces[index][0];
+    /* string bbname, funcname = traces[index][0]; */
+    string bbname;
+    auto currTrace = parse(tracesTmp[index], ':');
+    string funcname = currTrace[0];
     
     loopNode *currloop = nullptr, 
              *child = nullptr;
     int iterationcnt = 1;
 
     // here we are getting the entry 
-    MPI_EQUAL(traces[index][1], "entry");
+    /* MPI_EQUAL(traces[index][1], "entry"); */
+    MPI_EQUAL(currTrace[1], "entry");
     currloop = loopTrees[funcname];
 
     while (!isExit 
-            && index < traces.size()) {
-        MPI_ASSERT(index < traces.size());
-        bbname = traces[index][0] 
-            + ":" + traces[index][1] 
-            + ":" + traces[index][2];
-        MPI_EQUAL(traces[index][0], funcname);
-        MPI_ASSERT(traces[index].size() == 3 
-                || traces[index].size() == 4);
-        isEntry = (traces[index][1] == "entry");
-        isExit = (traces[index][1] == "exit");
+            /* && index < traces.size()) { */
+            && index < tracesTmp.size()) {
+        /* MPI_ASSERT(index < traces.size()); */
+        MPI_ASSERT(index < tracesTmp.size());
+        /* bbname = traces[index][0] */ 
+        /*     + ":" + traces[index][1] */ 
+        /*     + ":" + traces[index][2]; */
+        bbname = tracesTmp[index];
+        currTrace = parse(bbname, ':');
+        /* MPI_EQUAL(traces[index][0], funcname); */
+        MPI_EQUAL(currTrace[0], funcname);
+        /* MPI_ASSERT(traces[index].size() == 3 */ 
+        /*         || traces[index].size() == 4); */
+        MPI_ASSERT(currTrace.size() == 3 
+                || currTrace.size() == 4);
+        /* isEntry = (traces[index][1] == "entry"); */
+        isEntry = (currTrace[1] == "entry");
+        /* isExit = (traces[index][1] == "exit"); */
+        isExit = (currTrace[1] == "exit");
 
         /* 
          * case 1: if we are in the inner loop, 
@@ -293,20 +306,27 @@ vector<shared_ptr<element>> makeHierarchyLoop(
                 eptr = make_shared<element>(
                         isEntry, 
                         isExit, 
-                        stoi(traces[index][2]), 
-                        traces[index][0], 
-                        stoul(traces[index][3]));
+                        /* stoi(traces[index][2]), */ 
+                        stoi(currTrace[2]),
+                        /* traces[index][0], */ 
+                        currTrace[0],
+                        /* stoul(traces[index][3])); */
+                        stoul(currTrace[3]));
             } else {
                 eptr = make_shared<element>(
                         isEntry, 
                         isExit, 
-                        stoi(traces[index][2]), 
-                        traces[index][0]);
+                        /* stoi(traces[index][2]), */ 
+                        stoi(currTrace[2]),
+                        /* traces[index][0]); */
+                        currTrace[0]);
             }
             index++;
             while(!isExit 
-                    && index < traces.size() 
-                    && traces[index][1] == "entry") {
+                    /* && index < traces.size() */ 
+                    && index < tracesTmp.size()
+                    /* && traces[index][1] == "entry") { */
+                    && (currTrace = parse(tracesTmp[index], ':'))[1] == "entry") {
 
                 eptr->funcs.push_back(
                         makeHierarchyLoop(
@@ -453,8 +473,7 @@ vector<shared_ptr<element>> __makeHierarchyLoop(
                 /* && index < traces.size() */ 
                 && index < tracesTmp.size()
                 /* && traces[index][1] == "entry") { */
-                && parse(tracesTmp[index], ':')[1] == "entry") {
-            currTrace = parse(tracesTmp[index], ':');
+                && (currTrace = parse(tracesTmp[index], ':'))[1] == "entry") {
             eptr->funcs.push_back(
                     makeHierarchyLoop(
                         traces, 
