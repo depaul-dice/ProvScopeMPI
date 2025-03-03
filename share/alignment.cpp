@@ -252,7 +252,7 @@ vector<shared_ptr<element>> makeHierarchyLoop(
     bool isEntry = false, 
          isExit = false;
     /* string bbname, funcname = traces[index][0]; */
-    string bbname;
+    const char *bbname;
     auto currTrace = parse(tracesTmp[index], ':');
     string funcname = currTrace[0];
     
@@ -518,7 +518,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
     MPI_ASSERT(loopTrees.find("main") != loopTrees.end());
     loopNode *loopTree = loopTrees[mainname], 
              *child = nullptr;
-    string bbname;
+    /* string bbname; */
     const char *bbnameTmp;
     /*
      * in case there are some nodes that is before main, 
@@ -542,9 +542,9 @@ vector<shared_ptr<element>> makeHierarchyMain(
         /*         || traces[index].size() == 4); */
         MPI_ASSERT(currTrace.size() == 3 
                 || currTrace.size() == 4);
-        bbname = traces[index][0] + ":" 
-            + traces[index][1] + ":" 
-            + traces[index][2];
+        /* bbname = traces[index][0] + ":" */ 
+            /* + traces[index][1] + ":" */ 
+            /* + traces[index][2]; */
         bbnameTmp = tracesTmp[index];
         /* MPI_EQUAL(bbname, tracesTmp[index]); */
 
@@ -598,8 +598,7 @@ vector<shared_ptr<element>> makeHierarchyMain(
                 /* && index < traces.size() */ 
                 && index < tracesTmp.size()
                 /* && traces[index][1] == "entry") { */
-                && parse(tracesTmp[index], ':')[1] == "entry") {
-            currTrace = parse(tracesTmp[index], ':');
+                && (currTrace = parse(tracesTmp[index], ':'))[1] == "entry") {
             eptr->funcs.push_back(
                     makeHierarchyLoop(
                         traces, 
